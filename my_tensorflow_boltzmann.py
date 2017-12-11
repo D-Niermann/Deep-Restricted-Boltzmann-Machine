@@ -12,7 +12,7 @@ if True:
 	from math import exp,sqrt,sin,pi,cos,log
 	np.set_printoptions(precision=3)
 	# plt.style.use('ggplot')
-	os.chdir("/Users/Niermann/Google Drive/Masterarbeit")
+	os.chdir("/Users/Niermann/Google Drive/Masterarbeit/Python")
 	from Logger import *
 	### import seaborn? ###
 	if 0:
@@ -38,6 +38,7 @@ if True:
 	log=Logger(True)
 	import tensorflow as tf
 from tensorflow.examples.tutorials.mnist import input_data
+
 
 #### Load MNIST Data 
 if "train_data" not in globals():
@@ -173,7 +174,7 @@ def tile_raster_images(X, img_shape, tile_shape, tile_spacing=(0, 0),scale_rows_
         return out_array
 
 def save(w=[],bias_v=[],bias_h=[]):
-	path="/Users/Niermann/Google Drive/Masterarbeit"
+	path="/Users/Niermann/Google Drive/Masterarbeit/Python"
 	os.chdir(path)
 	if len(w)!=0:
 		np.savetxt("weights.txt", w)
@@ -184,7 +185,7 @@ def save(w=[],bias_v=[],bias_h=[]):
 	print "saved weights and biases"
 
 def init_pretrained(w=None,bias_v=None,bias_h=None):
-	path="/Users/Niermann/Google Drive/Masterarbeit"
+	path="/Users/Niermann/Google Drive/Masterarbeit/Python"
 	os.chdir(path)
 	m=[]
 	if (w)!=None:
@@ -202,16 +203,16 @@ def init_pretrained(w=None,bias_v=None,bias_h=None):
 
 ################################################################################################################################################
 #### User Variables
-writer_on=False
-hidden_units=500
-visible_units=784
-batchsize=55000/550 # dividing by one will not work, at least 2 batches are required here
-epochs=1
-learnrate=1.
-save_to_file=0
-load_from_file=0
-training=1
-liveplot=1
+writer_on      = False
+hidden_units   = 500
+visible_units  = 784
+batchsize      = 55000/550 # dividing by one will not work, at least 2 batches are required here
+epochs         = 3
+learnrate      = 1.
+save_to_file   = 0
+load_from_file = 0
+training       = 1
+liveplot       = 0
 
 ################################################################################################################################################
 #### Graph
@@ -220,7 +221,7 @@ test_image=rnd.random([1,784])
 v       = tf.placeholder(tf.float32,[None,visible_units],name="Visible-Layer")
 # h       = tf.placeholder(tf.float32,[hidden_units,1],name="Hidden-Layer")
 
-w       = tf.Variable(tf.random_uniform([visible_units,hidden_units],minval=-1e-3,maxval=1e-3),name="Weights")
+w       = tf.Variable(tf.random_uniform([visible_units,hidden_units],minval=-1e-6,maxval=1e-6),name="Weights")
 bias_v  = tf.Variable(tf.zeros([visible_units]),name="Visible-Bias")
 bias_h  = tf.Variable(tf.zeros([hidden_units]),name="Hidden-Bias")
 
@@ -272,7 +273,7 @@ time_now = time.asctime()
 
 # define a figure for liveplotting
 if training and liveplot:
-	fig,ax=plt.subplots(1,3,figsize=(15,10))
+	fig,ax=plt.subplots(1,1,figsize=(15,10))
 
 # start the session
 with tf.Session() as sess:
@@ -296,15 +297,19 @@ with tf.Session() as sess:
 				#### #update the biases
 				ubh,ubv=sess.run([update_bias_h,update_bias_v],feed_dict={v:batch})
 
+
+				errors.append(error_i)
+
+
 				#### plot
 				if liveplot:
-					errors.append(error_i)
-					ax[0].cla()
-					ax[1].cla()
-					ax[2].cla()
+
+					ax.cla()
+					# ax[1].cla()
+					# ax[2].cla()
 					
 					matrix_new=tile_raster_images(X=w_i.T, img_shape=(28, 28), tile_shape=(10, 10), tile_spacing=(0,0))
-					ax[0].matshow(matrix_new)
+					ax.matshow(matrix_new)
 					# ax[1].plot(errors)
 					# ax[2].matshow(ubv.reshape(28,28))
 					plt.pause(0.00001)
@@ -314,25 +319,33 @@ with tf.Session() as sess:
 	#### Testing the network
 	rec=v_prob.eval({v:train_data[0:9]})
 
-print "Error:",error_i
+if training:
+	print "Error:",error_i
+	log.out("Learnrate:",learnrate)
 log.end()
+
 
 ####################################################################################################################################
 #### Plot
-plt.plot(errors)
-matrix_new=tile_raster_images(X=w_i.T, img_shape=(28, 28), tile_shape=(20, 20), tile_spacing=(0,0))
-mapp1=plt.matshow(w_i)
-plt.colorbar(mapp1)
-mapp2=plt.matshow(matrix_new)
-plt.colorbar(mapp2)
+# Plot the Weights, Errors and other informations
+if training:
+	plt.plot(errors)
+	matrix_new=tile_raster_images(X=w_i.T, img_shape=(28, 28), tile_shape=(20, 20), tile_spacing=(0,0))
+	mapp1=plt.matshow(w_i)
+	plt.colorbar(mapp1)
+	mapp2=plt.matshow(matrix_new)
+	plt.colorbar(mapp2)
+
+# Plot the Test Phase	
 fig3,ax3=plt.subplots(2,8,figsize=(16,4))
 for i in range(len(rec)-1):
 	# plot the input
 	ax3[0][i].matshow(train_data[i:i+1].reshape(28,28))
 	# plot the reconstructied image
 	ax3[1][i].matshow(rec[i:i+1].reshape(28,28))
+
 plt.show()
 
-
+# Savin to file
 if save_to_file:
 	save(w_i)
