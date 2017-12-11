@@ -265,10 +265,11 @@ update_bias_h = bias_h.assign(bias_h+learnrate/1000.*tf.reduce_mean(h-h_gibbs,0)
 
 ####################################################################################################################################
 #### Session ####
-log.start("Session")
+time_now = time.asctime()
+log.start("Session",time_now)
 
 errors=[]
-time_now = time.asctime()
+
 
 # define a figure for liveplotting
 if training and liveplot:
@@ -283,7 +284,7 @@ with tf.Session() as sess:
 
 	if training:
 		for epoch in range(epochs):
-			log.out("epoch:",epoch)
+			log.start("epoch:",epoch)
 		
 			for start, end in zip( range(0, len(train_data), batchsize), range(batchsize, len(train_data), batchsize)):
 				#### define a batch
@@ -313,7 +314,7 @@ with tf.Session() as sess:
 					# ax[2].matshow(ubv.reshape(28,28))
 					plt.pause(0.00001)
 
-	
+			log.end() #ending the epoch
 
 	#### Testing the network
 	probs=v_prob.eval({v:train_data[0:9]})
@@ -339,9 +340,6 @@ if training:
 	plt.matshow(weights_raster)
 	#plot the bias_v
 	map3=plt.matshow(ubv.reshape(28,28))
-	plt.colorbar(map3)
-	#plot the bias_h
-	map3=plt.matshow(ubh[0:484].reshape(22,22))
 	plt.colorbar(map3)
 
 # Plot the Test Phase	
