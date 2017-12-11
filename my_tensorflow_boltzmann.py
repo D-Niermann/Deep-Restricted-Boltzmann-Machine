@@ -206,9 +206,9 @@ def init_pretrained(w=None,bias_v=None,bias_h=None):
 writer_on      = False
 hidden_units   = 500
 visible_units  = 784
-batchsize      = 55000/550 # dividing by one will not work, at least 2 batches are required here
-epochs         = 3
-learnrate      = 10.
+batchsize      = 55000/100 # dividing by one will not work, at least 2 batches are required here
+epochs         = 1
+learnrate      = 1.
 save_to_file   = 0
 load_from_file = 0
 training       = 1
@@ -216,10 +216,8 @@ liveplot       = 1
 
 ################################################################################################################################################
 #### Graph
-#define each layer and the weight matrix w
+#### define each layer and the weight matrix w
 v       = tf.placeholder(tf.float32,[None,visible_units],name="Visible-Layer")
-
-
 w       = tf.Variable(tf.zeros([visible_units,hidden_units]),name="Weights")
 bias_v  = tf.Variable(tf.zeros([visible_units]),name="Visible-Bias")
 bias_h  = tf.Variable(tf.zeros([hidden_units]),name="Hidden-Bias")
@@ -227,7 +225,6 @@ bias_h  = tf.Variable(tf.zeros([hidden_units]),name="Hidden-Bias")
 
 # get the probabilities of the hidden units in 
 h_prob  = tf.nn.sigmoid(tf.matmul(v,w) + bias_h)
-
 # get the actual activations for h {0,1}
 h       = tf.nn.relu(
 	            tf.sign(
@@ -246,27 +243,27 @@ v_recon = tf.nn.relu(
 # now get the probabilities of h again from the reconstructed v_recon
 h_gibbs = tf.nn.sigmoid(tf.matmul(v_recon, w) + bias_h) 
 
-# define reconstruction error and the energy  
+##### define reconstruction error and the energy  
 # energy = -tf.reduce_sum(bias_v*v_recon)-tf.reduce_sum(bias_h*h)-tf.matmul(tf.matmul(h,tf.transpose(w)), v_recon)
 error  = tf.reduce_mean(tf.square(v-v_recon))
 
-# Training with Contrastive Divergence
+#### Training with Contrastive Divergence
 pos_grad  = tf.matmul(tf.transpose(v),h)
 neg_grad  = tf.matmul(tf.transpose(v_recon),h_gibbs)
-numpoints = tf.cast(tf.size(v),tf.float32)
+numpoints = tf.cast(tf.shape(v)[0],tf.float32) #number of train inputs per batch (for averaging the CD matrix??)
 # weight update
 CD       = (pos_grad - neg_grad)/numpoints
-w_delta  = tf.multiply(CD,learnrate)
-update_w = w.assign(w+w_delta)
+update_w = w.assign(w+learnrate*CD)
 #update bias
 """ warum hier reduce_mean(...,0)?? -> das gibt sogar einen vector mit shape (784,)"""
-update_bias_v = bias_v.assign(bias_v+learnrate/1000.*tf.reduce_mean(v-v_recon,0))
-update_bias_h = bias_h.assign(bias_h+learnrate/1000.*tf.reduce_mean(h-h_gibbs,0))
+update_bias_v = bias_v.assign(bias_v+learnrate*tf.reduce_mean(v-v_recon,0))
+update_bias_h = bias_h.assign(bias_h+learnrate*tf.reduce_mean(h-h_gibbs,0))
 
 ####################################################################################################################################
 #### Session ####
 time_now = time.asctime()
-log.start("Session",time_now)
+log.start("Session")
+log.info(time_now)
 
 errors=[]
 
@@ -285,7 +282,7 @@ with tf.Session() as sess:
 	if training:
 		for epoch in range(epochs):
 			log.start("epoch:",epoch)
-		
+			
 			for start, end in zip( range(0, len(train_data), batchsize), range(batchsize, len(train_data), batchsize)):
 				#### define a batch
 				batch = train_data[start:end]
@@ -303,7 +300,6 @@ with tf.Session() as sess:
 
 				#### plot
 				if liveplot:
-
 					ax.cla()
 					# ax[1].cla()
 					# ax[2].cla()
@@ -313,7 +309,9 @@ with tf.Session() as sess:
 					# ax[1].plot(errors)
 					# ax[2].matshow(ubv.reshape(28,28))
 					plt.pause(0.00001)
-
+			
+			print numpoints.eval({v:batch})
+			log.info("\tError",error_i)
 			log.end() #ending the epoch
 
 	#### Testing the network
