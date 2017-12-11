@@ -173,46 +173,33 @@ def tile_raster_images(X, img_shape, tile_shape, tile_spacing=(0, 0),scale_rows_
                     ] = this_img * c
         return out_array
 
-def save(w=[],bias_v=[],bias_h=[]):
+def save(name_extension, w=[],bias_v=[],bias_h=[]):
 	path="/Users/Niermann/Google Drive/Masterarbeit/Python"
 	os.chdir(path)
 	if len(w)!=0:
-		np.savetxt("weights.txt", w)
+		np.savetxt("weights-%s.txt"%name_extension, w)
 	if len(bias_v)!=0:
-		np.savetxt("bias_v.txt", bias_v)
+		np.savetxt("bias_v-%s.txt"%name_extension, bias_v)
 	if len(bias_h)!=0:
-		np.savetxt("bias_h.txt", bias_h)
+		np.savetxt("bias_h-%s.txt"%name_extension, bias_h)
 	print "saved weights and biases"
 
-def init_pretrained(w=None,bias_v=None,bias_h=None):
+def init_pretrained(name_extension="0.039389666",w=None,bias_v=None,bias_h=None):
 	path="/Users/Niermann/Google Drive/Masterarbeit/Python"
 	os.chdir(path)
 	m=[]
 	if (w)!=None:
-		w=np.loadtxt("weights.txt")
+		w=np.loadtxt("weights-%s.txt"%name_extension)
 		m.append(w)
 	if (bias_v)!=None:
-		bias_v=np.loadtxt("bias_v.txt")
+		bias_v=np.loadtxt("bias_v-%s.txt"%name_extension)
 		m.append(bias_v)
 	if (bias_h)!=None:
-		bias_h=np.loadtxt("bias_h.txt")
+		bias_h=np.loadtxt("bias_h-%s.txt"%name_extension)
 		m.append(bias_h)
 	print "loaded %s objects from file"%str(len(m))
 	return m
 
-
-################################################################################################################################################
-#### User Variables
-writer_on      = False
-hidden_units   = 500
-visible_units  = 784
-batchsize      = 55000/100 # dividing by one will not work, at least 2 batches are required here
-epochs         = 1
-learnrate      = 1.
-save_to_file   = 0
-load_from_file = 0
-training       = 1
-liveplot       = 1
 
 ################################################################################################################################################
 #### Graph
@@ -259,8 +246,24 @@ update_w = w.assign(w+learnrate*CD)
 update_bias_v = bias_v.assign(bias_v+learnrate*tf.reduce_mean(v-v_recon,0))
 update_bias_h = bias_h.assign(bias_h+learnrate*tf.reduce_mean(h-h_gibbs,0))
 
+
+################################################################################################################################################
+#### User Variables
+writer_on      = False
+hidden_units   = 500
+visible_units  = 784
+batchsize      = 55000/300 # dividing by one will not work, at least 2 batches are required here
+epochs         = 2
+learnrate      = 0.5
+save_to_file   = 0
+load_from_file = 0
+training       = 1
+liveplot       = 1
+
+
 ####################################################################################################################################
 #### Session ####
+log.reset()
 time_now = time.asctime()
 log.start("Session")
 log.info(time_now)
@@ -270,7 +273,7 @@ errors=[]
 
 # define a figure for liveplotting
 if training and liveplot:
-	fig,ax=plt.subplots(1,1,figsize=(15,10))
+	fig,ax=plt.subplots(1,2,figsize=(15,10))
 
 # start the session
 with tf.Session() as sess:
@@ -278,6 +281,8 @@ with tf.Session() as sess:
 	
 	if load_from_file:
 		sess.run(w.assign(init_pretrained(w=1)[0]))
+		sess.run(bias_v.assign(init_pretrained(bias_v=1)[0]))
+		sess.run(bias_h.assign(init_pretrained(bias_h=1)[0]))
 
 	if training:
 		for epoch in range(epochs):
@@ -300,17 +305,16 @@ with tf.Session() as sess:
 
 				#### plot
 				if liveplot:
-					ax.cla()
-					# ax[1].cla()
+					ax[0].cla()
+					ax[1].cla()
 					# ax[2].cla()
 					
 					matrix_new=tile_raster_images(X=w_i.T, img_shape=(28, 28), tile_shape=(10, 10), tile_spacing=(0,0))
-					ax.matshow(matrix_new)
-					# ax[1].plot(errors)
+					ax[0].matshow(matrix_new)
+					ax[1].plot(errors)
 					# ax[2].matshow(ubv.reshape(28,28))
 					plt.pause(0.00001)
 			
-			print numpoints.eval({v:batch})
 			log.info("\tError",error_i)
 			log.end() #ending the epoch
 
@@ -319,6 +323,7 @@ with tf.Session() as sess:
 	rec=v_recon.eval({v:train_data[0:9]})
 
 if training:
+	log.reset()
 	log.info("Error:",error_i)
 	log.info("Learnrate:",learnrate,"// Batchsize:",batchsize)
 log.end()
@@ -354,4 +359,4 @@ plt.show()
 
 # Savin to file
 if save_to_file:
-	save(w_i)
+	save(str(error_i),w_i,ubh,ubv)
