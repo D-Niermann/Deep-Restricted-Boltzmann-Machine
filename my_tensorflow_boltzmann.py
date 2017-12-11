@@ -52,12 +52,12 @@ if "train_data" not in globals():
 ################################################################################################################################################
 #### User Variables
 writer_on     = False
-hidden_units  = 200
+hidden_units  = 500
 visible_units = 784
 batchsize     = 55000/500 # dividing by one will not work, at least 2 batches are required here
-epochs        = 1
-learnrate     = 0.25
-temp          = 1.0
+epochs        = 2
+learnrate     = 0.2
+temp          = 1.2
 
 save_to_file   = 0
 load_from_file = 0
@@ -171,10 +171,11 @@ with tf.Session() as sess:
 			log.end() #ending the epoch
 
 	#### Testing the network
-	probs=v_prob.eval({v:train_data[0:9]})
-	rec=v_recon.eval({v:train_data[0:9]})
+	half_images=train_data[0:9]
+	half_images[1:4,600:]=0
+	probs=v_prob.eval({v:half_images})
+	rec=v_recon.eval({v:half_images})
 
-	random_recon=v_recon.eval({v:rnd.random([1,784])})
 
 if training:
 	log.reset()
@@ -211,7 +212,7 @@ for i in range(len(rec)-1):
 	ax3[1][i].matshow(probs[i:i+1].reshape(28,28))
 	# plot the recunstructed image
 	ax3[2][i].matshow(rec[i:i+1].reshape(28,28))
-plt.matshow(random_recon.reshape(28,28))
+# plt.matshow(random_recon.reshape(28,28))
 plt.show()
 
 # Savin to file
