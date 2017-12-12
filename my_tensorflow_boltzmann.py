@@ -52,17 +52,20 @@ if "train_data" not in globals():
 ################################################################################################################################################
 #### User Variables
 writer_on     = False
-hidden_units  = 500
+hidden_units  = 300
 visible_units = 784
-batchsize     = 55000/500 # dividing by one will not work, at least 2 batches are required here
-epochs        = 2
-learnrate     = 0.2
-temp          = 1.2
+batchsize     = 55000/400 # dividing by one will not work, at least 2 batches are required here
+""" weniger epochs = genereller = besser vervollstandigen?????"""
+epochs        = 10
+learnrate     = 0.01
+"""Mit temp=10 kann er auch besser verfollseandigen???????"""
+temp          = 2.5 
 
 save_to_file   = 0
 load_from_file = 0
+
 training       = 1
-liveplot       = 1
+liveplot       = 0
 
 
 
@@ -70,6 +73,7 @@ liveplot       = 1
 #### Graph
 #### define each layer and the weight matrix w
 v       = tf.placeholder(tf.float32,[None,visible_units],name="Visible-Layer")
+
 w       = tf.Variable(tf.zeros([visible_units,hidden_units]),name="Weights")
 bias_v  = tf.Variable(tf.zeros([visible_units]),name="Visible-Bias")
 bias_h  = tf.Variable(tf.zeros([hidden_units]),name="Hidden-Bias")
@@ -172,7 +176,7 @@ with tf.Session() as sess:
 
 	#### Testing the network
 	half_images=train_data[0:9]
-	half_images[1:4,600:]=0
+	half_images[1:6,500:]=0
 	probs=v_prob.eval({v:half_images})
 	rec=v_recon.eval({v:half_images})
 
@@ -191,7 +195,7 @@ log.end()
 if training:
 	#plot the errors
 	plt.figure("Errors")
-	plt.plot(errors)
+	plt.plot(errors[10:])
 	# plt.figure("Mean of W")
 	# plt.plot(mean_w_)
 	#plot the weights
@@ -200,8 +204,8 @@ if training:
 	plt.colorbar(map1)
 	plt.matshow(weights_raster)
 	#plot the bias_v
-	map3=plt.matshow(ubv.reshape(28,28))
-	plt.colorbar(map3)
+	# map3=plt.matshow(ubv.reshape(28,28))
+	# plt.colorbar(map3)
 
 # Plot the Test Phase	
 fig3,ax3=plt.subplots(3,8,figsize=(16,4))
