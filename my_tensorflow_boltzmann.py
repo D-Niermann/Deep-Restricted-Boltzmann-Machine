@@ -52,13 +52,14 @@ if "train_data" not in globals():
 ################################################################################################################################################
 #### User Variables
 writer_on     = False
-hidden_units  = 300
+hidden_units  = 500
 visible_units = 784
-batchsize     = 55000/400 # dividing by one will not work, at least 2 batches are required here
-""" weniger epochs = genereller = besser vervollstandigen?????"""
-epochs        = 10
+
+
+num_batches   = 1000
+epochs        = 4
 learnrate     = 0.01
-"""Mit temp=10 kann er auch besser verfollseandigen???????"""
+learnrate_max = 1.
 temp          = 2.5 
 
 save_to_file   = 0
@@ -72,15 +73,18 @@ liveplot       = 0
 ################################################################################################################################################
 #### Graph
 #### define each layer and the weight matrix w
-v       = tf.placeholder(tf.float32,[None,visible_units],name="Visible-Layer")
+""" shape definitions are wired here-normally one would define [rows,columns] but here it is reversed with [columns,rows]?"""
 
-w       = tf.Variable(tf.zeros([visible_units,hidden_units]),name="Weights")
+v       = tf.placeholder(tf.float32,[None,visible_units],name="Visible-Layer") # has shape [number of images per batch,number of visible units]
+
+w       = tf.Variable(tf.random_uniform([visible_units,hidden_units],minval=0,maxval=1e-2),name="Weights")# init with small random values to break symmetriy
 bias_v  = tf.Variable(tf.zeros([visible_units]),name="Visible-Bias")
 bias_h  = tf.Variable(tf.zeros([hidden_units]),name="Hidden-Bias")
 
 
 # get the probabilities of the hidden units in 
 h_prob  = sigmoid(tf.matmul(v,w) + bias_h,temp)
+#h has shape [number of images per batch, number of hidden units]
 # get the actual activations for h {0,1}
 h       = tf.nn.relu(
 	            tf.sign(
@@ -104,28 +108,40 @@ h_gibbs = sigmoid(tf.matmul(v_recon, w) + bias_h,temp)
 error  = tf.reduce_mean(tf.square(v-v_recon))
 
 #### Training with Contrastive Divergence
+#matrix shape is untouched throu the batches because w*v=h even if v has more columns, but dividing be numpoints is recomended since CD
+# [] = [784,batchsize]-transposed v * [batchsize,500] -> [784,500] - like w 
 pos_grad  = tf.matmul(tf.transpose(v),h)
+eval_pos  = tf.shape(pos_grad)
 neg_grad  = tf.matmul(tf.transpose(v_recon),h_gibbs)
-numpoints = tf.cast(tf.shape(v)[0],tf.float32) #number of train inputs per batch (for averaging the CD matrix??)
+numpoints = tf.cast(tf.shape(v)[0],tf.float32) #number of train inputs per batch (for averaging the CD matrix -> see practical paper by hinton)
 # weight update
 CD       = (pos_grad - neg_grad)/numpoints
 update_w = w.assign(w+learnrate*CD)
 mean_w   = tf.reduce_mean(w)
 #update bias
-""" warum hier reduce_mean(...,0)?? -> das gibt sogar einen vector mit shape (784,)"""
+""" Since vectors v and h are actualy matrices with number of batch_size images in them, reduce mean will make them to a vector again """
 update_bias_v = bias_v.assign(bias_v+learnrate*tf.reduce_mean(v-v_recon,0))
 update_bias_h = bias_h.assign(bias_h+learnrate*tf.reduce_mean(h-h_gibbs,0))
 
+# reverse feed
+h_rev       = tf.placeholder(tf.float32,[None,hidden_units],name="Reverse-hidden")
+v_prob_rev  = sigmoid(tf.matmul(h_rev,tf.transpose(w)) + bias_v,temp)
+v_recon_rev = tf.nn.relu(tf.sign(v_prob - tf.random_uniform(tf.shape(v_prob))))
 
 ####################################################################################################################################
 #### Session ####
-log.reset()
 time_now = time.asctime()
+log.reset()
 log.start("Session")
 log.info(time_now)
 
-errors=[]
-mean_w_=[]
+errors         = []
+mean_w_        = []
+update         = 0
+batchsize      = 55000/1000 
+num_of_updates = epochs*num_batches
+d_learnrate    = float(learnrate_max-learnrate)/num_of_updates
+
 
 # define a figure for liveplotting
 if training and liveplot:
@@ -153,11 +169,13 @@ with tf.Session() as sess:
 				w_i,error_i=sess.run([update_w,error],feed_dict={v:batch})
 
 				#### #update the biases
-				ubh,ubv=sess.run([update_bias_h,update_bias_v],feed_dict={v:batch})
+				sess.run([update_bias_h,update_bias_v],feed_dict={v:batch})
 
 				# mean_w_.append(mean_w.eval())
 				errors.append(error_i)
 
+				# increase the learnrate
+				learnrate+=d_learnrate
 
 				#### plot
 				if liveplot:
@@ -170,7 +188,7 @@ with tf.Session() as sess:
 					# ax[1].plot(errors)
 					# ax[2].matshow(ubv.reshape(28,28))
 					plt.pause(0.00001)
-			
+			log.info("\tLearnrate:",learnrate)
 			log.info("\tError",error_i)
 			log.end() #ending the epoch
 
@@ -180,6 +198,17 @@ with tf.Session() as sess:
 	probs=v_prob.eval({v:half_images})
 	rec=v_recon.eval({v:half_images})
 
+	#reverse feeding
+	input_vector=np.round(np.zeros([1,hidden_units]))
+	# fig,ax2=plt.subplots(2,1,figsize=(10,10))
+	for i in range(100):
+		output=v_prob_rev.eval({h_rev:input_vector})
+		input_vector=h.eval({v:output})
+		# ax2[0].cla()
+		# ax2[1].cla()
+		# ax2[0].matshow(output.reshape(28,28))
+		# ax2[1].matshow(input_vector[:,:400].reshape(20,20))
+		# plt.pause(0.0001)
 
 if training:
 	log.reset()
@@ -200,7 +229,9 @@ if training:
 	# plt.plot(mean_w_)
 	#plot the weights
 	weights_raster=tile_raster_images(X=w_i.T, img_shape=(28, 28), tile_shape=(10, 20), tile_spacing=(0,0))
-	map1=plt.matshow(w_i)
+	fig_m=plt.figure("Weights",figsize=(8,3))
+	ax_m=fig_m.add_subplot(1,1,1)
+	map1=ax_m.matshow(w_i.T)
 	plt.colorbar(map1)
 	plt.matshow(weights_raster)
 	#plot the bias_v
@@ -217,8 +248,13 @@ for i in range(len(rec)-1):
 	# plot the recunstructed image
 	ax3[2][i].matshow(rec[i:i+1].reshape(28,28))
 # plt.matshow(random_recon.reshape(28,28))
-plt.show()
+
+#plot the reverse outputs
+# plt.matshow(output.reshape(28,28))
+
 
 # Savin to file
 if save_to_file:
 	save(str(error_i),w_i,ubv,ubh)
+
+plt.show()
