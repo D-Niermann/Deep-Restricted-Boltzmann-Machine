@@ -56,9 +56,9 @@ hidden_units  = 500
 visible_units = 784
 
 
-num_batches   = 1000
+num_batches   = 700
 epochs        = 4
-learnrate     = 0.01
+learnrate     = 0.03
 learnrate_max = 1.
 temp          = 2.5 
 
@@ -66,7 +66,7 @@ save_to_file   = 0
 load_from_file = 0
 
 training       = 1
-liveplot       = 0
+liveplot       = 1
 
 
 
@@ -77,7 +77,7 @@ liveplot       = 0
 
 v       = tf.placeholder(tf.float32,[None,visible_units],name="Visible-Layer") # has shape [number of images per batch,number of visible units]
 
-w       = tf.Variable(tf.random_uniform([visible_units,hidden_units],minval=0,maxval=1e-2),name="Weights")# init with small random values to break symmetriy
+w       = tf.Variable(tf.random_uniform([visible_units,hidden_units],minval=-1e-3,maxval=1e-3),name="Weights")# init with small random values to break symmetriy
 bias_v  = tf.Variable(tf.zeros([visible_units]),name="Visible-Bias")
 bias_h  = tf.Variable(tf.zeros([hidden_units]),name="Hidden-Bias")
 
@@ -138,7 +138,7 @@ log.info(time_now)
 errors         = []
 mean_w_        = []
 update         = 0
-batchsize      = 55000/1000 
+batchsize      = 55000/num_batches 
 num_of_updates = epochs*num_batches
 d_learnrate    = float(learnrate_max-learnrate)/num_of_updates
 
@@ -178,18 +178,19 @@ with tf.Session() as sess:
 				learnrate+=d_learnrate
 
 				#### plot
-				if liveplot:
+				if liveplot and plt.fignum_exists(fig.number):
 					ax.cla()
 					# ax[1].cla()
 					# ax[2].cla()
-					
+
 					matrix_new=tile_raster_images(X=w_i.T, img_shape=(28, 28), tile_shape=(10, 10), tile_spacing=(0,0))
 					ax.matshow(matrix_new)
 					# ax[1].plot(errors)
 					# ax[2].matshow(ubv.reshape(28,28))
 					plt.pause(0.00001)
-			log.info("\tLearnrate:",learnrate)
-			log.info("\tError",error_i)
+					
+			log.info("\tLearnrate:",round(learnrate,2))
+			log.info("\tError",round(error_i,3))
 			log.end() #ending the epoch
 
 	#### Testing the network
@@ -213,7 +214,7 @@ with tf.Session() as sess:
 if training:
 	log.reset()
 	log.info("Error:",error_i)
-	log.info("Learnrate:",learnrate," // Batchsize:",batchsize," // Temp.:",temp)
+	log.info("Learnrate:",round(learnrate)," // Batchsize:",batchsize," // Temp.:",temp)
 log.end()
 
 
