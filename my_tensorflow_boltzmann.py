@@ -56,9 +56,9 @@ hidden_units  = 500
 visible_units = 784
 
 
-num_batches   = 700
-epochs        = 4
-learnrate     = 0.03
+num_batches   = 500
+epochs        = 3
+learnrate     = 0.05
 learnrate_max = 1.
 temp          = 2.5 
 
@@ -66,7 +66,7 @@ save_to_file   = 0
 load_from_file = 0
 
 training       = 1
-liveplot       = 1
+liveplot       = 0
 
 
 
@@ -158,7 +158,7 @@ with tf.Session() as sess:
 
 	if training:
 		for epoch in range(epochs):
-			log.start("epoch:",epoch)
+			log.start("Epoch:",epoch+1,"/",epochs)
 			
 			for start, end in zip( range(0, len(train_data), batchsize), range(batchsize, len(train_data), batchsize)):
 				#### define a batch
@@ -194,7 +194,7 @@ with tf.Session() as sess:
 			log.end() #ending the epoch
 
 	#### Testing the network
-	half_images=train_data[0:9]
+	half_images=test_data[0:11]
 	half_images[1:6,500:]=0
 	probs=v_prob.eval({v:half_images})
 	rec=v_recon.eval({v:half_images})
@@ -240,10 +240,10 @@ if training:
 	# plt.colorbar(map3)
 
 # Plot the Test Phase	
-fig3,ax3=plt.subplots(3,8,figsize=(16,4))
+fig3,ax3=plt.subplots(3,10,figsize=(16,4))
 for i in range(len(rec)-1):
 	# plot the input
-	ax3[0][i].matshow(train_data[i:i+1].reshape(28,28))
+	ax3[0][i].matshow(half_images[i:i+1].reshape(28,28))
 	# plot the probs of visible layer
 	ax3[1][i].matshow(probs[i:i+1].reshape(28,28))
 	# plot the recunstructed image

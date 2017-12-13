@@ -58,7 +58,7 @@ class Logger(object):
 				from time import time
 				self.end_time=time()
 				try:
-					print str(self.count_save.pop())+".","-"*(len(self.start_time)-1),"^ \t:",self.process_name[len(self.process_name)-1]," (took ",str(round(self.end_time-self.start_time[len(self.start_time)-1],5))," sek)"
+					print str(self.count_save.pop())+".","-"*(len(self.start_time)-1),"^ \t:","\t",self.process_name[len(self.process_name)-1]," (took ",str(round(self.end_time-self.start_time[len(self.start_time)-1],1))," sek)"
 					self.start_time.pop()
 					self.process_name.pop()
 					self.end_time=0
