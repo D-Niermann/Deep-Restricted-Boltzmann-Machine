@@ -56,11 +56,11 @@ hidden_units  = 500
 visible_units = 784
 
 
-num_batches   = 500
-epochs        = 3
-learnrate     = 0.05
-learnrate_max = 1.
-temp          = 2.5 
+num_batches   = 1000
+epochs        = 2
+learnrate     = 0.1
+learnrate_max = 0.8
+temp          = 1.5 
 
 save_to_file   = 0
 load_from_file = 0
@@ -100,7 +100,7 @@ v_recon = tf.nn.relu(
 				)
 			)
 
-# now get the probabilities of h again from the reconstructed v_recon
+# Gibbs sampling: get the probabilities of h again from the reconstructed v_recon
 h_gibbs = sigmoid(tf.matmul(v_recon, w) + bias_h,temp) 
 
 ##### define reconstruction error and the energy  
@@ -111,7 +111,6 @@ error  = tf.reduce_mean(tf.square(v-v_recon))
 #matrix shape is untouched throu the batches because w*v=h even if v has more columns, but dividing be numpoints is recomended since CD
 # [] = [784,batchsize]-transposed v * [batchsize,500] -> [784,500] - like w 
 pos_grad  = tf.matmul(tf.transpose(v),h)
-eval_pos  = tf.shape(pos_grad)
 neg_grad  = tf.matmul(tf.transpose(v_recon),h_gibbs)
 numpoints = tf.cast(tf.shape(v)[0],tf.float32) #number of train inputs per batch (for averaging the CD matrix -> see practical paper by hinton)
 # weight update
@@ -199,6 +198,8 @@ with tf.Session() as sess:
 	probs=v_prob.eval({v:half_images})
 	rec=v_recon.eval({v:half_images})
 
+	mean_test_error=sess.run([error],feed_dict={v:test_data})
+
 	#reverse feeding
 	input_vector=np.round(np.zeros([1,hidden_units]))
 	# fig,ax2=plt.subplots(2,1,figsize=(10,10))
@@ -213,7 +214,8 @@ with tf.Session() as sess:
 
 if training:
 	log.reset()
-	log.info("Error:",error_i)
+	log.info("Train Error:",error_i)
+	log.info("Test Error:",mean_test_error[0])
 	log.info("Learnrate:",round(learnrate)," // Batchsize:",batchsize," // Temp.:",temp)
 log.end()
 
