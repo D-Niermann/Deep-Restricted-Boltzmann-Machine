@@ -48,26 +48,31 @@ if "train_data" not in globals():
 	mnist = input_data.read_data_sets("MNIST_data/", one_hot=True)
 	train_data, trY, test_data, teY = mnist.train.images, mnist.train.labels, mnist.test.images, mnist.test.labels
 
+#get test data of only one number class:
+index_for_number=[]
+for i in range(len(teY)):
+	if (teY[i]==[0,0,0,0,0,0,1,0,0,0]).sum()==10:
+		index_for_number.append(i)
 
 ################################################################################################################################################
 #### User Variables
 writer_on     = False
-hidden_units  = 500
+hidden_units  = 5*5
 visible_units = 784
 
 
 num_batches   = 1000
-epochs        = 2
-learnrate     = 0.1
-learnrate_max = 0.8
-temp          = 1.5 
+epochs        = 20
+learnrate     = 0.02
+learnrate_max = 2.
+temp          = 1.0
 
 save_to_file   = 0
 load_from_file = 0
+file_suffix    = "0.0651765" #for a 10 x 10 hidden layer and relative good training 
 
 training       = 1
 liveplot       = 0
-
 
 
 ################################################################################################################################################
@@ -89,8 +94,8 @@ h_prob  = sigmoid(tf.matmul(v,w) + bias_h,temp)
 h       = tf.nn.relu(
 	            tf.sign(
 	            	h_prob - tf.random_uniform(tf.shape(h_prob)) 
-	            ) 
-        	) 
+	            	) 
+        		) 
 
 # and the same for visible units
 v_prob  = sigmoid(tf.matmul(h,tf.transpose(w)) + bias_v,temp)
@@ -125,7 +130,7 @@ update_bias_h = bias_h.assign(bias_h+learnrate*tf.reduce_mean(h-h_gibbs,0))
 # reverse feed
 h_rev       = tf.placeholder(tf.float32,[None,hidden_units],name="Reverse-hidden")
 v_prob_rev  = sigmoid(tf.matmul(h_rev,tf.transpose(w)) + bias_v,temp)
-v_recon_rev = tf.nn.relu(tf.sign(v_prob - tf.random_uniform(tf.shape(v_prob))))
+v_recon_rev = tf.nn.relu(tf.sign(v_prob_rev - tf.random_uniform(tf.shape(v_prob_rev))))
 
 ####################################################################################################################################
 #### Session ####
@@ -151,9 +156,9 @@ with tf.Session() as sess:
 	sess.run(tf.global_variables_initializer())
 	
 	if load_from_file:
-		sess.run(w.assign(init_pretrained(w=1)[0]))
-		sess.run(bias_v.assign(init_pretrained(bias_v=1)[0]))
-		sess.run(bias_h.assign(init_pretrained(bias_h=1)[0]))
+		sess.run(w.assign(init_pretrained(file_suffix,w=1)[0]))
+		sess.run(bias_v.assign(init_pretrained(file_suffix,bias_v=1)[0]))
+		sess.run(bias_h.assign(init_pretrained(file_suffix,bias_h=1)[0]))
 
 	if training:
 		for epoch in range(epochs):
@@ -168,7 +173,7 @@ with tf.Session() as sess:
 				w_i,error_i=sess.run([update_w,error],feed_dict={v:batch})
 
 				#### #update the biases
-				sess.run([update_bias_h,update_bias_v],feed_dict={v:batch})
+				ubh,ubv=sess.run([update_bias_h,update_bias_v],feed_dict={v:batch})
 
 				# mean_w_.append(mean_w.eval())
 				errors.append(error_i)
@@ -194,18 +199,29 @@ with tf.Session() as sess:
 
 	#### Testing the network
 	half_images=test_data[0:11]
+	#halfing some images from test_data
 	half_images[1:6,500:]=0
 	probs=v_prob.eval({v:half_images})
 	rec=v_recon.eval({v:half_images})
 
 	mean_test_error=sess.run([error],feed_dict={v:test_data})
 
+	
+	# checking if h looks the same for one number class
+	number_data=test_data[index_for_number[:]]
+	h_layer=h.eval({v:number_data})
+
+	#check if the h_layers really recreate the desired numbers
+	recon=v_recon_rev.eval({h_rev:h_layer})
+	h_mean=np.round(np.mean(h_layer,axis=0)).reshape(1,hidden_units)
+	recon_mean=v_recon_rev.eval({h_rev:h_mean})
+
 	#reverse feeding
-	input_vector=np.round(np.zeros([1,hidden_units]))
+	# input_vector=np.round(np.zeros([1,hidden_units]))
 	# fig,ax2=plt.subplots(2,1,figsize=(10,10))
-	for i in range(100):
-		output=v_prob_rev.eval({h_rev:input_vector})
-		input_vector=h.eval({v:output})
+	# for i in range(100):
+		# output=v_prob_rev.eval({h_rev:input_vector})
+		# input_vector=h.eval({v:output})
 		# ax2[0].cla()
 		# ax2[1].cla()
 		# ax2[0].matshow(output.reshape(28,28))
@@ -218,6 +234,10 @@ if training:
 	log.info("Test Error:",mean_test_error[0])
 	log.info("Learnrate:",round(learnrate)," // Batchsize:",batchsize," // Temp.:",temp)
 log.end()
+
+# Savin to file
+if save_to_file:
+	save(str(error_i),w_i,ubv,ubh)
 
 
 ####################################################################################################################################
@@ -250,14 +270,30 @@ for i in range(len(rec)-1):
 	ax3[1][i].matshow(probs[i:i+1].reshape(28,28))
 	# plot the recunstructed image
 	ax3[2][i].matshow(rec[i:i+1].reshape(28,28))
-# plt.matshow(random_recon.reshape(28,28))
+	# plt.matshow(random_recon.reshape(28,28))
 
-#plot the reverse outputs
-# plt.matshow(output.reshape(28,28))
+#plot the h_layers
+fig_h,ax_h=plt.subplots(7,7,figsize=(11,11))
+m=0
+for i in range(7):
+	for j in range(7):
+		ax_h[i][j].matshow(h_layer[m].reshape(int(sqrt(hidden_units)),int(sqrt(hidden_units))))
+		m+=1
+fig_h.tight_layout()
+
+# plot the reconstructed digits from h_layer
+fig_recon,ax_recon=plt.subplots(7,7,figsize=(11,11))
+m=0
+for i in range(7):
+	for j in range(7):
+		ax_recon[i][j].matshow(recon[m].reshape(28,28))
+		m+=1
+fig_recon.tight_layout()
+
+#plot the reconstructed digit from the mean h
+plt.matshow(h_mean.reshape(int(sqrt(hidden_units)),int(sqrt(hidden_units))))
+plt.matshow(recon_mean.reshape(28,28))
 
 
-# Savin to file
-if save_to_file:
-	save(str(error_i),w_i,ubv,ubh)
 
 plt.show()

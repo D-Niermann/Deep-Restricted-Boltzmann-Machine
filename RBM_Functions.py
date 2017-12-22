@@ -137,7 +137,7 @@ def save(name_extension, w=[],bias_v=[],bias_h=[]):
 		np.savetxt("bias_h-%s.txt"%name_extension, bias_h)
 	print "saved weights and biases"
 
-def init_pretrained(name_extension="0.0393897",w=None,bias_v=None,bias_h=None):
+def init_pretrained(name_extension="0.0651765",w=None,bias_v=None,bias_h=None):
 	path="/Users/Niermann/Google Drive/Masterarbeit/Python"
 	os.chdir(path)
 	print "loading from: "+ path
