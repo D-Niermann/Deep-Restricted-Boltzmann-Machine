@@ -54,83 +54,100 @@ for i in range(len(teY)):
 	if (teY[i]==[0,0,0,0,0,0,1,0,0,0]).sum()==10:
 		index_for_number.append(i)
 
-################################################################################################################################################
-#### User Variables
-writer_on     = False
-hidden_units  = 15*15
-visible_units = 784
-
-
-num_batches   = 1000
-epochs        = 20
-learnrate     = 0.2
-learnrate_max = 0.002
-temp          = 1.0
-
-save_to_file   = 0
-load_from_file = 0
-file_suffix    = "0.0651765" #for a 10 x 10 hidden layer and relative good training 
-
-training       = 1
-liveplot       = 0
-
 
 ################################################################################################################################################
-#### Graph
-#### define each layer and the weight matrix w
-""" shape definitions are wired here-normally one would define [rows,columns] but here it is reversed with [columns,rows]?"""
+### Class RBM 
+class RBM(object):
+	""" defines a 2 layer restricted boltzmann machine - first layer = input, second
+	layer = output. Training with contrastive divergence """
 
-v       = tf.placeholder(tf.float32,[None,visible_units],name="Visible-Layer") # has shape [number of images per batch,number of visible units]
+	def __init__(self,...):
+		#### User Variables
+		writer_on     = False
+		hidden_units  = 15*15
+		visible_units = 784
 
-w       = tf.Variable(tf.random_uniform([visible_units,hidden_units],minval=-1e-3,maxval=1e-3),name="Weights")# init with small random values to break symmetriy
-bias_v  = tf.Variable(tf.zeros([visible_units]),name="Visible-Bias")
-bias_h  = tf.Variable(tf.zeros([hidden_units]),name="Hidden-Bias")
+
+		num_batches   = 1000
+		epochs        = 20
+		learnrate     = 0.2
+		learnrate_max = 0.002
+		temp          = 1.0
+
+		save_to_file   = 0
+		load_from_file = 0
+		file_suffix    = "0.0651765" #for a 10 x 10 hidden layer and relative good training 
+
+		training       = 1
+		liveplot       = 0
+
+	def feed(self):
+		################################################################################################################################################
+		#### Graph
+		################################################################################################################################################
+		""" shape definitions are wired here-normally one would define [rows,columns] but here it is reversed with [columns,rows]? """
+
+		v       = tf.placeholder(tf.float32,[None,visible_units],name="Visible-Layer") # has shape [number of images per batch,number of visible units]
+
+		w       = tf.Variable(tf.random_uniform([visible_units,hidden_units],minval=-1e-3,maxval=1e-3),name="Weights")# init with small random values to break symmetriy
+		bias_v  = tf.Variable(tf.zeros([visible_units]),name="Visible-Bias")
+		bias_h  = tf.Variable(tf.zeros([hidden_units]),name="Hidden-Bias")
 
 
-# get the probabilities of the hidden units in 
-h_prob  = sigmoid(tf.matmul(v,w) + bias_h,temp)
-#h has shape [number of images per batch, number of hidden units]
-# get the actual activations for h {0,1}
-h       = tf.nn.relu(
-	            tf.sign(
-	            	h_prob - tf.random_uniform(tf.shape(h_prob)) 
-	            	) 
-        		) 
+		# get the probabilities of the hidden units in 
+		h_prob  = sigmoid(tf.matmul(v,w) + bias_h,temp)
+		#h has shape [number of images per batch, number of hidden units]
+		# get the actual activations for h {0,1}
+		h       = tf.nn.relu(
+			            tf.sign(
+			            	h_prob - tf.random_uniform(tf.shape(h_prob)) 
+			            	) 
+		        		) 
 
-# and the same for visible units
-v_prob  = sigmoid(tf.matmul(h,tf.transpose(w)) + bias_v,temp)
-v_recon = tf.nn.relu(
-			tf.sign(
-				v_prob - tf.random_uniform(tf.shape(v_prob))
-				)
-			)
+		# and the same for visible units
+		v_prob  = sigmoid(tf.matmul(h,tf.transpose(w)) + bias_v,temp)
+		v_recon = tf.nn.relu(
+					tf.sign(
+						v_prob - tf.random_uniform(tf.shape(v_prob))
+						)
+					)
 
-# Gibbs sampling: get the probabilities of h again from the reconstructed v_recon
-h_gibbs = sigmoid(tf.matmul(v_recon, w) + bias_h,temp) 
+		# Gibbs sampling: get the probabilities of h again from the reconstructed v_recon
+		h_gibbs = sigmoid(tf.matmul(v_recon, w) + bias_h,temp) 
 
-##### define reconstruction error and the energy  
-# energy = -tf.reduce_sum(bias_v*v_recon)-tf.reduce_sum(bias_h*h)-tf.matmul(tf.matmul(h,tf.transpose(w)), v_recon)
-error  = tf.reduce_mean(tf.square(v-v_recon))
+		##### define reconstruction error and the energy  
+		# energy = -tf.reduce_sum(bias_v*v_recon)-tf.reduce_sum(bias_h*h)-tf.matmul(tf.matmul(h,tf.transpose(w)), v_recon)
+		error  = tf.reduce_mean(tf.square(v-v_recon))
 
-#### Training with Contrastive Divergence
-#matrix shape is untouched throu the batches because w*v=h even if v has more columns, but dividing be numpoints is recomended since CD
-# [] = [784,batchsize]-transposed v * [batchsize,500] -> [784,500] - like w 
-pos_grad  = tf.matmul(tf.transpose(v),h)
-neg_grad  = tf.matmul(tf.transpose(v_recon),h_gibbs)
-numpoints = tf.cast(tf.shape(v)[0],tf.float32) #number of train inputs per batch (for averaging the CD matrix -> see practical paper by hinton)
-# weight update
-CD       = (pos_grad - neg_grad)/numpoints
-update_w = w.assign(w+learnrate*CD)
-mean_w   = tf.reduce_mean(w)
-#update bias
-""" Since vectors v and h are actualy matrices with number of batch_size images in them, reduce mean will make them to a vector again """
-update_bias_v = bias_v.assign(bias_v+learnrate*tf.reduce_mean(v-v_recon,0))
-update_bias_h = bias_h.assign(bias_h+learnrate*tf.reduce_mean(h-h_gibbs,0))
+		#### Training with Contrastive Divergence
+		#matrix shape is untouched throu the batches because w*v=h even if v has more columns, but dividing be numpoints is recomended since CD
+		# [] = [784,batchsize]-transposed v * [batchsize,500] -> [784,500] - like w 
+		pos_grad  = tf.matmul(tf.transpose(v),h)
+		neg_grad  = tf.matmul(tf.transpose(v_recon),h_gibbs)
+		numpoints = tf.cast(tf.shape(v)[0],tf.float32) #number of train inputs per batch (for averaging the CD matrix -> see practical paper by hinton)
+		# contrastive divergence
+		CD       = (pos_grad - neg_grad)/numpoints
 
-# reverse feed
-h_rev       = tf.placeholder(tf.float32,[None,hidden_units],name="Reverse-hidden")
-v_prob_rev  = sigmoid(tf.matmul(h_rev,tf.transpose(w)) + bias_v,temp)
-v_recon_rev = tf.nn.relu(tf.sign(v_prob_rev - tf.random_uniform(tf.shape(v_prob_rev))))
+
+		self.CD=CD # damit das global gespeichert wird in der klasse
+		return v_recon,error # return evtl auch h oder so
+
+
+	def train(self):
+		#update w
+		update_w = w.assign(w+learnrate*CD)
+		mean_w   = tf.reduce_mean(w)
+		#update bias
+		""" Since vectors v and h are actualy matrices with number of batch_size images in them, reduce mean will make them to a vector again """
+		update_bias_v = bias_v.assign(bias_v+learnrate*tf.reduce_mean(v-v_recon,0))
+		update_bias_h = bias_h.assign(bias_h+learnrate*tf.reduce_mean(h-h_gibbs,0))
+
+	def reverse_feed(self):
+		# reverse feed
+		h_rev       = tf.placeholder(tf.float32,[None,hidden_units],name="Reverse-hidden")
+		v_prob_rev  = sigmoid(tf.matmul(h_rev,tf.transpose(w)) + bias_v,temp)
+		v_recon_rev = tf.nn.relu(tf.sign(v_prob_rev - tf.random_uniform(tf.shape(v_prob_rev))))
+
 
 ####################################################################################################################################
 #### Session ####
@@ -168,20 +185,31 @@ with tf.Session() as sess:
 				#### define a batch
 				batch = train_data[start:end]
 
-			
+				
+
+
+				output_1st_RBM=RBM1.v_recon(train_batch)
+				""" klassen müssen noch richtig def sein """
+				output_2nd_RBM=RBM2.v_recon(output_1st_RBM)
+
+
+
+
+
+
 				#### update the weights
 				w_i,error_i=sess.run([update_w,error],feed_dict={v:batch})
 
 				#### #update the biases
 				ubh,ubv=sess.run([update_bias_h,update_bias_v],feed_dict={v:batch})
 
-				# mean_w_.append(mean_w.eval())
-				# errors.append(error_i)
+				# for plotting
+				errors.append(error_i)
 
 				# increase the learnrate
 				learnrate+=d_learnrate
 
-				#### plot
+				#### liveplot
 				if liveplot and plt.fignum_exists(fig.number):
 					ax.cla()
 					# ax[1].cla()
