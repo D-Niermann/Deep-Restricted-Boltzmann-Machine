@@ -51,7 +51,7 @@ if "train_data" not in globals():
 #get test data of only one number class:
 index_for_number=[]
 for i in range(len(teY)):
-	if (teY[i]==[0,0,0,0,0,0,1,0,0,0]).sum()==10:
+	if (teY[i]==[1,0,0,0,0,0,0,0,0,0]).sum()==10:
 		index_for_number.append(i)
 
 ################################################################################################################################################
@@ -62,9 +62,9 @@ visible_units = 784
 
 
 num_batches   = 1000
-epochs        = 20
-learnrate     = 0.2
-learnrate_max = 0.002
+epochs        = 3
+learnrate     = 0.07
+learnrate_max = 0.005
 temp          = 1.0
 
 save_to_file   = 0
@@ -193,9 +193,10 @@ with tf.Session() as sess:
 					# ax[2].matshow(ubv.reshape(28,28))
 					plt.pause(0.00001)
 					
-			log.info("\tLearnrate:",round(learnrate,2))
+			log.info("\tLearnrate:",round(learnrate,4))
 			log.info("\tError",round(error_i,3))
 			log.end() #ending the epoch
+
 
 	#### Testing the network
 	half_images=test_data[0:11]
@@ -213,8 +214,11 @@ with tf.Session() as sess:
 
 	#check if the h_layers really recreate the desired numbers
 	recon=v_recon_rev.eval({h_rev:h_layer})
+	#take the mean of every h layer and generate a image from this one
 	h_mean=np.round(np.mean(h_layer,axis=0)).reshape(1,hidden_units)
-	recon_mean=v_recon_rev.eval({h_rev:h_mean})
+	recon_mean=np.zeros([100,784])
+	for i in range(100):
+		recon_mean[i]=v_recon_rev.eval({h_rev:h_mean})
 
 	#reverse feeding
 	# input_vector=np.round(np.zeros([1,hidden_units]))
@@ -295,8 +299,11 @@ fig_recon.tight_layout()
 
 #plot the reconstructed digit from the mean h
 plt.matshow(h_mean.reshape(int(sqrt(hidden_units)),int(sqrt(hidden_units))))
-plt.matshow(recon_mean.reshape(28,28))
-
+fig4,ax4=plt.subplots(1,1)
+for i in range(100):
+	ax4.cla()
+	ax4.matshow(recon_mean[i].reshape(28,28))
+	plt.pause(0.05)
 
 
 plt.show()
