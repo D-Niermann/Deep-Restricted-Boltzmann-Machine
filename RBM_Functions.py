@@ -135,7 +135,7 @@ def save(name_extension, w=[],bias_v=[],bias_h=[]):
 		np.savetxt("bias_v-%s.txt"%name_extension, bias_v)
 	if len(bias_h)!=0:
 		np.savetxt("bias_h-%s.txt"%name_extension, bias_h)
-	print "saved weights and biases"
+	print "saved weights and biases with name_extension=%s"%name_extension
 
 def init_pretrained(name_extension="0.0651765",w=None,bias_v=None,bias_h=None):
 	path="/Users/Niermann/Google Drive/Masterarbeit/Python"
