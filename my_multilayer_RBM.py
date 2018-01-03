@@ -61,93 +61,99 @@ class RBM(object):
 	""" defines a 2 layer restricted boltzmann machine - first layer = input, second
 	layer = output. Training with contrastive divergence """
 
-	def __init__(self,...):
+	def __init__(self,vu,hu,forw_mult,back_mult,liveplot):
 		#### User Variables
-		writer_on     = False
-		hidden_units  = 15*15
-		visible_units = 784
+
+		self.hidden_units  = hu
+		self.visible_units = vu
 
 
-		num_batches   = 1000
-		epochs        = 20
-		learnrate     = 0.2
-		learnrate_max = 0.002
-		temp          = 1.0
+		self.liveplot       = liveplot
 
-		save_to_file   = 0
-		load_from_file = 0
-		file_suffix    = "0.0651765" #for a 10 x 10 hidden layer and relative good training 
+		self.forw_mult = forw_mult
+		self.back_mult = back_mult
 
-		training       = 1
-		liveplot       = 0
-
-	def feed(self):
+	# def graph(self):
 		################################################################################################################################################
 		#### Graph
 		################################################################################################################################################
 		""" shape definitions are wired here-normally one would define [rows,columns] but here it is reversed with [columns,rows]? """
 
-		v       = tf.placeholder(tf.float32,[None,visible_units],name="Visible-Layer") # has shape [number of images per batch,number of visible units]
+		self.v       = tf.placeholder(tf.float32,[None,self.visible_units],name="Visible-Layer") # has shape [number of images per batch,number of visible units]
 
-		w       = tf.Variable(tf.random_uniform([visible_units,hidden_units],minval=-1e-3,maxval=1e-3),name="Weights")# init with small random values to break symmetriy
-		bias_v  = tf.Variable(tf.zeros([visible_units]),name="Visible-Bias")
-		bias_h  = tf.Variable(tf.zeros([hidden_units]),name="Hidden-Bias")
+		self.w       = tf.Variable(tf.random_uniform([self.visible_units,self.hidden_units],minval=-1e-3,maxval=1e-3),name="Weights")# init with small random values to break symmetriy
+		self.bias_v  = tf.Variable(tf.zeros([self.visible_units]),name="Visible-Bias")
+		self.bias_h  = tf.Variable(tf.zeros([self.hidden_units]),name="Hidden-Bias")
 
 
 		# get the probabilities of the hidden units in 
-		h_prob  = sigmoid(tf.matmul(v,w) + bias_h,temp)
+		self.h_prob  = sigmoid(tf.matmul(self.v,self.forw_mult*self.w) + self.bias_h,temp)
 		#h has shape [number of images per batch, number of hidden units]
 		# get the actual activations for h {0,1}
-		h       = tf.nn.relu(
+		self.h       = tf.nn.relu(
 			            tf.sign(
-			            	h_prob - tf.random_uniform(tf.shape(h_prob)) 
+			            	self.h_prob - tf.random_uniform(tf.shape(self.h_prob)) 
 			            	) 
 		        		) 
 
 		# and the same for visible units
-		v_prob  = sigmoid(tf.matmul(h,tf.transpose(w)) + bias_v,temp)
-		v_recon = tf.nn.relu(
+		self.v_prob  = sigmoid(tf.matmul(self.h,tf.transpose(self.back_mult*self.w)) + self.bias_v,temp)
+		self.v_recon = tf.nn.relu(
 					tf.sign(
-						v_prob - tf.random_uniform(tf.shape(v_prob))
+						self.v_prob - tf.random_uniform(tf.shape(self.v_prob))
 						)
 					)
 
 		# Gibbs sampling: get the probabilities of h again from the reconstructed v_recon
-		h_gibbs = sigmoid(tf.matmul(v_recon, w) + bias_h,temp) 
+		self.h_gibbs = sigmoid(tf.matmul(self.v_recon, self.w) + self.bias_h,temp) 
 
 		##### define reconstruction error and the energy  
 		# energy = -tf.reduce_sum(bias_v*v_recon)-tf.reduce_sum(bias_h*h)-tf.matmul(tf.matmul(h,tf.transpose(w)), v_recon)
-		error  = tf.reduce_mean(tf.square(v-v_recon))
+		self.error  = tf.reduce_mean(tf.square(self.v-self.v_recon))
 
 		#### Training with Contrastive Divergence
 		#matrix shape is untouched throu the batches because w*v=h even if v has more columns, but dividing be numpoints is recomended since CD
 		# [] = [784,batchsize]-transposed v * [batchsize,500] -> [784,500] - like w 
-		pos_grad  = tf.matmul(tf.transpose(v),h)
-		neg_grad  = tf.matmul(tf.transpose(v_recon),h_gibbs)
-		numpoints = tf.cast(tf.shape(v)[0],tf.float32) #number of train inputs per batch (for averaging the CD matrix -> see practical paper by hinton)
+		self.pos_grad  = tf.matmul(tf.transpose(self.v),self.h)
+		self.neg_grad  = tf.matmul(tf.transpose(self.v_recon),self.h_gibbs)
+		self.numpoints = tf.cast(tf.shape(self.v)[0],tf.float32) #number of train inputs per batch (for averaging the CD matrix -> see practical paper by hinton)
 		# contrastive divergence
-		CD       = (pos_grad - neg_grad)/numpoints
+		self.CD        = (self.pos_grad - self.neg_grad)/self.numpoints
+		
 
-
-		self.CD=CD # damit das global gespeichert wird in der klasse
-		return v_recon,error # return evtl auch h oder so
-
-
-	def train(self):
 		#update w
-		update_w = w.assign(w+learnrate*CD)
-		mean_w   = tf.reduce_mean(w)
+		self.update_w = self.w.assign(self.w+learnrate*self.CD)
+		self.mean_w   = tf.reduce_mean(self.w)
 		#update bias
 		""" Since vectors v and h are actualy matrices with number of batch_size images in them, reduce mean will make them to a vector again """
-		update_bias_v = bias_v.assign(bias_v+learnrate*tf.reduce_mean(v-v_recon,0))
-		update_bias_h = bias_h.assign(bias_h+learnrate*tf.reduce_mean(h-h_gibbs,0))
+		self.update_bias_v = self.bias_v.assign(self.bias_v+learnrate*tf.reduce_mean(self.v-self.v_recon,0))
+		self.update_bias_h = self.bias_h.assign(self.bias_h+learnrate*tf.reduce_mean(self.h-self.h_gibbs,0))
 
-	def reverse_feed(self):
+
 		# reverse feed
-		h_rev       = tf.placeholder(tf.float32,[None,hidden_units],name="Reverse-hidden")
-		v_prob_rev  = sigmoid(tf.matmul(h_rev,tf.transpose(w)) + bias_v,temp)
-		v_recon_rev = tf.nn.relu(tf.sign(v_prob_rev - tf.random_uniform(tf.shape(v_prob_rev))))
+		self.h_rev       = tf.placeholder(tf.float32,[None,self.hidden_units],name="Reverse-hidden")
+		self.v_prob_rev  = sigmoid(tf.matmul(self.h_rev,tf.transpose(self.w)) + self.bias_v,temp)
+		self.v_recon_rev = tf.nn.relu(tf.sign(self.v_prob_rev - tf.random_uniform(tf.shape(self.v_prob_rev))))
 
+####################################################################################################################################
+#### User Settings ###
+num_batches   = 500
+epochs        = 1
+learnrate     = 0.02
+learnrate_max = 0.02
+temp          = 1.0
+training      = 1
+
+save_to_file   = 0
+load_from_file = 0
+file_suffix    = ""
+
+#### Create RBMs and merge them into one list for iteration###
+#RBM(visible units, hidden units, forw_mult, back_mult, liveplot,...)
+rbm1=RBM(784, 18*18, 2, 1, 0)
+rbm2=RBM(18*18, 100, 2, 2, 0)
+rbm3=RBM(100, 10, 1, 2, 0)
+DBM=[rbm1,rbm2]
 
 ####################################################################################################################################
 #### Session ####
@@ -165,96 +171,99 @@ d_learnrate    = float(learnrate_max-learnrate)/num_of_updates
 
 
 # define a figure for liveplotting
-if training and liveplot:
+if training:
 	fig,ax=plt.subplots(1,1,figsize=(15,10))
 
 # start the session
 with tf.Session() as sess:
+	""" den code hier pro rbm oder global ausfueren? """
 	sess.run(tf.global_variables_initializer())
 	
-	if load_from_file:
-		sess.run(w.assign(init_pretrained(file_suffix,w=1)[0]))
-		sess.run(bias_v.assign(init_pretrained(file_suffix,bias_v=1)[0]))
-		sess.run(bias_h.assign(init_pretrained(file_suffix,bias_h=1)[0]))
+	# if load_from_file:
+	# 	sess.run(w.assign(init_pretrained(file_suffix,w=1)[0]))
+	# 	sess.run(bias_v.assign(init_pretrained(file_suffix,bias_v=1)[0]))
+	# 	sess.run(bias_h.assign(init_pretrained(file_suffix,bias_h=1)[0]))
 
-	if training:
-		for epoch in range(epochs):
-			log.start("Epoch:",epoch+1,"/",epochs)
+	#iterate through the DBM , each iteration is a RBM
+	for RBM_i,RBM in enumerate(DBM):
+
+		if training:
+			log.out("Training ",str(RBM_i+1)+".", "RBM")
 			
-			for start, end in zip( range(0, len(train_data), batchsize), range(batchsize, len(train_data), batchsize)):
-				#### define a batch
-				batch = train_data[start:end]
 
+			for epoch in range(epochs):
+				log.start("Epoch:",epoch+1,"/",epochs)
 				
+				for start, end in zip( range(0, len(train_data), batchsize), range(batchsize, len(train_data), batchsize)):
+					#### define a batch
+					batch = train_data[start:end]
+
+					my_input_data= batch
+					if RBM_i>0:
+						my_input_data=DBM[RBM_i-1].h.eval({DBM[RBM_i-1].v:batch})
 
 
-				output_1st_RBM=RBM1.v_recon(train_batch)
-				""" klassen müssen noch richtig def sein """
-				output_2nd_RBM=RBM2.v_recon(output_1st_RBM)
+					# output_1st_RBM=RBM1.v_recon(train_batch)
+					""" klassen müssen noch richtig def sein """
+					# output_2nd_RBM=RBM2.v_recon(output_1st_RBM)
 
 
 
 
 
 
-				#### update the weights
-				w_i,error_i=sess.run([update_w,error],feed_dict={v:batch})
+					#### update the weights
+					RBM.w_i,error_i=sess.run([RBM.update_w,RBM.error],feed_dict={RBM.v:my_input_data})
 
-				#### #update the biases
-				ubh,ubv=sess.run([update_bias_h,update_bias_v],feed_dict={v:batch})
+					#### #update the biases
+					sess.run([RBM.update_bias_h,RBM.update_bias_v],feed_dict={RBM.v:my_input_data})
 
-				# for plotting
-				errors.append(error_i)
+					# for plotting
+					# errors.append(error_i)
 
-				# increase the learnrate
-				learnrate+=d_learnrate
+					# increase the learnrate
+					learnrate+=d_learnrate
 
-				#### liveplot
-				if liveplot and plt.fignum_exists(fig.number):
-					ax.cla()
-					# ax[1].cla()
-					# ax[2].cla()
+					#### liveplot
+					if RBM.liveplot and plt.fignum_exists(fig.number):
+						ax.cla()
+						# ax[1].cla()
+						# ax[2].cla()
 
-					matrix_new=tile_raster_images(X=w_i.T, img_shape=(28, 28), tile_shape=(10, 10), tile_spacing=(0,0))
-					ax.matshow(matrix_new)
-					# ax[1].plot(errors)
-					# ax[2].matshow(ubv.reshape(28,28))
-					plt.pause(0.00001)
-					
-			log.info("\tLearnrate:",round(learnrate,2))
-			log.info("\tError",round(error_i,3))
-			log.end() #ending the epoch
+						matrix_new=tile_raster_images(X=RBM.w_i.T, img_shape=(28, 28), tile_shape=(10, 10), tile_spacing=(0,0))
+						ax.matshow(matrix_new)
+						# ax[1].plot(errors)
+						# ax[2].matshow(ubv.reshape(28,28))
+						plt.pause(0.00001)
+						
+				log.info("\tLearnrate:",round(learnrate,2))
+				log.info("\tError",round(error_i,3))
+				log.end() #ending the epoch
 
-	#### Testing the network
-	half_images=test_data[0:11]
-	#halfing some images from test_data
-	half_images[1:6,500:]=0
-	probs=v_prob.eval({v:half_images})
-	rec=v_recon.eval({v:half_images})
+		#### Testing the network
+		if RBM_i==0:
+			half_images = test_data[0:11]
+			#halfing some images from test_data
+			half_images[1:6,500:] = 0
+			RBM.probs      = RBM.v_prob.eval({RBM.v:half_images})
+			RBM.rec        = RBM.v_recon.eval({RBM.v:half_images})
 
-	mean_test_error=sess.run([error],feed_dict={v:test_data})
+			mean_test_error = sess.run([RBM.error],feed_dict={RBM.v:test_data})
 
-	
-	# checking if h looks the same for one number class
-	number_data=test_data[index_for_number[:]]
-	h_layer=h.eval({v:number_data})
 
-	#check if the h_layers really recreate the desired numbers
-	recon=v_recon_rev.eval({h_rev:h_layer})
-	h_mean=np.round(np.mean(h_layer,axis=0)).reshape(1,hidden_units)
-	recon_mean=v_recon_rev.eval({h_rev:h_mean})
+		#reverse feeding
+		# input_vector=np.round(np.zeros([1,hidden_units]))
+		# fig,ax2=plt.subplots(2,1,figsize=(10,10))
+		# for i in range(100):
+			# output=v_prob_rev.eval({h_rev:input_vector})
+			# input_vector=h.eval({v:output})
+			# ax2[0].cla()
+			# ax2[1].cla()
+			# ax2[0].matshow(output.reshape(28,28))
+			# ax2[1].matshow(input_vector[:,:400].reshape(20,20))
+			# plt.pause(0.0001)
+### End of Session
 
-	#reverse feeding
-	# input_vector=np.round(np.zeros([1,hidden_units]))
-	# fig,ax2=plt.subplots(2,1,figsize=(10,10))
-	# for i in range(100):
-		# output=v_prob_rev.eval({h_rev:input_vector})
-		# input_vector=h.eval({v:output})
-		# ax2[0].cla()
-		# ax2[1].cla()
-		# ax2[0].matshow(output.reshape(28,28))
-		# ax2[1].matshow(input_vector[:,:400].reshape(20,20))
-		# plt.pause(0.0001)
 
 if training:
 	log.reset()
@@ -270,60 +279,41 @@ if save_to_file:
 
 ####################################################################################################################################
 #### Plot
+for rbm in DBM:
+	# Plot the Weights, Errors and other informations
+	rbm.shape_o=int(sqrt(rbm.visible_units))
+	if training:
+		#plot the errors
+		# plt.figure("Errors")
+		# plt.plot(errors[10:])
 
-# Plot the Weights, Errors and other informations
-if training:
-	#plot the errors
-	# plt.figure("Errors")
-	# plt.plot(errors[10:])
+		# plt.figure("Mean of W")
+		# plt.plot(mean_w_)
+		
+		#plot the weights
+		
+		weights_raster=tile_raster_images(X=rbm.w_i.T, img_shape=(rbm.shape_o, rbm.shape_o), tile_shape=(10, 20), tile_spacing=(0,0))
+		fig_m=plt.figure("Weights",figsize=(8,3))
+		ax_m=fig_m.add_subplot(1,1,1)
+		map1=ax_m.matshow(rbm.w_i.T)
+		plt.colorbar(map1)
+		plt.matshow(weights_raster)
+		
+		#plot the bias_v
+		# map3=plt.matshow(ubv.reshape(rbm.shape_o,rbm.shape_o))
+		# plt.colorbar(map3)
 
-	# plt.figure("Mean of W")
-	# plt.plot(mean_w_)
-	
-	#plot the weights
-	weights_raster=tile_raster_images(X=w_i.T, img_shape=(28, 28), tile_shape=(10, 20), tile_spacing=(0,0))
-	fig_m=plt.figure("Weights",figsize=(8,3))
-	ax_m=fig_m.add_subplot(1,1,1)
-	map1=ax_m.matshow(w_i.T)
-	plt.colorbar(map1)
-	plt.matshow(weights_raster)
-	
-	#plot the bias_v
-	# map3=plt.matshow(ubv.reshape(28,28))
-	# plt.colorbar(map3)
-
-# Plot the Test Phase	
-fig3,ax3=plt.subplots(3,10,figsize=(16,4))
-for i in range(len(rec)-1):
-	# plot the input
-	ax3[0][i].matshow(half_images[i:i+1].reshape(28,28))
-	# plot the probs of visible layer
-	ax3[1][i].matshow(probs[i:i+1].reshape(28,28))
-	# plot the recunstructed image
-	ax3[2][i].matshow(rec[i:i+1].reshape(28,28))
-	# plt.matshow(random_recon.reshape(28,28))
-
-#plot the h_layers
-fig_h,ax_h=plt.subplots(7,7,figsize=(11,11))
-m=0
-for i in range(7):
-	for j in range(7):
-		ax_h[i][j].matshow(h_layer[m].reshape(int(sqrt(hidden_units)),int(sqrt(hidden_units))))
-		m+=1
-fig_h.tight_layout()
-
-# plot the reconstructed digits from h_layer
-fig_recon,ax_recon=plt.subplots(7,7,figsize=(11,11))
-m=0
-for i in range(7):
-	for j in range(7):
-		ax_recon[i][j].matshow(recon[m].reshape(28,28))
-		m+=1
-fig_recon.tight_layout()
-
-#plot the reconstructed digit from the mean h
-plt.matshow(h_mean.reshape(int(sqrt(hidden_units)),int(sqrt(hidden_units))))
-plt.matshow(recon_mean.reshape(28,28))
+	# # Plot the Test Phase	
+	# fig3,ax3=plt.subplots(3,10,figsize=(16,4))
+	# if rbm.visible_units==784:
+	# 	for i in range(len(rec)-1):
+	# 		# plot the input
+	# 		ax3[0][i].matshow(half_images[i:i+1].reshape(28,28))
+	# 		# plot the probs of visible layer
+	# 		ax3[1][i].matshow(rbm.probs[i:i+1].reshape(28,28))
+	# 		# plot the recunstructed image
+	# 		ax3[2][i].matshow(rbm.rec[i:i+1].reshape(28,28))
+	# 		# plt.matshow(random_recon.reshape(rbm.shape_o,rbm.shape_o))
 
 
 
