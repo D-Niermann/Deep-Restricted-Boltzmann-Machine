@@ -54,6 +54,9 @@ for i in range(len(teY)):
 	if (teY[i]==[0,0,0,0,0,0,1,0,0,0]).sum()==10:
 		index_for_number.append(i)
 
+half_images = test_data[0:11]
+#halfing some images from test_data
+half_images[1:6,500:] = 0
 
 ################################################################################################################################################
 ### Class RBM 
@@ -73,7 +76,7 @@ class RBM(object):
 		self.forw_mult = forw_mult
 		self.back_mult = back_mult
 
-	# def graph(self):
+	
 		################################################################################################################################################
 		#### Graph
 		################################################################################################################################################
@@ -138,9 +141,9 @@ class RBM(object):
 ####################################################################################################################################
 #### User Settings ###
 num_batches   = 500
-epochs        = 1
-learnrate     = 0.02
-learnrate_max = 0.02
+epochs        = 5
+learnrate     = 0.01
+learnrate_max = 0.01
 temp          = 1.0
 training      = 1
 
@@ -150,16 +153,17 @@ file_suffix    = ""
 
 #### Create RBMs and merge them into one list for iteration###
 #RBM(visible units, hidden units, forw_mult, back_mult, liveplot,...)
-rbm1=RBM(784, 18*18, 2, 1, 0)
-rbm2=RBM(18*18, 100, 2, 2, 0)
-rbm3=RBM(100, 10, 1, 2, 0)
-DBM=[rbm1,rbm2]
+DBM=[0]*3
+DBM[0]=RBM(784, 18*18, 2, 1, 0)
+DBM[1]=RBM(18*18, 14*14, 2, 2, 1)
+DBM[2]=RBM(14*14, 10*10, 1, 2, 1)
+
 
 ####################################################################################################################################
 #### Session ####
 time_now = time.asctime()
 log.reset()
-log.start("Session")
+
 log.info(time_now)
 
 errors         = []
@@ -170,7 +174,7 @@ num_of_updates = epochs*num_batches
 d_learnrate    = float(learnrate_max-learnrate)/num_of_updates
 
 
-# define a figure for liveplotting
+#define a figure for liveplotting
 if training:
 	fig,ax=plt.subplots(1,1,figsize=(15,10))
 
@@ -188,7 +192,7 @@ with tf.Session() as sess:
 	for RBM_i,RBM in enumerate(DBM):
 
 		if training:
-			log.out("Training ",str(RBM_i+1)+".", "RBM")
+			log.start("Training ",str(RBM_i+1)+".", "RBM")
 			
 
 			for epoch in range(epochs):
@@ -198,25 +202,19 @@ with tf.Session() as sess:
 					#### define a batch
 					batch = train_data[start:end]
 
-					my_input_data= batch
-					if RBM_i>0:
-						my_input_data=DBM[RBM_i-1].h.eval({DBM[RBM_i-1].v:batch})
-
-
-					# output_1st_RBM=RBM1.v_recon(train_batch)
-					""" klassen müssen noch richtig def sein """
-					# output_2nd_RBM=RBM2.v_recon(output_1st_RBM)
-
-
-
+					RBM.my_input_data = batch
+					if RBM_i==1:
+						RBM.my_input_data=DBM[RBM_i-1].h.eval({DBM[RBM_i-1].v:batch})
+					elif RBM_i==2:
+						RBM.my_input_data=DBM[RBM_i-1].h.eval({DBM[RBM_i-1].v:DBM[RBM_i-1].my_input_data})
 
 
 
 					#### update the weights
-					RBM.w_i,error_i=sess.run([RBM.update_w,RBM.error],feed_dict={RBM.v:my_input_data})
+					RBM.w_i,error_i=sess.run([RBM.update_w,RBM.error],feed_dict={RBM.v:RBM.my_input_data})
 
 					#### #update the biases
-					sess.run([RBM.update_bias_h,RBM.update_bias_v],feed_dict={RBM.v:my_input_data})
+					sess.run([RBM.update_bias_h,RBM.update_bias_v],feed_dict={RBM.v:RBM.my_input_data})
 
 					# for plotting
 					# errors.append(error_i)
@@ -225,52 +223,53 @@ with tf.Session() as sess:
 					learnrate+=d_learnrate
 
 					#### liveplot
-					if RBM.liveplot and plt.fignum_exists(fig.number):
+					if RBM.liveplot and plt.fignum_exists(fig.number) and start%40==0:
 						ax.cla()
 						# ax[1].cla()
 						# ax[2].cla()
-
-						matrix_new=tile_raster_images(X=RBM.w_i.T, img_shape=(28, 28), tile_shape=(10, 10), tile_spacing=(0,0))
+						rbm_shape=int(sqrt(RBM.visible_units))
+						matrix_new=tile_raster_images(X=RBM.w_i.T, img_shape=(rbm_shape, rbm_shape), tile_shape=(10, 10), tile_spacing=(0,0))
 						ax.matshow(matrix_new)
 						# ax[1].plot(errors)
 						# ax[2].matshow(ubv.reshape(28,28))
 						plt.pause(0.00001)
 						
-				log.info("\tLearnrate:",round(learnrate,2))
-				log.info("\tError",round(error_i,3))
+				log.info("Learnrate:",round(learnrate,4))
+				log.info("Error",round(error_i,4))
 				log.end() #ending the epoch
-
-		#### Testing the network
-		if RBM_i==0:
-			half_images = test_data[0:11]
-			#halfing some images from test_data
-			half_images[1:6,500:] = 0
-			RBM.probs      = RBM.v_prob.eval({RBM.v:half_images})
-			RBM.rec        = RBM.v_recon.eval({RBM.v:half_images})
-
-			mean_test_error = sess.run([RBM.error],feed_dict={RBM.v:test_data})
+			log.end()#ending training the rbm 
 
 
-		#reverse feeding
-		# input_vector=np.round(np.zeros([1,hidden_units]))
-		# fig,ax2=plt.subplots(2,1,figsize=(10,10))
-		# for i in range(100):
-			# output=v_prob_rev.eval({h_rev:input_vector})
-			# input_vector=h.eval({v:output})
-			# ax2[0].cla()
-			# ax2[1].cla()
-			# ax2[0].matshow(output.reshape(28,28))
-			# ax2[1].matshow(input_vector[:,:400].reshape(20,20))
-			# plt.pause(0.0001)
+		#### training is finished so set the multipliers for w to 1
+		RBM.forw_mult = 1
+		RBM.back_mult = 1
+
+	#### Propagating the whole DBM forward and backward
+	h1       = DBM[0].h.eval({DBM[0].v:test_data[0:11]})
+	h2       = DBM[1].h.eval({DBM[1].v:h1})
+	v_prob3 = DBM[2].v_prob.eval({DBM[2].v:h2})
+	v_prob2 = DBM[1].v_prob_rev.eval({DBM[1].h_rev:v_prob3})
+	v_prob1 = DBM[0].v_prob_rev.eval({DBM[0].h_rev:v_prob2})
+	""" achtung : 2 fache gewichte ausschalten"""
+	""" zum unteren text: achso ich hab das schon gemacht mit dem reverse feed"""
+	""" hier müsste jetzt h als placeholder definiert sein damit man 
+	einen einfachen reverse feed machen kann ohne v aus der akutellen rbm vorzugeben. 
+	Das geht aber nicht so einfach - entweder für den reverse feed eine neue h variable als
+	placeholder definieren oder eine neue klasse machen wo die DBM drinne steht als graph 
+	und dann die gelernten gewichte als placeholder nimmt"""
+	
+
+
 ### End of Session
 
 
 if training:
+	plt.close(fig)
 	log.reset()
 	log.info("Train Error:",error_i)
-	log.info("Test Error:",mean_test_error[0])
-	log.info("Learnrate:",round(learnrate)," // Batchsize:",batchsize," // Temp.:",temp)
-log.end()
+	# log.info("Test Error:",mean_test_error[0])
+	log.info("Learnrate:",round(learnrate,4)," // Batchsize:",batchsize," // Temp.:",temp)
+
 
 # Savin to file
 if save_to_file:
@@ -293,9 +292,9 @@ for rbm in DBM:
 		#plot the weights
 		
 		weights_raster=tile_raster_images(X=rbm.w_i.T, img_shape=(rbm.shape_o, rbm.shape_o), tile_shape=(10, 20), tile_spacing=(0,0))
-		fig_m=plt.figure("Weights",figsize=(8,3))
-		ax_m=fig_m.add_subplot(1,1,1)
-		map1=ax_m.matshow(rbm.w_i.T)
+		# fig_m=plt.figure("Weights",figsize=(8,3))
+		# ax_m=fig_m.add_subplot(1,1,1)
+		map1=plt.matshow(rbm.w_i.T)
 		plt.colorbar(map1)
 		plt.matshow(weights_raster)
 		
@@ -303,17 +302,18 @@ for rbm in DBM:
 		# map3=plt.matshow(ubv.reshape(rbm.shape_o,rbm.shape_o))
 		# plt.colorbar(map3)
 
-	# # Plot the Test Phase	
-	# fig3,ax3=plt.subplots(3,10,figsize=(16,4))
-	# if rbm.visible_units==784:
-	# 	for i in range(len(rec)-1):
-	# 		# plot the input
-	# 		ax3[0][i].matshow(half_images[i:i+1].reshape(28,28))
-	# 		# plot the probs of visible layer
-	# 		ax3[1][i].matshow(rbm.probs[i:i+1].reshape(28,28))
-	# 		# plot the recunstructed image
-	# 		ax3[2][i].matshow(rbm.rec[i:i+1].reshape(28,28))
-	# 		# plt.matshow(random_recon.reshape(rbm.shape_o,rbm.shape_o))
+	# Plot the Test Phase	
+	if rbm.visible_units==784:
+		fig3,ax3=plt.subplots(2,10,figsize=(16,4))
+
+		for i in range(len(v_prob1)-1):
+			# plot the input
+			ax3[0][i].matshow(half_images[i:i+1].reshape(28,28))
+			# plot the probs of visible layer
+			# ax3[1][i].matshow(rbm.probs[i:i+1].reshape(28,28))
+			# plot the recunstructed image
+			ax3[1][i].matshow(v_prob1[i:i+1].reshape(28,28))
+			# plt.matshow(random_recon.reshape(rbm.shape_o,rbm.shape_o))
 
 
 

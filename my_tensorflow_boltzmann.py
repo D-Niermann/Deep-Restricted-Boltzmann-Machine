@@ -201,14 +201,15 @@ with tf.Session() as sess:
 
 
 	#### Testing the network
-	half_images=np.copy(test_data[0:11])
+	half_images = np.copy(test_data[0:11])
 	#halfing some images from test_data
-	r=sorted((rnd.sample(784)*784).astype(np.int))
-	half_images[1:6,r[:]]=0
-	probs=v_prob.eval({v:half_images})
-	rec=v_recon.eval({v:half_images})
-	prob_gibbs=v_prob.eval({v:half_images[1:2]})
-	fig3,ax3=plt.subplots(1,1)
+	r                     = sorted((rnd.sample(784)*784).astype(np.int))
+	half_images[1:6,r[:]] = 0
+	probs                 = v_prob.eval({v:half_images})
+	rec                   = v_recon.eval({v:half_images})
+	prob_gibbs            = v_prob.eval({v:half_images[1:2]})
+	fig3,ax3              = plt.subplots(1,1)
+	
 	if plot_recon_with_gibbs_sampling:
 		for i in range(gibbs_steps):
 			# gibbs steps

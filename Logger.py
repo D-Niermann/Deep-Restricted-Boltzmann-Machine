@@ -18,7 +18,7 @@ class Logger(object):
 
 	def info(self,*args):
 		if self.on:			
-			string="Info \t\t: "
+			string="Info \t\t: "+"\t"*(len(self.start_time)-1)
 			for i in args:
 				string+=str(i)+" "
 			print string 
@@ -31,7 +31,7 @@ class Logger(object):
 			for i in args:
 				input_str+=" "+str(i)
 			try:
-				print str(self.count)+".","\t      :",str(input_str)
+				print str(self.count)+".","\t      :","\t"*(len(self.start_time)-1),str(input_str)
 				self.count+=1
 			except:
 				print "Error while logging"
@@ -44,7 +44,7 @@ class Logger(object):
 				input_str+=" "+str(i)
 			from time import time
 			try:
-				print str(self.count)+".","-"*(len(self.start_time)),"v \t:",str(input_str)
+				print str(self.count)+".","-"*(len(self.start_time)),"v \t:","\t"*(len(self.start_time)-1),str(input_str)
 				self.count_save.append(self.count)
 				self.count+=1
 				self.start_time.append(time())
@@ -58,7 +58,7 @@ class Logger(object):
 				from time import time
 				self.end_time=time()
 				try:
-					print str(self.count_save.pop())+".","-"*(len(self.start_time)-1),"^ \t:","\t",self.process_name[len(self.process_name)-1]," (took ",str(round(self.end_time-self.start_time[len(self.start_time)-1],1))," sek)"
+					print str(self.count_save.pop())+".","-"*(len(self.start_time)-1),"^ \t:","\t"*(len(self.start_time)-2),self.process_name[len(self.process_name)-1]," (took ",str(round(self.end_time-self.start_time[len(self.start_time)-1],1))," sek)"
 					self.start_time.pop()
 					self.process_name.pop()
 					self.end_time=0
@@ -74,13 +74,14 @@ class Logger(object):
 
 if __name__=="__main__":
 
-	log=Logger(False)
+	log=Logger(True)
 
 	log.start("Smooth")
 
 	log.start("Blur")
 	
-
+	log.info("test info box")
+	log.out("test out box")
 	log.out("Decontrast")
 	log.end()
 	log.end()
@@ -93,6 +94,8 @@ if __name__=="__main__":
 	log.start("test")
 	log.start("test")
 	# log.reset()
+	log.out("test1")
+	log.info("test2")
 	log.end()
 	log.end()
 	log.end()
