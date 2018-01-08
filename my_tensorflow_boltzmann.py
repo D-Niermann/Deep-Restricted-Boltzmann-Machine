@@ -57,13 +57,13 @@ for i in range(len(teY)):
 ################################################################################################################################################
 #### User Variables
 writer_on     = False
-hidden_units  = 3*3
+hidden_units  = 13*13
 visible_units = 784
 
 
 num_batches   = 1000
-epochs        = 10
-learnrate     = 0.1
+epochs        = 5
+learnrate     = 0.005
 learnrate_max = 0.005
 temp          = 1.0
 
@@ -72,7 +72,7 @@ load_from_file = 0
 file_suffix    = "0.0651765" #for a 10 x 10 hidden layer and relative good training 
 
 training       = 1
-liveplot       = 0
+liveplot       = 1
 
 plot_recon_with_gibbs_sampling=0
 gibbs_steps=100
@@ -184,7 +184,7 @@ with tf.Session() as sess:
 				learnrate+=d_learnrate
 
 				#### plot
-				if liveplot and plt.fignum_exists(fig.number):
+				if liveplot and plt.fignum_exists(fig.number) and start%40==0:
 					ax.cla()
 					# ax[1].cla()
 					# ax[2].cla()
