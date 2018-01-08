@@ -48,18 +48,20 @@ if "train_data" not in globals():
 	mnist = input_data.read_data_sets("MNIST_data/", one_hot=True)
 	train_data, trY, test_data, teY = mnist.train.images, mnist.train.labels, mnist.test.images, mnist.test.labels
 
-#get test data of only one number class:
-index_for_number=[]
-for i in range(len(teY)):
-	if (teY[i]==[0,0,0,0,0,0,1,0,0,0]).sum()==10:
-		index_for_number.append(i)
+	#get test data of only one number class:
+	index_for_number=[]
+	for i in range(len(teY)):
+		if (teY[i]==[0,0,0,0,0,0,1,0,0,0]).sum()==10:
+			index_for_number.append(i)
 
-half_images = test_data[0:11]
-#halfing some images from test_data
-half_images[1:6,500:] = 0
+	half_images = test_data[0:11]
+	#halfing some images from test_data
+	half_images[1:6,500:] = 0
 
 ################################################################################################################################################
 ### Class RBM 
+
+
 class RBM(object):
 	""" defines a 2 layer restricted boltzmann machine - first layer = input, second
 	layer = output. Training with contrastive divergence """
@@ -138,6 +140,11 @@ class RBM(object):
 		self.v_prob_rev  = sigmoid(tf.matmul(self.h_rev,tf.transpose(self.w)) + self.bias_v,temp)
 		self.v_recon_rev = tf.nn.relu(tf.sign(self.v_prob_rev - tf.random_uniform(tf.shape(self.v_prob_rev))))
 
+
+
+
+################################################################################################################################################
+### Class Deep BM 
 class DBM_class(object):
 	"""defines a deep boltzmann machine
 	shape should be the array with the DBM classes so one can
@@ -146,8 +153,6 @@ class DBM_class(object):
 	"""
 
 	def __init__(self,shape,weights):
-
-
 		self.n_layers = len(shape)
 		self.shape = shape
 
@@ -177,12 +182,11 @@ class DBM_class(object):
 		self.h2      = tf.nn.relu(tf.sign(self.h2_prob - tf.random_uniform(tf.shape(self.h2_prob)))) 
 
 		## Backward Feed
-		self.v_recon_prob  = sigmoid(tf.matmul(self.h1,tf.transpose(self.w1)), temp)
+		self.v_recon_prob  = sigmoid(tf.matmul(self.h1,tf.transpose(self.w1))+self.bias_v, temp)
 		self.v_recon       = tf.nn.relu(tf.sign(self.v_recon_prob - tf.random_uniform(tf.shape(self.v_recon_prob)))) 
 		self.h1_recon_prob = sigmoid(tf.matmul(self.h2,tf.transpose(self.w2)), temp)
 		self.h1_recon      = tf.nn.relu(tf.sign(self.h1_recon_prob - tf.random_uniform(tf.shape(self.h1_recon_prob)))) 
-		# self.h2_recon_prob = sigmoid(tf.matmul(self.h1,tf.transpose(self.w2)), temp)
-		# self.h2_recon      = tf.nn.relu(tf.sign(self.h2_recon_prob - tf.random_uniform(tf.shape(self.h2_recon_prob)))) 
+
 
 		## Gibbs step probs
 		self.h1_gibbs = sigmoid(tf.matmul(self.v_recon,self.w1) + tf.matmul(self.h2,tf.transpose(self.w2)) + self.bias_h1,temp)
@@ -204,13 +208,18 @@ class DBM_class(object):
 		self.numpoints2 = tf.cast(tf.shape(self.h2)[0],tf.float32) #number of train inputs per batch (for averaging the CD matrix -> see practical paper by hinton)
 		self.CD2	    = (self.pos_grad2 - self.neg_grad2)/self.numpoints2
 		self.update_w2  = self.w2.assign(self.w2+learnrate*self.CD2)
+
+		""" bias updates"""
+		self.update_bias_h1 = self.bias_h1.assign(self.bias_h1+learnrate*tf.reduce_mean(self.h1-self.h1_gibbs,0))
+		self.update_bias_h2 = self.bias_h2.assign(self.bias_h2+learnrate*tf.reduce_mean(self.h2-self.h2_gibbs,0))
+		self.update_bias_v  = self.bias_v.assign(self.bias_v+learnrate*tf.reduce_mean(self.v-self.v_recon,0))
 		
 
 ####################################################################################################################################
 #### User Settings ###
 num_batches     = 1000
 pretrain_epochs = 1
-epochs          = 4
+epochs          = 5
 learnrate       = 0.005
 learnrate_max   = 0.005
 temp            = 1.0
@@ -224,8 +233,8 @@ file_suffix    = ""
 #### Create RBMs and merge them into one list for iteration###
 #RBM(visible units, hidden units, forw_mult, back_mult, liveplot,...)
 RBMs    = [0]*2
-RBMs[0] = RBM(784, 10*10, 2, 1, 0)
-RBMs[1] = RBM(10*10, 100 , 1, 2, 0)
+RBMs[0] = RBM(784, 18*18, 2, 1, 0)
+RBMs[1] = RBM(18*18, 100 , 1, 2, 0)
 
 
 
@@ -266,7 +275,7 @@ with tf.Session() as sess:
 			
 
 			for epoch in range(pretrain_epochs):
-				log.start("Epoch:",epoch+1,"/",epochs)
+				log.start("Epoch:",epoch+1,"/",pretrain_epochs)
 				
 				for start, end in zip( range(0, len(train_data), batchsize), range(batchsize, len(train_data), batchsize)):
 					#### define a batch
@@ -308,16 +317,18 @@ with tf.Session() as sess:
 
 
 			log.end() #ending training the rbm 
+			log.reset()
 
-	weights=[]
-	for i in range(len(RBMs)):
-		weights.append(RBMs[i].w.eval())
+		weights=[]
+		for i in range(len(RBMs)):
+			weights.append(RBMs[i].w.eval())
 
 
 	#### Pre training is ended - create the DBM with the gained weights
 	DBM=DBM_class(RBMs, [RBMs[0].w.eval(),RBMs[1].w.eval()])
 	sess.run(tf.global_variables_initializer())
-
+	test_error=[]
+	
 	if training:
 		error_=[]
 		for epoch in range(epochs):
@@ -327,8 +338,13 @@ with tf.Session() as sess:
 				#### define a batch
 				batch = train_data[start:end]
 
-				sess.run([DBM.update_w1,DBM.update_w2],{DBM.v:batch})
+				# update the weights and biases
+				sess.run([DBM.update_w1,DBM.update_w2,
+					DBM.update_bias_v,DBM.update_bias_h1,DBM.update_bias_h2],{DBM.v:batch})
+				
+				# calculate the error				
 				error_.append(DBM.error.eval({DBM.v:batch}))
+			
 			log.end()
 
 	### testing the Deep BM
@@ -336,22 +352,22 @@ with tf.Session() as sess:
 			#### define a batch
 			batch = train_data[start:end]
 
+			# get the probabilites and reconstructed images
 			probs      = DBM.v_recon_prob.eval({DBM.v:batch})
 			rec        = DBM.v_recon.eval({DBM.v:batch})
-			test_error = DBM.error.eval({DBM.v:batch})
+			
+			test_error.append(DBM.error.eval({DBM.v:batch}))
+
+	# save all weights and biases for plotting
+	w1    = tile_raster_images(X=DBM.w1.eval().T, img_shape=(28, 28), tile_shape=(10, 10), tile_spacing=(0,0))
+	w2    = DBM.w2.eval()
+	bias1 = DBM.bias_v.eval()
+	bias2 = DBM.bias_h1.eval()
+	bias3 = DBM.bias_h2.eval()
 
 
-plt.plot(error_)
-plt.show()
 
 
-
-	#### Propagating the whole DBM forward and backward
-	# h1       = DBM[0].h.eval({DBM[0].v:test_data[0:11]})
-	# h2       = DBM[1].h.eval({DBM[1].v:h1})
-	# v_prob3 = DBM[2].v_prob.eval({DBM[2].v:h2})
-	# v_prob2 = DBM[1].v_prob_rev.eval({DBM[1].h_rev:v_prob3})
-	# v_prob1 = DBM[0].v_prob_rev.eval({DBM[0].h_rev:v_prob2})
 
 ### End of Session
 
@@ -359,7 +375,7 @@ plt.show()
 if pre_training:
 	plt.close(fig)
 	log.reset()
-	log.info("Train Error:",error_i)
+	log.info("Test Error:",np.mean(test_error))
 	# log.info("Test Error:",mean_test_error[0])
 	log.info("Learnrate:",round(learnrate,4)," // Batchsize:",batchsize," // Temp.:",temp)
 
@@ -371,27 +387,15 @@ if save_to_file:
 
 ####################################################################################################################################
 #### Plot
+# Plot the Weights, Errors and other informations
+fig_w,ax_w=plt.subplots(2,1,figsize=(10,10))
+ax_w[0].matshow(w1)
+ax_w[1].matshow(w2.T)
 
-	# Plot the Weights, Errors and other informations
 
-if pre_training:
-	for rbm in RBMs:		
-		rbm.shape_o=int(sqrt(rbm.visible_units))
-		weights_raster=tile_raster_images(X=rbm.w_i.T, img_shape=(rbm.shape_o, rbm.shape_o), tile_shape=(10, 20), tile_spacing=(0,0))
-		map1=plt.matshow(rbm.w_i.T)
-		plt.colorbar(map1)
-		plt.matshow(weights_raster)
 
-		# Plot the Test Phase	
-		# if rbm.visible_units==784:
-		# 	fig3,ax3=plt.subplots(2,10,figsize=(16,4))
 
-		# 	for i in range(len(v_prob1)-1):
-		# 		# plot the input
-		# 		ax3[0][i].matshow(half_images[i:i+1].reshape(28,28))
-		# 		# and the reconstruction
-		# 		ax3[1][i].matshow(v_prob1[i:i+1].reshape(28,28))
-				
+plt.plot(test_error)				
 fig3,ax3=plt.subplots(3,10,figsize=(16,4))
 for i in range(10):
 	# plot the input
