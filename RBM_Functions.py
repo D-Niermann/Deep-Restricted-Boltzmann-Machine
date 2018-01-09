@@ -127,15 +127,16 @@ def tile_raster_images(X, img_shape, tile_shape, tile_spacing=(0, 0),scale_rows_
         return out_array
 
 def save(name_extension, w=[],bias_v=[],bias_h=[]):
-	path="/Users/Niermann/Google Drive/Masterarbeit/Python"
-	os.chdir(path)
-	if len(w)!=0:
-		np.savetxt("weights-%s.txt"%name_extension, w)
-	if len(bias_v)!=0:
-		np.savetxt("bias_v-%s.txt"%name_extension, bias_v)
-	if len(bias_h)!=0:
-		np.savetxt("bias_h-%s.txt"%name_extension, bias_h)
-	print "saved weights and biases with name_extension=%s"%name_extension
+      """ als argument nur eine array in der die ws und bias sind , durch iterieren-> jedes element savetxt()"""
+      path="/Users/Niermann/Google Drive/Masterarbeit/Python"
+      os.chdir(path)
+      if len(w)!=0:
+      	np.savetxt("weights-%s.txt"%name_extension, w)
+      if len(bias_v)!=0:
+      	np.savetxt("bias_v-%s.txt"%name_extension, bias_v)
+      if len(bias_h)!=0:
+      	np.savetxt("bias_h-%s.txt"%name_extension, bias_h)
+      print "saved weights and biases with name_extension=%s"%name_extension
 
 def init_pretrained(name_extension="0.0651765",w=None,bias_v=None,bias_h=None):
 	path="/Users/Niermann/Google Drive/Masterarbeit/Python"

@@ -140,7 +140,12 @@ class RBM(object):
 		self.v_prob_rev  = sigmoid(tf.matmul(self.h_rev,tf.transpose(self.w)) + self.bias_v,temp)
 		self.v_recon_rev = tf.nn.relu(tf.sign(self.v_prob_rev - tf.random_uniform(tf.shape(self.v_prob_rev))))
 
+		def train():
+			pass
+			#append self.error array here 
 
+		def test():
+			pass
 
 
 ################################################################################################################################################
@@ -155,21 +160,27 @@ class DBM_class(object):
 	def __init__(self,shape,weights):
 		self.n_layers = len(shape)
 		self.shape = shape
+		self.error_ = []
+		self.weights=weights
+		self.init_state=0
 
+	def graph_init(self):
 		################################################################################################################################################
 		####  DBM Graph
 		################################################################################################################################################
 		""" shape definitions are wired here-normally one would define [rows,columns] but here it is reversed with [columns,rows]? """
 
-		self.v        = tf.placeholder(tf.float32,[None,shape[0].visible_units],name="Visible-Layer") # has shape [number of images per batch,number of visible units]
+		self.v        = tf.placeholder(tf.float32,[None,self.shape[0].visible_units],name="Visible-Layer") # has self.shape [number of images per batch,number of visible units]
+		
 
-		self.w1       = tf.Variable(weights[0],name="Weights1")# init with small random values to break symmetriy
-		self.bias_v   = tf.Variable(tf.zeros([shape[0].visible_units]),name="Visible-Bias")
-		self.bias_h1  = tf.Variable(tf.zeros([shape[0].hidden_units]),name="Hidden-Bias")
+		# self.h2      = tf.Variable(tf.random_uniform([len(batch_data),self.shape[1].hidden_units],minval=-1e-3,maxval=1e-3),name="h2")
 
-		self.h2      = tf.Variable(tf.random_uniform([batchsize,shape[1].hidden_units],minval=-1e-3,maxval=1e-3),name="h2")
-		self.w2      = tf.Variable(weights[1],name="Weights2")# init with small random values to break symmetriy
-		self.bias_h2 = tf.Variable(tf.zeros([shape[1].hidden_units]),name="Hidden-Bias")
+		self.w1       = tf.Variable(self.weights[0],name="Weights1")# init with small random values to break symmetriy
+		self.bias_v   = tf.Variable(tf.zeros([self.shape[0].visible_units]),name="Visible-Bias")
+		self.bias_h1  = tf.Variable(tf.zeros([self.shape[0].hidden_units]),name="Hidden-Bias")
+
+		self.w2      = tf.Variable(self.weights[1],name="Weights2")# init with small random values to break symmetriy
+		self.bias_h2 = tf.Variable(tf.zeros([self.shape[1].hidden_units]),name="Hidden-Bias")
 
 
 		### Propagation
@@ -208,36 +219,74 @@ class DBM_class(object):
 		self.numpoints2 = tf.cast(tf.shape(self.h2)[0],tf.float32) #number of train inputs per batch (for averaging the CD matrix -> see practical paper by hinton)
 		self.CD2	    = (self.pos_grad2 - self.neg_grad2)/self.numpoints2
 		self.update_w2  = self.w2.assign(self.w2+learnrate*self.CD2)
-
-		""" bias updates"""
+		# bias updates
 		self.update_bias_h1 = self.bias_h1.assign(self.bias_h1+learnrate*tf.reduce_mean(self.h1-self.h1_gibbs,0))
 		self.update_bias_h2 = self.bias_h2.assign(self.bias_h2+learnrate*tf.reduce_mean(self.h2-self.h2_gibbs,0))
 		self.update_bias_v  = self.bias_v.assign(self.bias_v+learnrate*tf.reduce_mean(self.v-self.v_recon,0))
+		sess.run(tf.global_variables_initializer())
+
+		self.init_state=1
+
+
+	def train(self,epochs,batchsize,learnrate):
+		# init all vars for training
+		self.h2      = tf.Variable(tf.random_uniform([batchsize,self.shape[1].hidden_units],minval=-1e-3,maxval=1e-3),name="h2")
+		tf.variables_initializer([self.h2], name='init_train')
+		if self.init_state==0:
+			self.graph_init()
+
+
+		for epoch in range(epochs):
+			log.start("Deep BM Epoch:",epoch+1,"/",epochs)
+
+			for start, end in zip( range(0, len(train_data), batchsize), range(batchsize, len(train_data), batchsize)):
+				# define a batch
+				batch = train_data[start:end]
+				# run all updates 
+				sess.run([self.update_w1,self.update_w2,self.update_bias_v,self.update_bias_h1,self.update_bias_h2],feed_dict={self.v:batch})
+				# append error and other data to self variables
+				self.error_.append(self.error.eval({self.v:batch}))
+			
+			log.end()
+
+
+	def test(self):
+		#init the vars
+		self.h2      = tf.Variable(tf.random_uniform([len(test_data),self.shape[1].hidden_units],minval=-1e-3,maxval=1e-3),name="h2")
+		tf.variables_initializer([self.h2], name='init_train')
+		if self.init_state==0:
+			self.graph_init()
 		
+		self.test_error=self.error.eval({v:test_data})
+
 
 ####################################################################################################################################
 #### User Settings ###
-num_batches     = 1000
+# num_batches     = 1000
 pretrain_epochs = 1
-epochs          = 5
-learnrate       = 0.005
-learnrate_max   = 0.005
+# epochs          = 1
+# learnrate       = 0.005
+# learnrate_max   = 0.005
 temp            = 1.0
-pre_training    = 1
+pre_training    = 0
 training        = 1
+plotting	    = 0
+
 
 save_to_file   = 0
 load_from_file = 0
 file_suffix    = ""
 
+number_of_layers = 3
+n_first_layer    = 784
+n_second_layer   = 15*15
+n_third_layer    = 100
+####################################################################################################################################
 #### Create RBMs and merge them into one list for iteration###
 #RBM(visible units, hidden units, forw_mult, back_mult, liveplot,...)
-RBMs    = [0]*2
-RBMs[0] = RBM(784, 18*18, 2, 1, 0)
-RBMs[1] = RBM(18*18, 100 , 1, 2, 0)
-
-
-
+RBMs    = [0]*(number_of_layers-1)
+RBMs[0] = RBM(n_first_layer, n_second_layer, 2, 1, 0)
+RBMs[1] = RBM(n_second_layer, n_third_layer , 1, 2, 0)
 ####################################################################################################################################
 #### Session ####
 time_now = time.asctime()
@@ -248,7 +297,7 @@ log.info(time_now)
 errors         = []
 mean_w_        = []
 update         = 0
-batchsize      = 55000/num_batches 
+# batchsize      = 55000/num_batches 
 num_of_updates = epochs*num_batches
 d_learnrate    = float(learnrate_max-learnrate)/num_of_updates
 
@@ -269,10 +318,7 @@ with tf.Session() as sess:
 	#iterate through the RBMs , each iteration is a RBM
 	if pre_training:	
 		for RBM_i,RBM in enumerate(RBMs):
-
-		
 			log.start("Pretraining ",str(RBM_i+1)+".", "RBM")
-			
 
 			for epoch in range(pretrain_epochs):
 				log.start("Epoch:",epoch+1,"/",pretrain_epochs)
@@ -281,6 +327,7 @@ with tf.Session() as sess:
 					#### define a batch
 					batch = train_data[start:end]
 
+					# das noch in die rbm klasse rein : 
 					RBM.my_input_data = batch
 					if RBM_i==1:
 						RBM.my_input_data=RBMs[RBM_i-1].h.eval({RBMs[RBM_i-1].v:batch})
@@ -290,14 +337,13 @@ with tf.Session() as sess:
 
 
 					#### update the weights
+					#RBM.train() -> w_i und error werden in der train function definiert
 					RBM.w_i,error_i=sess.run([RBM.update_w,RBM.error],feed_dict={RBM.v:RBM.my_input_data})
 
 					#### #update the biases
-					sess.run([RBM.update_bias_h,RBM.update_bias_v],feed_dict={RBM.v:RBM.my_input_data})
+					# sess.run([RBM.update_bias_h,RBM.update_bias_v],feed_dict={RBM.v:RBM.my_input_data})
 
 
-					# increase the learnrate
-					learnrate+=d_learnrate
 
 					#### liveplot
 					if RBM.liveplot and plt.fignum_exists(fig.number) and start%40==0:
@@ -326,26 +372,28 @@ with tf.Session() as sess:
 
 	#### Pre training is ended - create the DBM with the gained weights
 	DBM=DBM_class(RBMs, [RBMs[0].w.eval(),RBMs[1].w.eval()])
-	sess.run(tf.global_variables_initializer())
+	
 	test_error=[]
 	
 	if training:
-		error_=[]
-		for epoch in range(epochs):
-			log.start("Deep BM Epoch:",epoch+1,"/",epochs)
-			
-			for start, end in zip( range(0, len(train_data), batchsize), range(batchsize, len(train_data), batchsize)):
-				#### define a batch
-				batch = train_data[start:end]
+		
+
+
+				# increase the learnrate
+				# learnrate+=d_learnrate
 
 				# update the weights and biases
-				sess.run([DBM.update_w1,DBM.update_w2,
-					DBM.update_bias_v,DBM.update_bias_h1,DBM.update_bias_h2],{DBM.v:batch})
+				# sess.run([DBM.update_w1,DBM.update_w2,
+					# DBM.update_bias_v,DBM.update_bias_h1,DBM.update_bias_h2],{DBM.v:batch})
+		DBM.train(epochs=1, batchsize=100 ,learnrate=0.005)
+		DBM.test()
+
+		print DBM.test_error
 				
 				# calculate the error				
-				error_.append(DBM.error.eval({DBM.v:batch}))
+				# error_.append(DBM.error.eval({DBM.v:batch}))
 			
-			log.end()
+			
 
 	### testing the Deep BM
 	for start, end in zip( range(0, len(train_data)/4, batchsize), range(batchsize, len(train_data)/4, batchsize)):
@@ -353,12 +401,14 @@ with tf.Session() as sess:
 			batch = train_data[start:end]
 
 			# get the probabilites and reconstructed images
+			#hier auch test function rein und die drei zeilen in eine machen 
 			probs      = DBM.v_recon_prob.eval({DBM.v:batch})
 			rec        = DBM.v_recon.eval({DBM.v:batch})
 			
 			test_error.append(DBM.error.eval({DBM.v:batch}))
 
 	# save all weights and biases for plotting
+	#das geht auch in der klasse bei train hinter sess.run() oder in einer externen export funtion
 	w1    = tile_raster_images(X=DBM.w1.eval().T, img_shape=(28, 28), tile_shape=(10, 10), tile_spacing=(0,0))
 	w2    = DBM.w2.eval()
 	bias1 = DBM.bias_v.eval()
@@ -388,24 +438,26 @@ if save_to_file:
 ####################################################################################################################################
 #### Plot
 # Plot the Weights, Errors and other informations
-fig_w,ax_w=plt.subplots(2,1,figsize=(10,10))
-ax_w[0].matshow(w1)
-ax_w[1].matshow(w2.T)
+if plotting:
+	fig_w,ax_w=plt.subplots(2,1,figsize=(10,10))
+	ax_w[0].matshow(w1)
+	ax_w[1].matshow(w2.T)
 
 
 
+	plt.figure()
+	plt.plot(test_error)				
 
-plt.plot(test_error)				
-fig3,ax3=plt.subplots(3,10,figsize=(16,4))
-for i in range(10):
-	# plot the input
-	ax3[0][i].matshow(batch[i:i+1].reshape(28,28))
-	# plot the probs of visible layer
-	ax3[1][i].matshow(probs[i:i+1].reshape(28,28))
-	# plot the recunstructed image
-	ax3[2][i].matshow(rec[i:i+1].reshape(28,28))
-	# plt.matshow(random_recon.reshape(28,28))
+	fig3,ax3=plt.subplots(3,10,figsize=(16,4))
+	for i in range(10):
+		# plot the input
+		ax3[0][i].matshow(batch[i:i+1].reshape(28,28))
+		# plot the probs of visible layer
+		ax3[1][i].matshow(probs[i:i+1].reshape(28,28))
+		# plot the recunstructed image
+		ax3[2][i].matshow(rec[i:i+1].reshape(28,28))
+		# plt.matshow(random_recon.reshape(28,28))
 
 
 
-plt.show()
+	plt.show()
