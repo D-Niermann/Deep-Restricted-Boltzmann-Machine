@@ -1,15 +1,15 @@
 #### Imports
 if True:
 	# -*- coding: utf-8 -*-
-	print "Starting..."
+	print ("Starting...")
 	import numpy as np
 	import numpy.random as rnd
 	import matplotlib.pyplot as plt
-	import matplotlib.image as img
+
 	import tensorflow as tf
 	# import scipy.ndimage.filters as filters
 	# import pandas as pd
-	import os,time,sys
+	import os,time
 	from math import exp,sqrt,sin,pi,cos,log
 	np.set_printoptions(precision=3)
 	# plt.style.use('ggplot')
@@ -154,8 +154,7 @@ class RBM(object):
 
 		return self.w_i,self.error_i
 
-	def test():
-		pass
+
 
 
 ################################################################################################################################################
@@ -167,13 +166,14 @@ class DBM_class(object):
 	should be used.
 	"""
 
-	def __init__(self,shape,weights,learnrate):
-		self.n_layers = len(shape)
-		self.shape = shape
+	def __init__(self,shape,weights,learnrate,liveplot):
+		self.n_layers     = len(shape)
+		self.liveplot     = liveplot
+		self.shape        = shape
 		self.train_error_ = []
-		self.weights=weights
-		self.init_state=0
-		self.learnrate=learnrate
+		self.weights      = weights
+		self.init_state   = 0
+		self.learnrate    = learnrate
 
 	def graph_init(self):
 		################################################################################################################################################
@@ -215,7 +215,7 @@ class DBM_class(object):
 		self.h2_gibbs = sigmoid(tf.matmul(self.h1_recon,self.w2), temp)
 		
 		#Error
-		self.error  = tf.reduce_mean(tf.square(self.v-self.v_recon))
+		self.error    = tf.reduce_mean(tf.square(self.v-self.v_recon))
 
 		### Training with contrastive Divergence
 		#first weight matrix
@@ -241,13 +241,16 @@ class DBM_class(object):
 
 	def train(self,epochs,num_batches):
 		# init all vars for training
-		batchsize      = 55000/num_batches
+		batchsize      = int(55000/num_batches)
 		self.batchsize = batchsize
 		num_of_updates = epochs*num_batches
 		self.h2        = tf.Variable(tf.random_uniform([batchsize,self.shape[1].hidden_units],minval=-1e-3,maxval=1e-3),name="h2")
 		tf.variables_initializer([self.h2], name='init_train')
 		if self.init_state==0:
 			self.graph_init()
+
+		if self.liveplot:
+			fig,ax=plt.subplots(1,1,figsize=(15,10))
 
 
 		for epoch in range(epochs):
@@ -260,6 +263,15 @@ class DBM_class(object):
 				sess.run([self.update_w1,self.update_w2,self.update_bias_v,self.update_bias_h1,self.update_bias_h2],feed_dict={self.v:batch})
 				# append error and other data to self variables
 				self.train_error_.append(self.error.eval({self.v:batch}))
+
+
+				if self.liveplot and plt.fignum_exists(fig.number) and start%40==0:
+						ax.cla()
+						
+						matrix_new=tile_raster_images(X=self.w1.eval().T, img_shape=(28, 28), tile_shape=(12, 12), tile_spacing=(0,0))
+						ax.matshow(matrix_new)
+						plt.pause(0.00001)
+			
 			
 			log.info("Error:",self.train_error_[-1])
 			
@@ -268,44 +280,46 @@ class DBM_class(object):
 
 	def test(self):
 		#init the vars
-		self.h2      = tf.Variable(tf.random_uniform([len(test_data),self.shape[1].hidden_units],minval=-1e-3,maxval=1e-3),name="h2")
-		tf.variables_initializer([self.h2], name='init_train')
-		if self.init_state==0:
-			self.graph_init()
+		# self.h2      = tf.Variable(tf.random_uniform([len(test_data),self.shape[1].hidden_units],minval=-1e-3,maxval=1e-3),name="h2")
+		# tf.variables_initializer([self.h2], name='init_train')
+		# if self.init_state==0:
+		# 	self.graph_init()
 		
 		""" testing only the batch because shapes will not match when taking a bigger batch """
-		self.test_batch=test_data[0:self.batchsize]
+		self.test_batch = test_data[0:self.batchsize]
 
-		self.test_error =self.error.eval({self.v:self.test_batch})
+		self.test_error = self.error.eval({self.v:self.test_batch})
 
-		self.probs      = DBM.v_recon_prob.eval({DBM.v:self.test_batch})
-		self.rec        = DBM.v_recon.eval({DBM.v:self.test_batch})
+		self.probs      = self.v_recon_prob.eval({self.v:self.test_batch})
+		self.rec        = self.v_recon.eval({self.v:self.test_batch})
+
+		self.rec_h1     = self.h1_recon_prob.eval({self.v:self.test_batch})
 
 
 	def export(self):
-		self.w1    = tile_raster_images(X=DBM.w1.eval().T, img_shape=(28, 28), tile_shape=(10, 10), tile_spacing=(0,0))
-		self.w2    = DBM.w2.eval()
-		self.bias1 = DBM.bias_v.eval()
-		self.bias2 = DBM.bias_h1.eval()
-		self.bias3 = DBM.bias_h2.eval()
+		self.w1    = self.w1.eval() 
+		self.w2    = self.w2.eval()
+		self.bias1 = self.bias_v.eval()
+		self.bias2 = self.bias_h1.eval()
+		self.bias3 = self.bias_h2.eval()
 
 
 
 ####################################################################################################################################
 #### User Settings ###
-num_batches_pretrain = 500
+num_batches_pretrain = 1000
 dbm_batches          = 500
 pretrain_epochs      = 1
-dbm_epochs           = 4
+dbm_epochs           = 3
 
-dbm_learnrate        = 0.005
-rbm_learnrate        = 0.005
+rbm_learnrate = 0.005
+dbm_learnrate = 0.005
 
-temp                 = 1.0
+temp          = 1.
 
-pre_training   = 1
-training       = 1
-plotting       = 1
+pre_training = 1
+training     = 1
+plotting     = 1
 
 save_to_file   = 0
 load_from_file = 0
@@ -314,25 +328,24 @@ file_suffix    = ""
 number_of_layers = 3
 n_first_layer    = 784
 n_second_layer   = 15*15
-n_third_layer    = 100
+n_third_layer    = 10*10
+
+
 ####################################################################################################################################
 #### Create RBMs and merge them into one list for iteration###
 #RBM(visible units, hidden units, forw_mult, back_mult, liveplot,...)
 RBMs    = [0]*(number_of_layers-1)
 RBMs[0] = RBM(n_first_layer, n_second_layer , 2, 1, learnrate=rbm_learnrate, liveplot=0)
 RBMs[1] = RBM(n_second_layer, n_third_layer , 1, 2, learnrate=rbm_learnrate, liveplot=0)
+
+
+
+
 ####################################################################################################################################
 #### Session ####
 time_now = time.asctime()
 log.reset()
-
 log.info(time_now)
-
-errors         = []
-mean_w_        = []
-update         = 0
-batchsize_pretrain = 55000/num_batches_pretrain
-
 
 # d_learnrate   = float(learnrate_max-learnrate)/num_of_updates
 
@@ -344,7 +357,8 @@ if pre_training:
 			log.info("Liveplot is open!")
 			fig,ax=plt.subplots(1,1,figsize=(15,10))
 			break
-	
+
+batchsize_pretrain = int(55000/num_batches_pretrain)
 
 # start the session
 with tf.Session() as sess:
@@ -367,18 +381,20 @@ with tf.Session() as sess:
 					#### define a batch
 					batch = train_data[start:end]
 
+
+					# train the rbm 
 					w_i,error_i = RBM.train(batch)
 			
+
 					#### liveplot
 					if RBM.liveplot and plt.fignum_exists(fig.number) and start%40==0:
 						ax.cla()
-
 						rbm_shape=int(sqrt(RBM.visible_units))
 						matrix_new=tile_raster_images(X=w_i.T, img_shape=(rbm_shape, rbm_shape), tile_shape=(10, 10), tile_spacing=(0,0))
 						ax.matshow(matrix_new)
-
 						plt.pause(0.00001)
 						
+
 				log.info("Learnrate:",round(rbm_learnrate,4))
 				log.info("Error",round(error_i,4))
 				log.end() #ending the epoch
@@ -392,15 +408,19 @@ with tf.Session() as sess:
 		for i in range(len(RBMs)):
 			weights.append(RBMs[i].w.eval())
 
+
+
 	######### DBM ##########################################################################
 	#### Pre training is ended - create the DBM with the gained weights
-	DBM = DBM_class(RBMs, [RBMs[0].w.eval(),RBMs[1].w.eval()],learnrate=dbm_learnrate)
+	DBM = DBM_class(RBMs, weights,learnrate=dbm_learnrate,liveplot=0)
 	
 	if training:
 		DBM.train(epochs=dbm_epochs, num_batches=dbm_batches)
 		DBM.export()
 		
-	DBM.test()				
+	DBM.test()
+
+
 	
 log.reset()
 log.info("test error: ",(DBM.test_error), "learnrate: ",dbm_learnrate)
@@ -414,14 +434,14 @@ if save_to_file:
 #### Plot
 # Plot the Weights, Errors and other informations
 if plotting:
-	fig_w,ax_w=plt.subplots(2,1,figsize=(10,10))
-	map1=ax_w[0].matshow(DBM.w1)
-	ax_w[0].set_title("W 1")
-	plt.colorbar(map1,ax_w[1])
 	
-	map2=ax_w[1].matshow(DBM.w2.T)
-	ax_w[1].set_title("W 2")
-	plt.colorbar(map2,ax_w[1])
+	map1=plt.matshow(tile_raster_images(X=DBM.w1.T, img_shape=(28, 28), tile_shape=(12, 12), tile_spacing=(0,0)))
+	plt.title("W 1")
+
+
+	map2=plt.matshow(DBM.w2.T)
+	plt.title("W 2")
+	plt.colorbar(map2)
 
 
 	fig3,ax3 = plt.subplots(3,10,figsize=(16,4))
