@@ -136,12 +136,12 @@ def save(name_extension, w=[],bias_v=[],bias_h=[]):
       	np.savetxt("bias_v-%s.txt"%name_extension, bias_v)
       if len(bias_h)!=0:
       	np.savetxt("bias_h-%s.txt"%name_extension, bias_h)
-      print( "saved weights and biases with name_extension=%s"%name_extension)
+      print "saved weights and biases with name_extension=%s"%name_extension
 
 def init_pretrained(name_extension="0.0651765",w=None,bias_v=None,bias_h=None):
 	path="/Users/Niermann/Google Drive/Masterarbeit/Python"
 	os.chdir(path)
-	print( "loading from: "+ path)
+	print "loading from: "+ path
 	m=[]
 	if (w)!=None:
 		w=np.loadtxt("weights-%s.txt"%name_extension)
@@ -152,7 +152,7 @@ def init_pretrained(name_extension="0.0651765",w=None,bias_v=None,bias_h=None):
 	if (bias_h)!=None:
 		bias_h=np.loadtxt("bias_h-%s.txt"%name_extension)
 		m.append(bias_h)
-	print( "loaded %s objects from file"%str(len(m)))
+	print "loaded %s objects from file"%str(len(m))
 	return m
 
 def sigmoid(x,T):

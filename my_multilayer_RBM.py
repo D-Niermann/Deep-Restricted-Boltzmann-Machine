@@ -5,15 +5,19 @@ if True:
 	import numpy as np
 	import numpy.random as rnd
 	import matplotlib.pyplot as plt
-
+	import matplotlib as mpl
 	import tensorflow as tf
 	# import scipy.ndimage.filters as filters
 	# import pandas as pd
 	import os,time
 	from math import exp,sqrt,sin,pi,cos,log
 	np.set_printoptions(precision=3)
-	# plt.style.use('ggplot')
+	
 	workdir="/Users/Niermann/Google Drive/Masterarbeit/Python"
+	# workdir="/home/dario/Downloads"
+	mpl.rcParams["image.cmap"] = "jet"
+	mpl.rcParams["grid.linewidth"] = 0.0
+	
 	os.chdir(workdir)
 	from Logger import *
 	from RBM_Functions import *
@@ -330,6 +334,7 @@ class DBM_class(object):
 		self.rec        = self.v_recon.eval({self.v:test_data})
 
 		self.rec_h1     = self.h1_recon_prob.eval({self.v:test_data})
+		self.h2_test    = self.h2.eval({self.v:test_data})
 
 		log.end()
 
@@ -373,7 +378,7 @@ pre_training = 1
 training     = 1
 plotting     = 1
 
-save_to_file   = 1
+save_to_file   = 0
 load_from_file = 1
 pathsuffix     = "/Wed Jan 10 13-59-53 2018"
 
@@ -488,7 +493,7 @@ if plotting:
 	plt.colorbar(map2)
 
 
-	fig3,ax3 = plt.subplots(3,10,figsize=(16,4))
+	fig3,ax3 = plt.subplots(5,10,figsize=(16,4))
 	for i in range(10):
 		# plot the input
 		ax3[0][i].matshow(test_data[i:i+1].reshape(28,28))
@@ -496,6 +501,10 @@ if plotting:
 		ax3[1][i].matshow(DBM.probs[i:i+1].reshape(28,28))
 		# plot the recunstructed image
 		ax3[2][i].matshow(DBM.rec[i:i+1].reshape(28,28))
+		# plot the hidden layer h2
+		ax3[3][i].matshow(DBM.h2_test[i:i+1].reshape(int(sqrt(DBM.shape[1].hidden_units)),int(sqrt(DBM.shape[1].hidden_units))))
+		#plot the reconstructed layer h1
+		ax3[4][i].matshow(DBM.rec_h1[i:i+1].reshape(int(sqrt(DBM.shape[0].hidden_units)),int(sqrt(DBM.shape[0].hidden_units))))
 		# plt.matshow(random_recon.reshape(28,28))
 
 
