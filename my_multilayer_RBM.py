@@ -17,7 +17,7 @@ if True:
 	# workdir="/home/dario/Downloads"
 	mpl.rcParams["image.cmap"] = "jet"
 	mpl.rcParams["grid.linewidth"] = 0.0
-	
+
 	os.chdir(workdir)
 	from Logger import *
 	from RBM_Functions import *
@@ -52,7 +52,8 @@ if "train_data" not in globals():
 	log.out("Loading Data")
 	mnist = input_data.read_data_sets("MNIST_data/", one_hot=True)
 	train_data, trY, test_data, teY = mnist.train.images, mnist.train.labels, mnist.test.images, mnist.test.labels
-
+	test_data[:]=test_data[:]>0.3
+	train_data[:]=train_data[:]>0.3
 	#get test data of only one number class:
 	index_for_number=[]
 	for i in range(len(teY)):
@@ -370,7 +371,7 @@ pretrain_epochs      = 1
 dbm_epochs           = 1
 
 rbm_learnrate = 0.005
-dbm_learnrate = 0.001
+dbm_learnrate = 0.005
 
 temp          = 1.
 
@@ -385,7 +386,7 @@ pathsuffix     = "/Wed Jan 10 13-59-53 2018"
 number_of_layers = 3
 n_first_layer    = 784
 n_second_layer   = 15*15
-n_third_layer    = 4*4
+n_third_layer    = 100
 
 
 ####################################################################################################################################
@@ -493,8 +494,8 @@ if plotting:
 	plt.colorbar(map2)
 
 
-	fig3,ax3 = plt.subplots(5,10,figsize=(16,4))
-	for i in range(10):
+	fig3,ax3 = plt.subplots(5,15,figsize=(16,4))
+	for i in range(15):
 		# plot the input
 		ax3[0][i].matshow(test_data[i:i+1].reshape(28,28))
 		# plot the probs of visible layer

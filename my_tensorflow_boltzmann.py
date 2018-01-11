@@ -47,7 +47,8 @@ if "train_data" not in globals():
 	log.out("Loading Data")
 	mnist = input_data.read_data_sets("MNIST_data/", one_hot=True)
 	train_data, trY, test_data, teY = mnist.train.images, mnist.train.labels, mnist.test.images, mnist.test.labels
-
+test_data[:]=test_data[:]>0.3
+train_data[:]=train_data[:]>0.3
 #get test data of only one number class:
 index_for_number=[]
 for i in range(len(teY)):
@@ -55,24 +56,24 @@ for i in range(len(teY)):
 		index_for_number.append(i)
 
 #load test h images
-h_test_images=np.loadtxt("h_as_test_images")
-train_data_new=h_test_images
+# h_test_images=np.loadtxt("h_as_test_images")
+# train_data_new=h_test_images
 
 
 ################################################################################################################################################
 #### User Variables
 writer_on     = False
-hidden_units  = 10*10
-visible_units = 17*17
+hidden_units  = 17*17
+visible_units = 28*28
 
 
 num_batches   = 1000
-epochs        = 30
+epochs        = 10
 learnrate     = 0.005
 learnrate_max = 0.005
 temp          = 1.0
 
-save_to_file   = 0
+save_to_file   = 1
 load_from_file = 0
 file_suffix    = "0.0651765" #for a 10 x 10 hidden layer and relative good training 
 
@@ -80,8 +81,8 @@ training = 1
 liveplot = 0
 plotting = 1
 
-plot_recon_with_gibbs_sampling=0
-gibbs_steps=100
+plot_recon_with_gibbs_sampling=1
+gibbs_steps=1000
 
 ################################################################################################################################################
 #### Graph
@@ -134,7 +135,7 @@ mean_w   = tf.reduce_mean(w)
 """ Since vectors v and h are actualy matrices with number of batch_size images in them, reduce mean will make them to a vector again """
 update_bias_v = bias_v.assign(bias_v+learnrate*tf.reduce_mean(v-v_recon,0))
 update_bias_h = bias_h.assign(bias_h+learnrate*tf.reduce_mean(h-h_gibbs,0))
-
+#
 # reverse feed
 h_rev       = tf.placeholder(tf.float32,[None,hidden_units],name="Reverse-hidden")
 v_prob_rev  = sigmoid(tf.matmul(h_rev,tf.transpose(w)) + bias_v,temp)
@@ -150,7 +151,7 @@ log.info(time_now)
 errors         = []
 mean_w_        = []
 update         = 0
-batchsize      = int(len(train_data_new)/num_batches) 
+batchsize      = int(len(train_data)/num_batches) 
 num_of_updates = epochs*num_batches
 d_learnrate    = float(learnrate_max-learnrate)/num_of_updates
 
@@ -172,9 +173,9 @@ with tf.Session() as sess:
 		for epoch in range(epochs):
 			log.start("Epoch:",epoch+1,"/",epochs)
 			
-			for start, end in zip( range(0, len(train_data_new), batchsize), range(batchsize, len(train_data_new), batchsize)):
+			for start, end in zip( range(0, len(train_data), batchsize), range(batchsize, len(train_data), batchsize)):
 				#### define a batch
-				batch = train_data_new[start:end]
+				batch = train_data[start:end]
 
 			
 				#### update the weights
@@ -201,7 +202,7 @@ with tf.Session() as sess:
 					# ax[2].matshow(ubv.reshape(28,28))
 					plt.pause(0.00001)
 					
-			temp*=0.9
+			# temp*=0.1 #hilft nichts
 			log.info("Learnrate:",round(learnrate,4))
 			log.info("Error:",round(error_i,3))
 			log.info("Temp:",temp)
@@ -209,7 +210,7 @@ with tf.Session() as sess:
 
 
 	### Testing the network
-	half_images = np.copy(train_data_new[0:11])
+	half_images = np.copy(train_data[0:11])
 	#halfing some images from test_data
 	# r                     = sorted((rnd.sample(784)*784).astype(np.int))
 	# half_images[1:6,r[:]] = 0
@@ -218,42 +219,44 @@ with tf.Session() as sess:
 	prob_gibbs            = v_prob.eval({v:half_images[1:2]})
 	# h_test                = h.eval({v:test_data})
 	fig3,ax3              = plt.subplots(1,1)
-	
-	# if plot_recon_with_gibbs_sampling:
-	# 	for i in range(gibbs_steps):
-	# 		# gibbs steps
-	# 		ax3.cla()
-	# 		ax3.matshow(prob_gibbs.reshape(28,28))
-	# 		plt.pause(0.001)
-	# 		prob_gibbs=v_prob.eval({v:prob_gibbs})
 
 
-	# mean_test_error=sess.run([error],feed_dict={v:test_data})
+	if plot_recon_with_gibbs_sampling:
+		prob_gibbs_=np.zeros([gibbs_steps,784])
+		for i in range(gibbs_steps):
+			# gibbs steps
+			ax3.cla()
+			ax3.matshow(prob_gibbs.reshape(28,28))
+			plt.pause(0.001)
+			prob_gibbs=v_prob.eval({v:prob_gibbs})
+			prob_gibbs_[i]=prob_gibbs
+
+	mean_test_error=sess.run([error],feed_dict={v:test_data})
 
 	
 	# # checking if h looks the same for one number class
-	# number_data=test_data[index_for_number[:]]
-	# h_layer=h.eval({v:number_data})
+	number_data=test_data[index_for_number[:]]
+	h_layer=h.eval({v:number_data})
 
 	# #check if the h_layers really recreate the desired numbers
-	# recon=v_recon_rev.eval({h_rev:h_layer})
-	# #take the mean of every h layer and generate a image from this one
-	# h_mean=np.round(np.mean(h_layer,axis=0)).reshape(1,hidden_units)
-	# recon_mean=np.zeros([100,784])
-	# for i in range(100):
-	# 	recon_mean[i]=v_recon_rev.eval({h_rev:h_mean})
+	recon=v_recon_rev.eval({h_rev:h_layer})
+	#take the mean of every h layer and generate a image from this one
+	h_mean=np.round(np.mean(h_layer,axis=0)).reshape(1,hidden_units)
+	recon_mean=np.zeros([100,784])
+	for i in range(100):
+		recon_mean[i]=v_recon_rev.eval({h_rev:h_mean})
 
 	#reverse feeding
 	# input_vector=np.round(np.zeros([1,hidden_units]))
 	# fig,ax2=plt.subplots(2,1,figsize=(10,10))
 	# for i in range(100):
-		# output=v_prob_rev.eval({h_rev:input_vector})
-		# input_vector=h.eval({v:output})
-		# ax2[0].cla()
-		# ax2[1].cla()
-		# ax2[0].matshow(output.reshape(28,28))
-		# ax2[1].matshow(input_vector[:,:400].reshape(20,20))
-		# plt.pause(0.0001)
+	# 	output=v_prob_rev.eval({h_rev:input_vector})
+	# 	input_vector=h.eval({v:output})
+	# 	ax2[0].cla()
+	# 	ax2[1].cla()
+	# 	ax2[0].matshow(output.reshape(28,28))
+	# 	ax2[1].matshow(input_vector.reshape(28,28))
+	# 	plt.pause(0.0001)
 
 if training:
 	log.reset()
@@ -303,30 +306,30 @@ if plotting:
 		# plt.matshow(random_recon.reshape(28,28))
 
 	#plot the h_layers
-	# fig_h,ax_h=plt.subplots(7,7,figsize=(11,11))
-	# m=0
-	# for i in range(7):
-	# 	for j in range(7):
-	# 		ax_h[i][j].matshow(h_layer[m].reshape(int(sqrt(hidden_units)),int(sqrt(hidden_units))))
-	# 		m+=1
-	# fig_h.tight_layout()
+	fig_h,ax_h=plt.subplots(7,7,figsize=(11,11))
+	m=0
+	for i in range(7):
+		for j in range(7):
+			ax_h[i][j].matshow(h_layer[m].reshape(int(sqrt(hidden_units)),int(sqrt(hidden_units))))
+			m+=1
+	fig_h.tight_layout()
 
 	# # plot the reconstructed digits from h_layer
-	# fig_recon,ax_recon=plt.subplots(7,7,figsize=(11,11))
-	# m=0
-	# for i in range(7):
-	# 	for j in range(7):
-	# 		ax_recon[i][j].matshow(recon[m].reshape(28,28))
-	# 		m+=1
-	# fig_recon.tight_layout()
+	fig_recon,ax_recon=plt.subplots(7,7,figsize=(11,11))
+	m=0
+	for i in range(7):
+		for j in range(7):
+			ax_recon[i][j].matshow(recon[m].reshape(28,28))
+			m+=1
+	fig_recon.tight_layout()
 
 	#plot the reconstructed digit from the mean h
-	# plt.matshow(h_mean.reshape(int(sqrt(hidden_units)),int(sqrt(hidden_units))))
-	# fig4,ax4=plt.subplots(1,1)
-	# for i in range(100):
-	# 	ax4.cla()
-	# 	ax4.matshow(recon_mean[i].reshape(28,28))
-		# plt.pause(0.05)
+	plt.matshow(h_mean.reshape(int(sqrt(hidden_units)),int(sqrt(hidden_units))))
+	fig4,ax4=plt.subplots(1,1)
+	for i in range(100):
+		ax4.cla()
+		ax4.matshow(recon_mean[i].reshape(28,28))
+		plt.pause(0.05)
 
 
-	plt.show()
+plt.show()
