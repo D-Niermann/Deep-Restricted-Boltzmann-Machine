@@ -54,15 +54,20 @@ for i in range(len(teY)):
 	if (teY[i]==[0,0,0,0,0,0,0,0,0,1]).sum()==10:
 		index_for_number.append(i)
 
+#load test h images
+h_test_images=np.loadtxt("h_as_test_images")
+train_data_new=h_test_images
+
+
 ################################################################################################################################################
 #### User Variables
 writer_on     = False
-hidden_units  = 13*13
-visible_units = 784
+hidden_units  = 10*10
+visible_units = 17*17
 
 
 num_batches   = 1000
-epochs        = 5
+epochs        = 30
 learnrate     = 0.005
 learnrate_max = 0.005
 temp          = 1.0
@@ -71,8 +76,9 @@ save_to_file   = 0
 load_from_file = 0
 file_suffix    = "0.0651765" #for a 10 x 10 hidden layer and relative good training 
 
-training       = 1
-liveplot       = 1
+training = 1
+liveplot = 0
+plotting = 1
 
 plot_recon_with_gibbs_sampling=0
 gibbs_steps=100
@@ -144,7 +150,7 @@ log.info(time_now)
 errors         = []
 mean_w_        = []
 update         = 0
-batchsize      = 55000/num_batches 
+batchsize      = int(len(train_data_new)/num_batches) 
 num_of_updates = epochs*num_batches
 d_learnrate    = float(learnrate_max-learnrate)/num_of_updates
 
@@ -166,9 +172,9 @@ with tf.Session() as sess:
 		for epoch in range(epochs):
 			log.start("Epoch:",epoch+1,"/",epochs)
 			
-			for start, end in zip( range(0, len(train_data), batchsize), range(batchsize, len(train_data), batchsize)):
+			for start, end in zip( range(0, len(train_data_new), batchsize), range(batchsize, len(train_data_new), batchsize)):
 				#### define a batch
-				batch = train_data[start:end]
+				batch = train_data_new[start:end]
 
 			
 				#### update the weights
@@ -189,50 +195,53 @@ with tf.Session() as sess:
 					# ax[1].cla()
 					# ax[2].cla()
 
-					matrix_new=tile_raster_images(X=w_i.T, img_shape=(28, 28), tile_shape=(10, 10), tile_spacing=(0,0))
+					matrix_new=tile_raster_images(X=w_i.T, img_shape=(int(sqrt(visible_units)),int(sqrt(visible_units))), tile_shape=(10, 10), tile_spacing=(0,0))
 					ax.matshow(matrix_new)
 					# ax[1].plot(errors)
 					# ax[2].matshow(ubv.reshape(28,28))
 					plt.pause(0.00001)
 					
-			log.info("\tLearnrate:",round(learnrate,4))
-			log.info("\tError",round(error_i,3))
+			temp*=0.9
+			log.info("Learnrate:",round(learnrate,4))
+			log.info("Error:",round(error_i,3))
+			log.info("Temp:",temp)
 			log.end() #ending the epoch
 
 
-	#### Testing the network
-	half_images = np.copy(test_data[0:11])
+	### Testing the network
+	half_images = np.copy(train_data_new[0:11])
 	#halfing some images from test_data
-	r                     = sorted((rnd.sample(784)*784).astype(np.int))
-	half_images[1:6,r[:]] = 0
+	# r                     = sorted((rnd.sample(784)*784).astype(np.int))
+	# half_images[1:6,r[:]] = 0
 	probs                 = v_prob.eval({v:half_images})
 	rec                   = v_recon.eval({v:half_images})
 	prob_gibbs            = v_prob.eval({v:half_images[1:2]})
+	# h_test                = h.eval({v:test_data})
 	fig3,ax3              = plt.subplots(1,1)
 	
-	if plot_recon_with_gibbs_sampling:
-		for i in range(gibbs_steps):
-			# gibbs steps
-			ax3.cla()
-			ax3.matshow(prob_gibbs.reshape(28,28))
-			plt.pause(0.001)
-			prob_gibbs=v_prob.eval({v:prob_gibbs})
+	# if plot_recon_with_gibbs_sampling:
+	# 	for i in range(gibbs_steps):
+	# 		# gibbs steps
+	# 		ax3.cla()
+	# 		ax3.matshow(prob_gibbs.reshape(28,28))
+	# 		plt.pause(0.001)
+	# 		prob_gibbs=v_prob.eval({v:prob_gibbs})
 
 
-	mean_test_error=sess.run([error],feed_dict={v:test_data})
+	# mean_test_error=sess.run([error],feed_dict={v:test_data})
 
 	
-	# checking if h looks the same for one number class
-	number_data=test_data[index_for_number[:]]
-	h_layer=h.eval({v:number_data})
+	# # checking if h looks the same for one number class
+	# number_data=test_data[index_for_number[:]]
+	# h_layer=h.eval({v:number_data})
 
-	#check if the h_layers really recreate the desired numbers
-	recon=v_recon_rev.eval({h_rev:h_layer})
-	#take the mean of every h layer and generate a image from this one
-	h_mean=np.round(np.mean(h_layer,axis=0)).reshape(1,hidden_units)
-	recon_mean=np.zeros([100,784])
-	for i in range(100):
-		recon_mean[i]=v_recon_rev.eval({h_rev:h_mean})
+	# #check if the h_layers really recreate the desired numbers
+	# recon=v_recon_rev.eval({h_rev:h_layer})
+	# #take the mean of every h layer and generate a image from this one
+	# h_mean=np.round(np.mean(h_layer,axis=0)).reshape(1,hidden_units)
+	# recon_mean=np.zeros([100,784])
+	# for i in range(100):
+	# 	recon_mean[i]=v_recon_rev.eval({h_rev:h_mean})
 
 	#reverse feeding
 	# input_vector=np.round(np.zeros([1,hidden_units]))
@@ -260,7 +269,7 @@ if save_to_file:
 
 ####################################################################################################################################
 #### Plot
-if 1:
+if plotting:
 	# Plot the Weights, Errors and other informations
 	if training:
 		#plot the errors
@@ -271,7 +280,7 @@ if 1:
 		# plt.plot(mean_w_)
 		
 		#plot the weights
-		weights_raster=tile_raster_images(X=w_i.T, img_shape=(28, 28), tile_shape=(10, 20), tile_spacing=(0,0))
+		weights_raster=tile_raster_images(X=w_i.T, img_shape=(int(sqrt(visible_units)), int(sqrt(visible_units))), tile_shape=(10, 20), tile_spacing=(0,0))
 		fig_m=plt.figure("Weights",figsize=(8,3))
 		ax_m=fig_m.add_subplot(1,1,1)
 		map1=ax_m.matshow(w_i.T)
@@ -286,33 +295,33 @@ if 1:
 	fig3,ax3=plt.subplots(3,10,figsize=(16,4))
 	for i in range(len(rec)-1):
 		# plot the input
-		ax3[0][i].matshow(half_images[i:i+1].reshape(28,28))
+		ax3[0][i].matshow(half_images[i:i+1].reshape(int(sqrt(visible_units)),int(sqrt(visible_units))))
 		# plot the probs of visible layer
-		ax3[1][i].matshow(probs[i:i+1].reshape(28,28))
+		ax3[1][i].matshow(probs[i:i+1].reshape(int(sqrt(visible_units)),int(sqrt(visible_units))))
 		# plot the recunstructed image
-		ax3[2][i].matshow(rec[i:i+1].reshape(28,28))
+		ax3[2][i].matshow(rec[i:i+1].reshape(int(sqrt(visible_units)),int(sqrt(visible_units))))
 		# plt.matshow(random_recon.reshape(28,28))
 
 	#plot the h_layers
-	fig_h,ax_h=plt.subplots(7,7,figsize=(11,11))
-	m=0
-	for i in range(7):
-		for j in range(7):
-			ax_h[i][j].matshow(h_layer[m].reshape(int(sqrt(hidden_units)),int(sqrt(hidden_units))))
-			m+=1
-	fig_h.tight_layout()
+	# fig_h,ax_h=plt.subplots(7,7,figsize=(11,11))
+	# m=0
+	# for i in range(7):
+	# 	for j in range(7):
+	# 		ax_h[i][j].matshow(h_layer[m].reshape(int(sqrt(hidden_units)),int(sqrt(hidden_units))))
+	# 		m+=1
+	# fig_h.tight_layout()
 
-	# plot the reconstructed digits from h_layer
-	fig_recon,ax_recon=plt.subplots(7,7,figsize=(11,11))
-	m=0
-	for i in range(7):
-		for j in range(7):
-			ax_recon[i][j].matshow(recon[m].reshape(28,28))
-			m+=1
-	fig_recon.tight_layout()
+	# # plot the reconstructed digits from h_layer
+	# fig_recon,ax_recon=plt.subplots(7,7,figsize=(11,11))
+	# m=0
+	# for i in range(7):
+	# 	for j in range(7):
+	# 		ax_recon[i][j].matshow(recon[m].reshape(28,28))
+	# 		m+=1
+	# fig_recon.tight_layout()
 
 	#plot the reconstructed digit from the mean h
-	plt.matshow(h_mean.reshape(int(sqrt(hidden_units)),int(sqrt(hidden_units))))
+	# plt.matshow(h_mean.reshape(int(sqrt(hidden_units)),int(sqrt(hidden_units))))
 	# fig4,ax4=plt.subplots(1,1)
 	# for i in range(100):
 	# 	ax4.cla()

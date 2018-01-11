@@ -13,7 +13,8 @@ if True:
 	from math import exp,sqrt,sin,pi,cos,log
 	np.set_printoptions(precision=3)
 	# plt.style.use('ggplot')
-	os.chdir("/Users/Niermann/Google Drive/Masterarbeit/Python")
+	workdir="/Users/Niermann/Google Drive/Masterarbeit/Python"
+	os.chdir(workdir)
 	from Logger import *
 	from RBM_Functions import *
 	### import seaborn? ###
@@ -40,7 +41,7 @@ if True:
 	log=Logger(True)
 
 from tensorflow.examples.tutorials.mnist import input_data
-
+time_now = time.asctime()
 
 #### Load MNIST Data 
 if "train_data" not in globals():
@@ -174,24 +175,48 @@ class DBM_class(object):
 		self.weights      = weights
 		self.init_state   = 0
 		self.learnrate    = learnrate
+		self.exported     = 0
 
+	def load_from_file(self,path):
+		os.chdir(path)
+		log.out("Loading data from:","...",path[-20:])
+		self.w1_np=np.loadtxt("w1.txt")
+		self.w2_np=np.loadtxt("w2.txt")
+		self.bias1_np=np.loadtxt("bias1.txt")
+		self.bias2_np=np.loadtxt("bias2.txt")
+		self.bias3_np=np.loadtxt("bias3.txt")
+		os.chdir(workdir)
+
+
+	def import_(self):
+		""" setting up the graph and setting the weights and biases tf variables to the 
+		saved numpy arrays """
+		self.graph_init()
+		log.out("loading numpy vars into graph")
+		sess.run(self.w1.assign(self.w1_np))
+		sess.run(self.w2.assign(self.w2_np))
+		sess.run(self.bias_v.assign(self.bias1_np))
+		sess.run(self.bias_h1.assign(self.bias2_np))
+		sess.run(self.bias_h2.assign(self.bias3_np))
+
+	################################################################################################################################################
+	####  DBM Graph 
+	################################################################################################################################################
 	def graph_init(self):
-		################################################################################################################################################
-		####  DBM Graph
-		################################################################################################################################################
-		""" shape definitions are wired here-normally one would define [rows,columns] but here it is reversed with [columns,rows]? """
-
+		""" sets the graph up and loads the pretrained weights in , these are given
+		at class definition - could be changed .... """
+		log.out("Initializing graph")
 		self.v        = tf.placeholder(tf.float32,[None,self.shape[0].visible_units],name="Visible-Layer") # has self.shape [number of images per batch,number of visible units]
 		
 
-		# self.h2      = tf.Variable(tf.random_uniform([len(batch_data),self.shape[1].hidden_units],minval=-1e-3,maxval=1e-3),name="h2")
+		# self.h2      = tf.placeholder(tf.random_uniform([None,self.shape[1].hidden_units],minval=-1e-3,maxval=1e-3),name="h2_placeholder")
 
-		self.w1       = tf.Variable(self.weights[0],name="Weights1")# init with small random values to break symmetriy
-		self.bias_v   = tf.Variable(tf.zeros([self.shape[0].visible_units]),name="Visible-Bias")
-		self.bias_h1  = tf.Variable(tf.zeros([self.shape[0].hidden_units]),name="Hidden-Bias")
+		self.w1 = tf.Variable(self.weights[0],name="Weights1")# init with small random values to break symmetriy
+		self.w2 = tf.Variable(self.weights[1],name="Weights2")# init with small random values to break symmetriy
 
-		self.w2      = tf.Variable(self.weights[1],name="Weights2")# init with small random values to break symmetriy
-		self.bias_h2 = tf.Variable(tf.zeros([self.shape[1].hidden_units]),name="Hidden-Bias")
+		self.bias_v  = tf.Variable(tf.zeros([self.shape[0].visible_units]),name="Visible-Bias")
+		self.bias_h1 = tf.Variable(tf.zeros([self.shape[0].hidden_units]), name="Hidden-Bias")
+		self.bias_h2 = tf.Variable(tf.zeros([self.shape[1].hidden_units]), name="Hidden-Bias")
 
 
 		### Propagation
@@ -242,17 +267,24 @@ class DBM_class(object):
 	def train(self,epochs,num_batches):
 		# init all vars for training
 		batchsize      = int(55000/num_batches)
-		self.batchsize = batchsize
 		num_of_updates = epochs*num_batches
 		self.h2        = tf.Variable(tf.random_uniform([batchsize,self.shape[1].hidden_units],minval=-1e-3,maxval=1e-3),name="h2")
 		tf.variables_initializer([self.h2], name='init_train')
+
+		if load_from_file:
+			# load data from the file
+			self.load_from_file(workdir+pathsuffix)
+			self.import_()
+
+		# if no files loaded then init the graph with pretrained vars
 		if self.init_state==0:
 			self.graph_init()
 
 		if self.liveplot:
+			log.info("Liveplot is on!")
 			fig,ax=plt.subplots(1,1,figsize=(15,10))
 
-
+		# starting the training
 		for epoch in range(epochs):
 			log.start("Deep BM Epoch:",epoch+1,"/",epochs)
 
@@ -267,53 +299,73 @@ class DBM_class(object):
 
 				if self.liveplot and plt.fignum_exists(fig.number) and start%40==0:
 						ax.cla()
-						
 						matrix_new=tile_raster_images(X=self.w1.eval().T, img_shape=(28, 28), tile_shape=(12, 12), tile_spacing=(0,0))
 						ax.matshow(matrix_new)
 						plt.pause(0.00001)
 			
 			
-			log.info("Error:",self.train_error_[-1])
-			
+			log.out("Error:",self.train_error_[-1])
 			log.end()
 
+		self.export()
 
-	def test(self):
-		#init the vars
-		# self.h2      = tf.Variable(tf.random_uniform([len(test_data),self.shape[1].hidden_units],minval=-1e-3,maxval=1e-3),name="h2")
-		# tf.variables_initializer([self.h2], name='init_train')
-		# if self.init_state==0:
-		# 	self.graph_init()
+
+
+	def test(self,test_data):
+		#init the vars and reset the weights and biases 
+		log.start("Testing DBM")
 		
-		""" testing only the batch because shapes will not match when taking a bigger batch """
-		self.test_batch = test_data[0:self.batchsize]
+		self.h2   = tf.Variable(tf.random_uniform([len(test_data),self.shape[1].hidden_units],minval=-1e-3,maxval=1e-3),name="h2")
+		tf.variables_initializer([self.h2], name='init_train')
 
-		self.test_error = self.error.eval({self.v:self.test_batch})
+		if load_from_file and not training:
+			self.load_from_file(workdir+pathsuffix)
 
-		self.probs      = self.v_recon_prob.eval({self.v:self.test_batch})
-		self.rec        = self.v_recon.eval({self.v:self.test_batch})
+		self.import_()
+	
+		### starting the testing
+		self.test_error = self.error.eval({self.v:test_data})
 
-		self.rec_h1     = self.h1_recon_prob.eval({self.v:self.test_batch})
+		self.probs      = self.v_recon_prob.eval({self.v:test_data})
+		self.rec        = self.v_recon.eval({self.v:test_data})
 
+		self.rec_h1     = self.h1_recon_prob.eval({self.v:test_data})
+
+		log.end()
 
 	def export(self):
-		self.w1    = self.w1.eval() 
-		self.w2    = self.w2.eval()
-		self.bias1 = self.bias_v.eval()
-		self.bias2 = self.bias_h1.eval()
-		self.bias3 = self.bias_h2.eval()
+		# carefull: w1 is tf vriable and numpy array !
+		self.w1_np    = self.w1.eval() 
+		self.w2_np    = self.w2.eval()
+		self.bias1_np = self.bias_v.eval()
+		self.bias2_np = self.bias_h1.eval()
+		self.bias3_np = self.bias_h2.eval()
+		self.exported = 1
 
+	def write_to_file(self):
+		if self.exported!=1:
+			self.export()
+		new_path = os.getcwd()+"/"+str(time_now)
+		os.makedirs(new_path)
+		os.chdir(new_path)
+		np.savetxt("w1.txt", self.w1_np)
+		np.savetxt("w2.txt", self.w2_np)
+		np.savetxt("bias1.txt", self.bias1_np)
+		np.savetxt("bias2.txt", self.bias2_np)
+		np.savetxt("bias3.txt", self.bias3_np)
+		log.info("Saved weights and biases to:",new_path)
+		os.chdir(workdir)
 
 
 ####################################################################################################################################
 #### User Settings ###
 num_batches_pretrain = 1000
-dbm_batches          = 500
+dbm_batches          = 1000
 pretrain_epochs      = 1
-dbm_epochs           = 3
+dbm_epochs           = 1
 
 rbm_learnrate = 0.005
-dbm_learnrate = 0.005
+dbm_learnrate = 0.001
 
 temp          = 1.
 
@@ -321,14 +373,14 @@ pre_training = 1
 training     = 1
 plotting     = 1
 
-save_to_file   = 0
-load_from_file = 0
-file_suffix    = ""
+save_to_file   = 1
+load_from_file = 1
+pathsuffix     = "/Wed Jan 10 13-59-53 2018"
 
 number_of_layers = 3
 n_first_layer    = 784
 n_second_layer   = 15*15
-n_third_layer    = 10*10
+n_third_layer    = 4*4
 
 
 ####################################################################################################################################
@@ -343,7 +395,6 @@ RBMs[1] = RBM(n_second_layer, n_third_layer , 1, 2, learnrate=rbm_learnrate, liv
 
 ####################################################################################################################################
 #### Session ####
-time_now = time.asctime()
 log.reset()
 log.info(time_now)
 
@@ -360,15 +411,10 @@ if pre_training:
 
 batchsize_pretrain = int(55000/num_batches_pretrain)
 
-# start the session
+# start the session for training
 with tf.Session() as sess:
 	sess.run(tf.global_variables_initializer())
 	
-	# if load_from_file:
-	# 	sess.run(w.assign(init_pretrained(file_suffix,w=1)[0]))
-	# 	sess.run(bias_v.assign(init_pretrained(file_suffix,bias_v=1)[0]))
-	# 	sess.run(bias_h.assign(init_pretrained(file_suffix,bias_h=1)[0]))
-
 	#iterate through the RBMs , each iteration is a RBM
 	if pre_training:	
 		for RBM_i,RBM in enumerate(RBMs):
@@ -380,12 +426,8 @@ with tf.Session() as sess:
 				for start, end in zip( range(0, len(train_data), batchsize_pretrain), range(batchsize_pretrain, len(train_data), batchsize_pretrain)):
 					#### define a batch
 					batch = train_data[start:end]
-
-
 					# train the rbm 
 					w_i,error_i = RBM.train(batch)
-			
-
 					#### liveplot
 					if RBM.liveplot and plt.fignum_exists(fig.number) and start%40==0:
 						ax.cla()
@@ -393,7 +435,7 @@ with tf.Session() as sess:
 						matrix_new=tile_raster_images(X=w_i.T, img_shape=(rbm_shape, rbm_shape), tile_shape=(10, 10), tile_spacing=(0,0))
 						ax.matshow(matrix_new)
 						plt.pause(0.00001)
-						
+
 
 				log.info("Learnrate:",round(rbm_learnrate,4))
 				log.info("Error",round(error_i,4))
@@ -409,25 +451,27 @@ with tf.Session() as sess:
 			weights.append(RBMs[i].w.eval())
 
 
-
 	######### DBM ##########################################################################
 	#### Pre training is ended - create the DBM with the gained weights
 	DBM = DBM_class(RBMs, weights,learnrate=dbm_learnrate,liveplot=0)
-	
+
 	if training:
 		DBM.train(epochs=dbm_epochs, num_batches=dbm_batches)
-		DBM.export()
-		
-	DBM.test()
+
+# test session
+with tf.Session() as sess:
+	log.out("starting test session")
+
+	#testing the network
+	DBM.test(test_data) 
+
+	if save_to_file:
+		DBM.write_to_file()
+
+	log.reset()
+	log.info("test error: ",(DBM.test_error), "learnrate: ",dbm_learnrate)
 
 
-	
-log.reset()
-log.info("test error: ",(DBM.test_error), "learnrate: ",dbm_learnrate)
-
-# Savin to file
-if save_to_file:
-	save(str(error_i),w_i,ubv,ubh)
 
 
 ####################################################################################################################################
@@ -435,11 +479,11 @@ if save_to_file:
 # Plot the Weights, Errors and other informations
 if plotting:
 	
-	map1=plt.matshow(tile_raster_images(X=DBM.w1.T, img_shape=(28, 28), tile_shape=(12, 12), tile_spacing=(0,0)))
+	map1=plt.matshow(tile_raster_images(X=DBM.w1_np.T, img_shape=(28, 28), tile_shape=(12, 12), tile_spacing=(0,0)))
 	plt.title("W 1")
 
 
-	map2=plt.matshow(DBM.w2.T)
+	map2=plt.matshow(tile_raster_images(X=DBM.w2_np.T, img_shape=(int(sqrt(n_second_layer)),int(sqrt(n_second_layer))), tile_shape=(12, 12), tile_spacing=(0,0)))
 	plt.title("W 2")
 	plt.colorbar(map2)
 
@@ -447,7 +491,7 @@ if plotting:
 	fig3,ax3 = plt.subplots(3,10,figsize=(16,4))
 	for i in range(10):
 		# plot the input
-		ax3[0][i].matshow(DBM.test_batch[i:i+1].reshape(28,28))
+		ax3[0][i].matshow(test_data[i:i+1].reshape(28,28))
 		# plot the probs of visible layer
 		ax3[1][i].matshow(DBM.probs[i:i+1].reshape(28,28))
 		# plot the recunstructed image
