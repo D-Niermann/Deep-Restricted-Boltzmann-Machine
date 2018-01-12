@@ -333,8 +333,7 @@ class DBM_class(object):
 						ax.matshow(matrix_new)
 						plt.pause(0.00001)
 
-			
-			log.out("Error:",np.round(self.train_error_[m],4))
+			log.out("error:",np.round(self.train_error_[m],4))
 			log.end()
 		log.reset()
 
@@ -358,24 +357,21 @@ class DBM_class(object):
 		if load_from_file and not training:
 			self.load_from_file(workdir+pathsuffix)
 
-		elif training:
-			self.graph_init(0) # 0 because this graph creates the testing variables where only v is given, not h
-			self.import_()
-		
-			### starting the testing
-			self.test_error  = self.error.eval({self.v:test_data})
-			self.h1_act_test = self.h1_sum.eval({self.v:test_data})
-			self.h2_act_test = self.h2_sum.eval({self.v:test_data})
+		self.graph_init(0) # 0 because this graph creates the testing variables where only v is given, not h
+		self.import_()
 
-			self.probs      = self.v_recon_prob.eval({self.v:test_data})
-			self.rec        = self.v_recon.eval({self.v:test_data})
+		### starting the testing
+		self.test_error  = self.error.eval({self.v:test_data})
+		self.h1_act_test = self.h1_sum.eval({self.v:test_data})
+		self.h2_act_test = self.h2_sum.eval({self.v:test_data})
 
-			self.rec_h1     = self.h1_recon.eval({self.v:test_data})
-			self.h1_test    = self.h1.eval({self.v:test_data})
-			self.h2_test    = self.h2_prob.eval({self.v:test_data})
+		self.probs      = self.v_recon_prob.eval({self.v:test_data})
+		self.rec        = self.v_recon.eval({self.v:test_data})
 
-		else:
-			log.info("Neither loaded from file nor trained DBM cant perform anyting")
+		self.rec_h1     = self.h1_recon.eval({self.v:test_data})
+		self.h1_test    = self.h1.eval({self.v:test_data})
+		self.h2_test    = self.h2_prob.eval({self.v:test_data})
+
 
 		log.end()
 		self.h1_act_test*=1./(n_second_layer*len(test_data))
@@ -385,15 +381,39 @@ class DBM_class(object):
 		log.info("test error: ",(DBM.test_error), "learnrate: ",dbm_learnrate)
 		log.info("Activations of Neurons: ", np.round(self.h1_act_test,2) , np.round(self.h2_act_test,2))
 
-	def reverse_feed(self,input_data):
+	def reverse_feed(self,my_input_data):
 		""" use this in the test sesion to feed a h2 labeled vector to
 		genereate numbers """
-		v_rev=self.v_rev.eval({self.h2_rev:input_data})
+		v_rev=self.v_rev.eval({self.h2_rev:my_input_data})
 		return v_rev
 
 
-	def gibbs_sampling(self,input,gibbs_steps,liveplot=1):
-		pass
+	def gibbs_sampling(self,my_input_data,gibbs_steps,liveplot=1):
+		if load_from_file and not training:
+			self.load_from_file(workdir+pathsuffix)
+		self.h2   = tf.Variable(tf.random_uniform([len(my_input_data),self.shape[1].hidden_units],minval=-1e-3,maxval=1e-3),name="h2")
+		tf.variables_initializer([self.h2], name='init_train')
+
+		self.graph_init(train_graph=0)
+		self.import_()
+		if liveplot:
+			log.out("Liveplotting gibbs sampling")
+			fig,ax=plt.subplots(1,1)
+		#start with label h2 vector as input
+		self.v_rev_gibbs=self.v_rev_prob.eval({self.h2_rev:my_input_data})
+		#now set self.v_rev_gibbs = v and generate h2
+		h2_gibbs=self.h2.eval({self.v:self.v_rev_gibbs})
+		#and generate self.v_rev_gibbs again
+		for i in range(gibbs_steps):
+			if plt.fignum_exists(fig.number):
+				ax.cla()
+				ax.matshow(self.v_rev_gibbs.reshape(28,28))
+				plt.pause(0.01)
+				self.v_rev_gibbs=self.v_recon_prob.eval({self.v:self.v_rev_gibbs})
+			else:
+				break
+			# h2_gibbs=self.h2.eval({self.v:self.v_rev_gibbs})
+		plt.close(fig)
 
 	def export(self):
 		# carefull: w1 is tf vriable and numpy array !
@@ -424,7 +444,7 @@ class DBM_class(object):
 num_batches_pretrain = 1000
 dbm_batches          = 1000
 pretrain_epochs      = 1
-dbm_epochs           = 3
+dbm_epochs           = 10
 
 rbm_learnrate = 0.001
 dbm_learnrate = 0.01
@@ -432,7 +452,7 @@ dbm_learnrate = 0.01
 temp          = 1.
 
 pre_training = 0 #if no pretrain then files are automatically loaded
-training     = 1
+training     = 0
 plotting     = 1
 
 save_to_file    = 0
@@ -476,8 +496,10 @@ if pre_training:
 
 batchsize_pretrain = int(55000/num_batches_pretrain)
 
-# start the session for training
+
 with tf.Session() as sess:
+	# train session - v has batchsize length
+	log.start("Train Session")
 	sess.run(tf.global_variables_initializer())
 	
 	#iterate through the RBMs , each iteration is a RBM
@@ -503,7 +525,7 @@ with tf.Session() as sess:
 
 
 				log.info("Learnrate:",round(rbm_learnrate,4))
-				log.info("Error",round(error_i,4))
+				log.info("error",round(error_i,4))
 				log.end() #ending the epoch
 
 
@@ -525,6 +547,7 @@ with tf.Session() as sess:
 			weights.append(np.loadtxt("Pretrained-"+" %i "%i+pathsuffix_pretrained+".txt").astype(np.float32))
 
 
+
 	######### DBM ##########################################################################
 	#### Pre training is ended - create the DBM with the gained weights
 	DBM = DBM_class(RBMs, weights,learnrate=dbm_learnrate,liveplot=0)
@@ -532,20 +555,28 @@ with tf.Session() as sess:
 	if training:
 		DBM.train(epochs=dbm_epochs, num_batches=dbm_batches)
 
+	log.end()
+
 # test session
 with tf.Session() as sess:
-
-	#testing the network
+	log.start("Test Session")
+	# new session for test images - v has 10.000 length 
+	#testing the network , this also inits the graph so do not comment it out
 	DBM.test(test_data) 
 
+	# make a reverse feed with all 10.000 label - later only a few get plottet 
 	v_rev=DBM.reverse_feed(test_label)
-
-	if save_to_file:
-		DBM.write_to_file()
+	log.end()
 
 
+with tf.Session() as sess:
+	log.start("Gibbs Sampling Session")
+	# start a new session because gibbs sampling only has 1 test input - v has 1 length
+	DBM.gibbs_sampling(test_label[1:2], 1000, liveplot=1)
 
 
+if save_to_file:
+	DBM.write_to_file()
 
 ####################################################################################################################################
 #### Plot
@@ -560,15 +591,15 @@ if plotting:
 	# plt.title("W 2")
 	# plt.colorbar(map2)
 
-
-	fig_fr=plt.figure("Fire rates")
-	ax_fr1=fig_fr.add_subplot(211)
-	ax_fr1.plot(DBM.h1_activity[::4])
-	ax_fr2=fig_fr.add_subplot(212)
-	ax_fr2.plot(DBM.h2_activity[::4])
-	ax_fr1.set_title("Firerate h1 layer")
-	ax_fr2.set_title("Firerate h2 layer")
-	plt.tight_layout()
+	if training:
+		fig_fr=plt.figure("Fire rates")
+		ax_fr1=fig_fr.add_subplot(211)
+		ax_fr1.plot(DBM.h1_activity[::4])
+		ax_fr2=fig_fr.add_subplot(212)
+		ax_fr2.plot(DBM.h2_activity[::4])
+		ax_fr1.set_title("Firerate h1 layer")
+		ax_fr2.set_title("Firerate h2 layer")
+		plt.tight_layout()
 
 
 	#plot some samples from the testdata 
@@ -606,7 +637,7 @@ if plotting:
 		# plt.matshow(random_recon.reshape(28,28))
 		m+=1
 	plt.tight_layout(pad=0.0)
-	
+
 	# plot the reverse_feed:
 	fig5,ax5 = plt.subplots(2,14,figsize=(16,4))
 	for i in range(14):
