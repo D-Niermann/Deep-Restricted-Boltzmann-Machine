@@ -359,10 +359,12 @@ class DBM_class(object):
 			log.info("Neither loaded from file nor trained DBM cant perform anyting")
 
 		log.end()
+		self.h1_act_test*=1./(n_second_layer*len(test_data))
+		self.h2_act_test*=1./(n_third_layer*len(test_data))
 
 		log.reset()
 		log.info("test error: ",(DBM.test_error), "learnrate: ",dbm_learnrate)
-		log.info("Activations of Neurons: " self.h1_act_test , self.h2_act_test)
+		log.info("Activations of Neurons: ", np.round(self.h1_act_test,2) , np.round(self.h2_act_test,2))
 
 
 	def gibbs_sampling(self,input,gibbs_steps,liveplot=1):
@@ -397,7 +399,7 @@ class DBM_class(object):
 num_batches_pretrain = 1000
 dbm_batches          = 1000
 pretrain_epochs      = 2
-dbm_epochs           = 5
+dbm_epochs           = 2
 
 rbm_learnrate = 0.005
 dbm_learnrate = 0.005
