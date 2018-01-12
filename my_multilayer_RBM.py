@@ -244,8 +244,10 @@ class DBM_class(object):
 		self.h1_gibbs = sigmoid(tf.matmul(self.v_recon,self.w1) + tf.matmul(self.h2,tf.transpose(self.w2)) + self.bias_h1,temp)
 		self.h2_gibbs = sigmoid(tf.matmul(self.h1_recon,self.w2), temp)
 		
-		#Error
-		self.error    = tf.reduce_mean(tf.square(self.v-self.v_recon))
+		#Error and stuff
+		self.error  = tf.reduce_mean(tf.square(self.v-self.v_recon))
+		self.h1_sum = tf.reduce_sum(self.h1)
+		self.h2_sum = tf.reduce_sum(self.h2)
 
 		### Training with contrastive Divergence
 		#first weight matrix
@@ -289,28 +291,40 @@ class DBM_class(object):
 			log.info("Liveplot is on!")
 			fig,ax=plt.subplots(1,1,figsize=(15,10))
 
+		m=0 #laufvariable
+		
+		self.h1_activity=np.zeros(num_of_updates)
+		self.h2_activity=np.zeros(num_of_updates)
+		self.train_error_=np.zeros(num_of_updates)
 		# starting the training
 		for epoch in range(epochs):
 			log.start("Deep BM Epoch:",epoch+1,"/",epochs)
 
 			for start, end in zip( range(0, len(train_data), batchsize), range(batchsize, len(train_data), batchsize)):
+				m+=1
 				# define a batch
 				batch = train_data[start:end]
 				# run all updates 
 				sess.run([self.update_w1,self.update_w2,self.update_bias_v,self.update_bias_h1,self.update_bias_h2],feed_dict={self.v:batch})
 				# append error and other data to self variables
-				self.train_error_.append(self.error.eval({self.v:batch}))
+				self.train_error_[m]=(self.error.eval({self.v:batch}))
 
-
+				self.h1_activity[m]=sess.run(self.h1_sum,feed_dict={self.v:batch})
+				self.h2_activity[m]=sess.run(self.h2_sum,feed_dict={self.v:batch})
+				
 				if self.liveplot and plt.fignum_exists(fig.number) and start%40==0:
 						ax.cla()
 						matrix_new=tile_raster_images(X=self.w1.eval().T, img_shape=(28, 28), tile_shape=(12, 12), tile_spacing=(0,0))
 						ax.matshow(matrix_new)
 						plt.pause(0.00001)
+
 			
-			
-			log.out("Error:",self.train_error_[-1])
+			log.out("Error:",np.round(self.train_error_[m],4))
 			log.end()
+
+		# normalize the activity arrays
+		self.h1_activity*=1./(n_second_layer*batchsize)
+		self.h2_activity*=1./(n_third_layer*batchsize)
 
 		self.export()
 
@@ -326,18 +340,33 @@ class DBM_class(object):
 		if load_from_file and not training:
 			self.load_from_file(workdir+pathsuffix)
 
-		self.import_()
-	
-		### starting the testing
-		self.test_error = self.error.eval({self.v:test_data})
+		elif training:
+			self.import_()
+		
+			### starting the testing
+			self.test_error  = self.error.eval({self.v:test_data})
+			self.h1_act_test = self.h1_sum.eval({self.v:test_data})
+			self.h2_act_test = self.h2_sum.eval({self.v:test_data})
 
-		self.probs      = self.v_recon_prob.eval({self.v:test_data})
-		self.rec        = self.v_recon.eval({self.v:test_data})
+			self.probs      = self.v_recon_prob.eval({self.v:test_data})
+			self.rec        = self.v_recon.eval({self.v:test_data})
 
-		self.rec_h1     = self.h1_recon_prob.eval({self.v:test_data})
-		self.h2_test    = self.h2.eval({self.v:test_data})
+			self.rec_h1     = self.h1_recon.eval({self.v:test_data})
+			self.h1_test    = self.h1.eval({self.v:test_data})
+			self.h2_test    = self.h2.eval({self.v:test_data})
+
+		else:
+			log.info("Neither loaded from file nor trained DBM cant perform anyting")
 
 		log.end()
+
+		log.reset()
+		log.info("test error: ",(DBM.test_error), "learnrate: ",dbm_learnrate)
+		log.info("Activations of Neurons: " self.h1_act_test , self.h2_act_test)
+
+
+	def gibbs_sampling(self,input,gibbs_steps,liveplot=1):
+		pass
 
 	def export(self):
 		# carefull: w1 is tf vriable and numpy array !
@@ -367,21 +396,24 @@ class DBM_class(object):
 #### User Settings ###
 num_batches_pretrain = 1000
 dbm_batches          = 1000
-pretrain_epochs      = 1
-dbm_epochs           = 1
+pretrain_epochs      = 2
+dbm_epochs           = 5
 
 rbm_learnrate = 0.005
 dbm_learnrate = 0.005
 
 temp          = 1.
 
-pre_training = 1
+pre_training = 0 #if no pretrain then files are automatically loaded
 training     = 1
 plotting     = 1
 
-save_to_file   = 0
-load_from_file = 1
-pathsuffix     = "/Wed Jan 10 13-59-53 2018"
+save_to_file    = 0
+save_pretrained = 0
+load_from_file  = 0
+pathsuffix      = "/Thu Jan 11 17:20:28 2018"
+pathsuffix_pretrained = "Fri Jan 12 09-25-27 2018"
+
 
 number_of_layers = 3
 n_first_layer    = 784
@@ -456,6 +488,15 @@ with tf.Session() as sess:
 		for i in range(len(RBMs)):
 			weights.append(RBMs[i].w.eval())
 
+		if save_pretrained:
+			for i in range(len(weights)):
+				np.savetxt("Pretrained-"+" %i "%i+str(time_now)+".txt", weights[i])
+	else:
+		weights=[]
+		log.out("Loading Pretrained from file")
+		for i in range(number_of_layers-1):
+			weights.append(np.loadtxt("Pretrained-"+" %i "%i+pathsuffix_pretrained+".txt").astype(np.float32))
+
 
 	######### DBM ##########################################################################
 	#### Pre training is ended - create the DBM with the gained weights
@@ -474,8 +515,6 @@ with tf.Session() as sess:
 	if save_to_file:
 		DBM.write_to_file()
 
-	log.reset()
-	log.info("test error: ",(DBM.test_error), "learnrate: ",dbm_learnrate)
 
 
 
@@ -493,8 +532,17 @@ if plotting:
 	plt.title("W 2")
 	plt.colorbar(map2)
 
+	fig_fr=plt.figure("Fire rates")
+	ax_fr1=fig_fr.add_subplot(211)
+	ax_fr1.plot(DBM.h1_activity)
+	ax_fr2=fig_fr.add_subplot(212)
+	ax_fr2.plot(DBM.h2_activity)
+	ax_fr1.set_title("Firerate h1 layer")
+	ax_fr2.set_title("Firerate h2 layer")
 
-	fig3,ax3 = plt.subplots(5,15,figsize=(16,4))
+
+	#plot some samples from the testdata 
+	fig3,ax3 = plt.subplots(6,15,figsize=(16,4))
 	for i in range(15):
 		# plot the input
 		ax3[0][i].matshow(test_data[i:i+1].reshape(28,28))
@@ -502,12 +550,29 @@ if plotting:
 		ax3[1][i].matshow(DBM.probs[i:i+1].reshape(28,28))
 		# plot the recunstructed image
 		ax3[2][i].matshow(DBM.rec[i:i+1].reshape(28,28))
-		# plot the hidden layer h2
-		ax3[3][i].matshow(DBM.h2_test[i:i+1].reshape(int(sqrt(DBM.shape[1].hidden_units)),int(sqrt(DBM.shape[1].hidden_units))))
+		# plot the hidden layer h2 and h1
+		ax3[3][i].matshow(DBM.h1_test[i:i+1].reshape(int(sqrt(DBM.shape[0].hidden_units)),int(sqrt(DBM.shape[0].hidden_units))))
+		ax3[4][i].matshow(DBM.h2_test[i:i+1].reshape(int(sqrt(DBM.shape[1].hidden_units)),int(sqrt(DBM.shape[1].hidden_units))))
 		#plot the reconstructed layer h1
-		ax3[4][i].matshow(DBM.rec_h1[i:i+1].reshape(int(sqrt(DBM.shape[0].hidden_units)),int(sqrt(DBM.shape[0].hidden_units))))
+		ax3[5][i].matshow(DBM.rec_h1[i:i+1].reshape(int(sqrt(DBM.shape[0].hidden_units)),int(sqrt(DBM.shape[0].hidden_units))))
 		# plt.matshow(random_recon.reshape(28,28))
 
+	#plot only one digit
+	fig4,ax4 = plt.subplots(6,10,figsize=(16,4))
+	m=0
+	for i in index_for_number[0:10]:
+		# plot the input
+		ax4[0][m].matshow(test_data[i:i+1].reshape(28,28))
+		# plot the probs of visible layer
+		ax4[1][m].matshow(DBM.probs[i:i+1].reshape(28,28))
+		# plot the recunstructed image
+		ax4[2][m].matshow(DBM.rec[i:i+1].reshape(28,28))
+		# plot the hidden layer h2 and h1
+		ax4[3][m].matshow(DBM.h1_test[i:i+1].reshape(int(sqrt(DBM.shape[0].hidden_units)),int(sqrt(DBM.shape[0].hidden_units))))
+		ax4[4][m].matshow(DBM.h2_test[i:i+1].reshape(int(sqrt(DBM.shape[1].hidden_units)),int(sqrt(DBM.shape[1].hidden_units))))
+		#plot the reconstructed layer h1
+		ax4[5][m].matshow(DBM.rec_h1[i:i+1].reshape(int(sqrt(DBM.shape[0].hidden_units)),int(sqrt(DBM.shape[0].hidden_units))))
+		# plt.matshow(random_recon.reshape(28,28))
+		m+=1
 
-
-	plt.show()
+plt.show()

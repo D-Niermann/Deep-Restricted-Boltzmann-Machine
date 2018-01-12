@@ -73,11 +73,11 @@ learnrate     = 0.005
 learnrate_max = 0.005
 temp          = 1.0
 
-save_to_file   = 1
-load_from_file = 0
-file_suffix    = "0.0651765" #for a 10 x 10 hidden layer and relative good training 
+save_to_file   = 0
+load_from_file = 1
+file_suffix    = "0.0778525" #for a 10 x 10 hidden layer and relative good training 
 
-training = 1
+training = 0
 liveplot = 0
 plotting = 1
 
