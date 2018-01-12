@@ -51,13 +51,13 @@ time_now = time.asctime()
 if "train_data" not in globals():
 	log.out("Loading Data")
 	mnist = input_data.read_data_sets("MNIST_data/", one_hot=True)
-	train_data, trY, test_data, teY = mnist.train.images, mnist.train.labels, mnist.test.images, mnist.test.labels
+	train_data, train_label, test_data, test_label = mnist.train.images, mnist.train.labels, mnist.test.images, mnist.test.labels
 	test_data[:]=test_data[:]>0.3
 	train_data[:]=train_data[:]>0.3
 	#get test data of only one number class:
 	index_for_number=[]
-	for i in range(len(teY)):
-		if (teY[i]==[0,0,0,0,0,0,1,0,0,0]).sum()==10:
+	for i in range(len(test_label)):
+		if (test_label[i]==[0,0,0,0,0,0,1,0,0,0]).sum()==10:
 			index_for_number.append(i)
 
 	half_images = test_data[0:11]
@@ -196,7 +196,6 @@ class DBM_class(object):
 	def import_(self):
 		""" setting up the graph and setting the weights and biases tf variables to the 
 		saved numpy arrays """
-		self.graph_init()
 		log.out("loading numpy vars into graph")
 		sess.run(self.w1.assign(self.w1_np))
 		sess.run(self.w2.assign(self.w2_np))
@@ -207,12 +206,17 @@ class DBM_class(object):
 	################################################################################################################################################
 	####  DBM Graph 
 	################################################################################################################################################
-	def graph_init(self):
+	def graph_init(self,train_graph):
 		""" sets the graph up and loads the pretrained weights in , these are given
-		at class definition - could be changed .... """
+		at class definition
+		train_grpah :: 1 if the graph is used in training - this will set h2 to placeholder for the label data
+				   0 if the graph is used in testing - this will set h2 to a random value outside this function and to be calculated from h1 
+		"""
 		log.out("Initializing graph")
-		self.v        = tf.placeholder(tf.float32,[None,self.shape[0].visible_units],name="Visible-Layer") # has self.shape [number of images per batch,number of visible units]
-		
+		self.v  = tf.placeholder(tf.float32,[None,self.shape[0].visible_units],name="Visible-Layer") # has self.shape [number of images per batch,number of visible units]
+
+		if train_graph:
+			self.h2 = tf.placeholder(tf.float32,[None,self.shape[1].hidden_units])
 
 		# self.h2      = tf.placeholder(tf.random_uniform([None,self.shape[1].hidden_units],minval=-1e-3,maxval=1e-3),name="h2_placeholder")
 
@@ -230,8 +234,9 @@ class DBM_class(object):
 		self.h1_prob = sigmoid(tf.matmul(self.v,self.w1) + tf.matmul(self.h2,tf.transpose(self.w2)) + self.bias_h1,temp)
 		self.h1      = tf.nn.relu(tf.sign(self.h1_prob - tf.random_uniform(tf.shape(self.h1_prob)))) 
 		# h2 only from h1
-		self.h2_prob = sigmoid(tf.matmul(self.h1,self.w2) + self.bias_h2,temp)
-		self.h2      = tf.nn.relu(tf.sign(self.h2_prob - tf.random_uniform(tf.shape(self.h2_prob)))) 
+		if not train_graph:
+			self.h2_prob = sigmoid(tf.matmul(self.h1,self.w2) + self.bias_h2,temp)
+			self.h2      = tf.nn.relu(tf.sign(self.h2_prob - tf.random_uniform(tf.shape(self.h2_prob)))) 
 
 		## Backward Feed
 		self.v_recon_prob  = sigmoid(tf.matmul(self.h1,tf.transpose(self.w1))+self.bias_v, temp)
@@ -268,10 +273,18 @@ class DBM_class(object):
 		self.update_bias_v  = self.bias_v.assign(self.bias_v+self.learnrate*tf.reduce_mean(self.v-self.v_recon,0))
 		sess.run(tf.global_variables_initializer())
 
+		### reverse feed
+		self.h2_rev = tf.placeholder(tf.float32,[None,10],name="reverse_h2")
+		self.h1_rev_prob = sigmoid(tf.matmul(self.h2_rev, tf.transpose(self.w2))+self.bias_h1,temp)
+		self.h1_rev      = tf.nn.relu(tf.sign(self.h1_rev_prob - tf.random_uniform(tf.shape(self.h1_rev_prob)))) 
+		self.v_rev_prob  = sigmoid(tf.matmul(self.h1_rev, tf.transpose(self.w1))+self.bias_v,temp)
+		self.v_rev       = tf.nn.relu(tf.sign(self.v_rev_prob - tf.random_uniform(tf.shape(self.v_rev_prob)))) 
+
 		self.init_state=1
 
 
 	def train(self,epochs,num_batches):
+		""" training the DBM with given h2 as labels """
 		# init all vars for training
 		batchsize      = int(55000/num_batches)
 		num_of_updates = epochs*num_batches
@@ -281,11 +294,12 @@ class DBM_class(object):
 		if load_from_file:
 			# load data from the file
 			self.load_from_file(workdir+pathsuffix)
+			self.graph_init(1)
 			self.import_()
 
 		# if no files loaded then init the graph with pretrained vars
 		if self.init_state==0:
-			self.graph_init()
+			self.graph_init(1)
 
 		if self.liveplot:
 			log.info("Liveplot is on!")
@@ -304,13 +318,14 @@ class DBM_class(object):
 				m+=1
 				# define a batch
 				batch = train_data[start:end]
+				batch_label = train_label[start:end]
 				# run all updates 
-				sess.run([self.update_w1,self.update_w2,self.update_bias_v,self.update_bias_h1,self.update_bias_h2],feed_dict={self.v:batch})
+				sess.run([self.update_w1,self.update_w2,self.update_bias_v,self.update_bias_h1,self.update_bias_h2],feed_dict={self.v:batch,self.h2:batch_label})
 				# append error and other data to self variables
-				self.train_error_[m]=(self.error.eval({self.v:batch}))
+				self.train_error_[m]=(self.error.eval({self.v:batch,self.h2:batch_label}))
 
-				self.h1_activity[m]=sess.run(self.h1_sum,feed_dict={self.v:batch})
-				self.h2_activity[m]=sess.run(self.h2_sum,feed_dict={self.v:batch})
+				self.h1_activity[m]=sess.run(self.h1_sum,feed_dict={self.v:batch,self.h2:batch_label})
+				self.h2_activity[m]=sess.run(self.h2_sum,feed_dict={self.v:batch,self.h2:batch_label})
 				
 				if self.liveplot and plt.fignum_exists(fig.number) and start%40==0:
 						ax.cla()
@@ -321,6 +336,7 @@ class DBM_class(object):
 			
 			log.out("Error:",np.round(self.train_error_[m],4))
 			log.end()
+		log.reset()
 
 		# normalize the activity arrays
 		self.h1_activity*=1./(n_second_layer*batchsize)
@@ -331,6 +347,8 @@ class DBM_class(object):
 
 
 	def test(self,test_data):
+		""" testing runs without giving h2 , only v is given and h2 has to be infered 
+		by the DBM """
 		#init the vars and reset the weights and biases 
 		log.start("Testing DBM")
 		
@@ -341,6 +359,7 @@ class DBM_class(object):
 			self.load_from_file(workdir+pathsuffix)
 
 		elif training:
+			self.graph_init(0) # 0 because this graph creates the testing variables where only v is given, not h
 			self.import_()
 		
 			### starting the testing
@@ -353,7 +372,7 @@ class DBM_class(object):
 
 			self.rec_h1     = self.h1_recon.eval({self.v:test_data})
 			self.h1_test    = self.h1.eval({self.v:test_data})
-			self.h2_test    = self.h2.eval({self.v:test_data})
+			self.h2_test    = self.h2_prob.eval({self.v:test_data})
 
 		else:
 			log.info("Neither loaded from file nor trained DBM cant perform anyting")
@@ -365,6 +384,12 @@ class DBM_class(object):
 		log.reset()
 		log.info("test error: ",(DBM.test_error), "learnrate: ",dbm_learnrate)
 		log.info("Activations of Neurons: ", np.round(self.h1_act_test,2) , np.round(self.h2_act_test,2))
+
+	def reverse_feed(self,input_data):
+		""" use this in the test sesion to feed a h2 labeled vector to
+		genereate numbers """
+		v_rev=self.v_rev.eval({self.h2_rev:input_data})
+		return v_rev
 
 
 	def gibbs_sampling(self,input,gibbs_steps,liveplot=1):
@@ -398,11 +423,11 @@ class DBM_class(object):
 #### User Settings ###
 num_batches_pretrain = 1000
 dbm_batches          = 1000
-pretrain_epochs      = 2
-dbm_epochs           = 2
+pretrain_epochs      = 1
+dbm_epochs           = 3
 
-rbm_learnrate = 0.005
-dbm_learnrate = 0.005
+rbm_learnrate = 0.001
+dbm_learnrate = 0.01
 
 temp          = 1.
 
@@ -412,15 +437,15 @@ plotting     = 1
 
 save_to_file    = 0
 save_pretrained = 0
-load_from_file  = 0
-pathsuffix      = "/Thu Jan 11 17:20:28 2018"
-pathsuffix_pretrained = "Fri Jan 12 09-25-27 2018"
+load_from_file  = 1
+pathsuffix      = "/Fri Jan 12 11-25-58 2018"
+pathsuffix_pretrained = "Fri Jan 12 11-00-46 2018"
 
 
 number_of_layers = 3
 n_first_layer    = 784
 n_second_layer   = 15*15
-n_third_layer    = 100
+n_third_layer    = 10
 
 
 ####################################################################################################################################
@@ -509,10 +534,11 @@ with tf.Session() as sess:
 
 # test session
 with tf.Session() as sess:
-	log.out("starting test session")
 
 	#testing the network
 	DBM.test(test_data) 
+
+	v_rev=DBM.reverse_feed(test_label)
 
 	if save_to_file:
 		DBM.write_to_file()
@@ -530,17 +556,19 @@ if plotting:
 	plt.title("W 1")
 
 
-	map2=plt.matshow(tile_raster_images(X=DBM.w2_np.T, img_shape=(int(sqrt(n_second_layer)),int(sqrt(n_second_layer))), tile_shape=(12, 12), tile_spacing=(0,0)))
-	plt.title("W 2")
-	plt.colorbar(map2)
+	# map2=plt.matshow(tile_raster_images(X=DBM.w2_np.T, img_shape=(int(sqrt(n_second_layer)),int(sqrt(n_second_layer))), tile_shape=(12, 12), tile_spacing=(0,0)))
+	# plt.title("W 2")
+	# plt.colorbar(map2)
+
 
 	fig_fr=plt.figure("Fire rates")
 	ax_fr1=fig_fr.add_subplot(211)
-	ax_fr1.plot(DBM.h1_activity)
+	ax_fr1.plot(DBM.h1_activity[::4])
 	ax_fr2=fig_fr.add_subplot(212)
-	ax_fr2.plot(DBM.h2_activity)
+	ax_fr2.plot(DBM.h2_activity[::4])
 	ax_fr1.set_title("Firerate h1 layer")
 	ax_fr2.set_title("Firerate h2 layer")
+	plt.tight_layout()
 
 
 	#plot some samples from the testdata 
@@ -554,10 +582,11 @@ if plotting:
 		ax3[2][i].matshow(DBM.rec[i:i+1].reshape(28,28))
 		# plot the hidden layer h2 and h1
 		ax3[3][i].matshow(DBM.h1_test[i:i+1].reshape(int(sqrt(DBM.shape[0].hidden_units)),int(sqrt(DBM.shape[0].hidden_units))))
-		ax3[4][i].matshow(DBM.h2_test[i:i+1].reshape(int(sqrt(DBM.shape[1].hidden_units)),int(sqrt(DBM.shape[1].hidden_units))))
+		ax3[4][i].matshow(DBM.h2_test[i:i+1,:9].reshape(int(sqrt(DBM.shape[1].hidden_units)),int(sqrt(DBM.shape[1].hidden_units))))
 		#plot the reconstructed layer h1
 		ax3[5][i].matshow(DBM.rec_h1[i:i+1].reshape(int(sqrt(DBM.shape[0].hidden_units)),int(sqrt(DBM.shape[0].hidden_units))))
 		# plt.matshow(random_recon.reshape(28,28))
+	plt.tight_layout(pad=0.0)
 
 	#plot only one digit
 	fig4,ax4 = plt.subplots(6,10,figsize=(16,4))
@@ -571,10 +600,18 @@ if plotting:
 		ax4[2][m].matshow(DBM.rec[i:i+1].reshape(28,28))
 		# plot the hidden layer h2 and h1
 		ax4[3][m].matshow(DBM.h1_test[i:i+1].reshape(int(sqrt(DBM.shape[0].hidden_units)),int(sqrt(DBM.shape[0].hidden_units))))
-		ax4[4][m].matshow(DBM.h2_test[i:i+1].reshape(int(sqrt(DBM.shape[1].hidden_units)),int(sqrt(DBM.shape[1].hidden_units))))
+		ax4[4][m].matshow(DBM.h2_test[i:i+1,:9].reshape(int(sqrt(DBM.shape[1].hidden_units)),int(sqrt(DBM.shape[1].hidden_units))))
 		#plot the reconstructed layer h1
 		ax4[5][m].matshow(DBM.rec_h1[i:i+1].reshape(int(sqrt(DBM.shape[0].hidden_units)),int(sqrt(DBM.shape[0].hidden_units))))
 		# plt.matshow(random_recon.reshape(28,28))
 		m+=1
+	plt.tight_layout(pad=0.0)
+	
+	# plot the reverse_feed:
+	fig5,ax5 = plt.subplots(2,14,figsize=(16,4))
+	for i in range(14):
+		ax5[0][i].matshow(test_label[i,:9].reshape(3,3))
+		ax5[1][i].matshow(v_rev[i].reshape(28,28))
+	plt.tight_layout(pad=0.0)
 
 plt.show()
