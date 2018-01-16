@@ -57,7 +57,7 @@ if "train_data" not in globals():
 	#get test data of only one number class:
 	index_for_number=[]
 	for i in range(len(test_label)):
-		if (test_label[i]==[0,0,0,0,0,0,1,0,0,0]).sum()==10:
+		if (test_label[i]==[0,0,0,1,0,0,0,0,0,0]).sum()==10:
 			index_for_number.append(i)
 
 	half_images = test_data[0:11]
@@ -271,7 +271,7 @@ class DBM_class(object):
 		self.update_bias_h1 = self.bias_h1.assign(self.bias_h1+self.learnrate*tf.reduce_mean(self.h1-self.h1_gibbs,0))
 		self.update_bias_h2 = self.bias_h2.assign(self.bias_h2+self.learnrate*tf.reduce_mean(self.h2-self.h2_gibbs,0))
 		self.update_bias_v  = self.bias_v.assign(self.bias_v+self.learnrate*tf.reduce_mean(self.v-self.v_recon,0))
-		sess.run(tf.global_variables_initializer())
+		
 
 		### reverse feed
 		self.h2_rev = tf.placeholder(tf.float32,[None,10],name="reverse_h2")
@@ -280,6 +280,7 @@ class DBM_class(object):
 		self.v_rev_prob  = sigmoid(tf.matmul(self.h1_rev, tf.transpose(self.w1))+self.bias_v,temp)
 		self.v_rev       = tf.nn.relu(tf.sign(self.v_rev_prob - tf.random_uniform(tf.shape(self.v_rev_prob)))) 
 
+		sess.run(tf.global_variables_initializer())
 		self.init_state=1
 
 
@@ -377,14 +378,23 @@ class DBM_class(object):
 		self.h1_act_test*=1./(n_second_layer*len(test_data))
 		self.h2_act_test*=1./(n_third_layer*len(test_data))
 
+		# error of classifivation labels
+		class_error=np.mean(np.abs(DBM.h2_test-test_label))
+		
+		# set the maximum = 1 and the rest 0 		
+		for i in range(10000):
+			log.out("Taking only the maximum")
+			DBM.h2_test[i]=DBM.h2_test[i]==DBM.h2_test[i].max()
+
 		log.reset()
-		log.info("test error: ",(DBM.test_error), "learnrate: ",dbm_learnrate)
+		log.info("Reconstr. error: ",(DBM.test_error), "learnrate: ",dbm_learnrate)
+		log.info("Class error: ",class_error)
 		log.info("Activations of Neurons: ", np.round(self.h1_act_test,2) , np.round(self.h2_act_test,2))
 
 	def reverse_feed(self,my_input_data):
 		""" use this in the test sesion to feed a h2 labeled vector to
 		genereate numbers """
-		v_rev=self.v_rev.eval({self.h2_rev:my_input_data})
+		v_rev=self.v_rev_prob.eval({self.h2_rev:my_input_data})
 		return v_rev
 
 
@@ -412,7 +422,9 @@ class DBM_class(object):
 				self.v_rev_gibbs=self.v_recon_prob.eval({self.v:self.v_rev_gibbs})
 			else:
 				break
+
 			# h2_gibbs=self.h2.eval({self.v:self.v_rev_gibbs})
+		
 		plt.close(fig)
 
 	def export(self):
@@ -443,22 +455,23 @@ class DBM_class(object):
 #### User Settings ###
 num_batches_pretrain = 1000
 dbm_batches          = 1000
-pretrain_epochs      = 1
-dbm_epochs           = 10
+pretrain_epochs      = 2
+dbm_epochs           = 4
 
-rbm_learnrate = 0.001
-dbm_learnrate = 0.01
+rbm_learnrate = 0.005
+dbm_learnrate = 0.005
 
-temp          = 1.
+temp = 1.
 
-pre_training = 0 #if no pretrain then files are automatically loaded
+pre_training    = 0 #if no pretrain then files are automatically loaded
+save_pretrained = 0
+
 training     = 0
 plotting     = 1
 
 save_to_file    = 0
-save_pretrained = 0
 load_from_file  = 1
-pathsuffix      = "/Fri Jan 12 11-25-58 2018"
+pathsuffix      = "/Fri Jan 12 16-40-57 2018"
 pathsuffix_pretrained = "Fri Jan 12 11-00-46 2018"
 
 
@@ -566,14 +579,16 @@ with tf.Session() as sess:
 
 	# make a reverse feed with all 10.000 label - later only a few get plottet 
 	v_rev=DBM.reverse_feed(test_label)
+	
+
 	log.end()
 
 
 with tf.Session() as sess:
 	log.start("Gibbs Sampling Session")
 	# start a new session because gibbs sampling only has 1 test input - v has 1 length
-	DBM.gibbs_sampling(test_label[1:2], 1000, liveplot=1)
-
+	DBM.gibbs_sampling(test_label[1:2], 10, liveplot=1)
+	log.end()
 
 if save_to_file:
 	DBM.write_to_file()
@@ -644,5 +659,8 @@ if plotting:
 		ax5[0][i].matshow(test_label[i,:9].reshape(3,3))
 		ax5[1][i].matshow(v_rev[i].reshape(28,28))
 	plt.tight_layout(pad=0.0)
+
+
+	plt.matshow(np.mean(v_rev[index_for_number[:]],0).reshape(28,28))
 
 plt.show()
