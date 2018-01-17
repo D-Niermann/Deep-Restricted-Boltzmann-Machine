@@ -181,6 +181,7 @@ class DBM_class(object):
 		self.init_state   = 0
 		self.learnrate    = learnrate
 		self.exported     = 0
+		self.m            = 0 #laufvariable
 
 	def load_from_file(self,path):
 		os.chdir(path)
@@ -214,9 +215,12 @@ class DBM_class(object):
 		"""
 		log.out("Initializing graph")
 		self.v  = tf.placeholder(tf.float32,[None,self.shape[0].visible_units],name="Visible-Layer") # has self.shape [number of images per batch,number of visible units]
+		
 
+		
 		if train_graph:
-			self.h2 = tf.placeholder(tf.float32,[None,self.shape[1].hidden_units])
+			self.m_tf = tf.placeholder(tf.int32,[],name="running_array_index")
+			self.h2   = tf.placeholder(tf.float32,[None,self.shape[1].hidden_units])
 
 		# self.h2      = tf.placeholder(tf.random_uniform([None,self.shape[1].hidden_units],minval=-1e-3,maxval=1e-3),name="h2_placeholder")
 
@@ -226,6 +230,13 @@ class DBM_class(object):
 		self.bias_v  = tf.Variable(tf.zeros([self.shape[0].visible_units]),name="Visible-Bias")
 		self.bias_h1 = tf.Variable(tf.zeros([self.shape[0].hidden_units]), name="Hidden-Bias")
 		self.bias_h2 = tf.Variable(tf.zeros([self.shape[1].hidden_units]), name="Hidden-Bias")
+
+		self.h1_activity_  = tf.Variable(tf.zeros([self.num_of_updates]))
+		self.h2_activity_  = tf.Variable(tf.zeros([self.num_of_updates]))
+		self.train_error_ = tf.Variable(tf.zeros([self.num_of_updates]))
+		self.w1_mean_     = tf.Variable(tf.zeros([self.num_of_updates]))
+		self.CD1_mean_    = tf.Variable(tf.zeros([self.num_of_updates]))
+		self.CD2_mean_    = tf.Variable(tf.zeros([self.num_of_updates]))		
 
 
 		### Propagation
@@ -260,18 +271,30 @@ class DBM_class(object):
 		self.neg_grad1  = tf.matmul(tf.transpose(self.v_recon),self.h1_gibbs)
 		self.numpoints1 = tf.cast(tf.shape(self.v)[0],tf.float32) #number of train inputs per batch (for averaging the CD matrix -> see practical paper by hinton)
 		self.CD1        = (self.pos_grad1 - self.neg_grad1)/self.numpoints1
+		self.CD1_mean   = tf.reduce_mean(tf.square(self.CD1))
 		self.update_w1  = self.w1.assign(self.w1+self.learnrate*self.CD1)
+		self.mean_w1    = tf.reduce_mean(tf.square(self.w1))
 		# second weight matrix
 		self.pos_grad2  = tf.matmul(tf.transpose(self.h1), self.h2)
 		self.neg_grad2  = tf.matmul(tf.transpose(self.h1_recon), self.h2_gibbs)
 		self.numpoints2 = tf.cast(tf.shape(self.h2)[0],tf.float32) #number of train inputs per batch (for averaging the CD matrix -> see practical paper by hinton)
 		self.CD2	    = (self.pos_grad2 - self.neg_grad2)/self.numpoints2
+		self.CD2_mean   = tf.reduce_mean(tf.square(self.CD2))
 		self.update_w2  = self.w2.assign(self.w2+self.learnrate*self.CD2)
 		# bias updates
 		self.update_bias_h1 = self.bias_h1.assign(self.bias_h1+self.learnrate*tf.reduce_mean(self.h1-self.h1_gibbs,0))
 		self.update_bias_h2 = self.bias_h2.assign(self.bias_h2+self.learnrate*tf.reduce_mean(self.h2-self.h2_gibbs,0))
 		self.update_bias_v  = self.bias_v.assign(self.bias_v+self.learnrate*tf.reduce_mean(self.v-self.v_recon,0))
 		
+		
+
+		self.assign_arrays =	[tf.scatter_update(self.train_error_,self.m_tf,self.error),
+						 tf.scatter_update(self.CD1_mean_,self.m_tf,self.CD1_mean),
+						 tf.scatter_update(self.CD2_mean_,self.m_tf,self.CD2_mean),
+						 tf.scatter_update(self.w1_mean_,self.m_tf,self.mean_w1),
+						 tf.scatter_update(self.h1_activity_,self.m_tf,self.h1_sum),
+						 tf.scatter_update(self.h2_activity_,self.m_tf,self.h2_sum),
+						]
 
 		### reverse feed
 		self.h2_rev = tf.placeholder(tf.float32,[None,10],name="reverse_h2")
@@ -289,9 +312,15 @@ class DBM_class(object):
 		# init all vars for training
 		batchsize      = int(55000/num_batches)
 		num_of_updates = epochs*num_batches
+		self.num_of_updates = num_of_updates
+		d_learnrate    = float(dbm_learnrate_end-self.learnrate)/num_of_updates
+		
 		self.h2        = tf.Variable(tf.random_uniform([batchsize,self.shape[1].hidden_units],minval=-1e-3,maxval=1e-3),name="h2")
 		tf.variables_initializer([self.h2], name='init_train')
+		
+		
 
+		
 		if load_from_file:
 			# load data from the file
 			self.load_from_file(workdir+pathsuffix)
@@ -306,41 +335,57 @@ class DBM_class(object):
 			log.info("Liveplot is on!")
 			fig,ax=plt.subplots(1,1,figsize=(15,10))
 
-		m=0 #laufvariable
-		
-		self.h1_activity=np.zeros(num_of_updates)
-		self.h2_activity=np.zeros(num_of_updates)
-		self.train_error_=np.zeros(num_of_updates)
+		# def arrays where vars are saved 
+		#
+		#
+		#
+		### Moved to self.init_graph() as tf.Variables ###
+		#
+		#
+		#
+		#
 		# starting the training
 		for epoch in range(epochs):
 			log.start("Deep BM Epoch:",epoch+1,"/",epochs)
 
 			for start, end in zip( range(0, len(train_data), batchsize), range(batchsize, len(train_data), batchsize)):
-				m+=1
+				self.m+=1
 				# define a batch
 				batch = train_data[start:end]
 				batch_label = train_label[start:end]
+				
 				# run all updates 
-				sess.run([self.update_w1,self.update_w2,self.update_bias_v,self.update_bias_h1,self.update_bias_h2],feed_dict={self.v:batch,self.h2:batch_label})
-				# append error and other data to self variables
-				self.train_error_[m]=(self.error.eval({self.v:batch,self.h2:batch_label}))
+				sess.run([	self.update_w1,
+						self.update_w2,
+						self.update_bias_v,
+						self.update_bias_h1,
+						self.update_bias_h2,
+						self.assign_arrays],
+						feed_dict={	self.v:batch,
+								self.h2:batch_label,
+								self.m_tf:self.m}
+					)
+				
+			
+				# increase the learnrate
+				self.learnrate+=d_learnrate
 
-				self.h1_activity[m]=sess.run(self.h1_sum,feed_dict={self.v:batch,self.h2:batch_label})
-				self.h2_activity[m]=sess.run(self.h2_sum,feed_dict={self.v:batch,self.h2:batch_label})
 				
 				if self.liveplot and plt.fignum_exists(fig.number) and start%40==0:
-						ax.cla()
-						matrix_new=tile_raster_images(X=self.w1.eval().T, img_shape=(28, 28), tile_shape=(12, 12), tile_spacing=(0,0))
-						ax.matshow(matrix_new)
-						plt.pause(0.00001)
+					ax.cla()
+					matrix_new=tile_raster_images(X=self.w1.eval().T, img_shape=(28, 28), tile_shape=(12, 12), tile_spacing=(0,0))
+					ax.matshow(matrix_new)
+					plt.pause(0.00001)
 
-			log.out("error:",np.round(self.train_error_[m],4))
+			# self.train_error_np=self.train_error_.eval()
+			# log.out("error:",np.round(self.train_error_np[m],4)," learnrate:",self.learnrate)
+			
 			log.end()
 		log.reset()
 
 		# normalize the activity arrays
-		self.h1_activity*=1./(n_second_layer*batchsize)
-		self.h2_activity*=1./(n_third_layer*batchsize)
+		self.h1_activity_*=1./(n_second_layer*batchsize)
+		self.h2_activity_*=1./(n_third_layer*batchsize)
 
 		self.export()
 
@@ -382,9 +427,9 @@ class DBM_class(object):
 		class_error=np.mean(np.abs(DBM.h2_test-test_label))
 		
 		# set the maximum = 1 and the rest 0 		
-		for i in range(10000):
-			log.out("Taking only the maximum")
-			DBM.h2_test[i]=DBM.h2_test[i]==DBM.h2_test[i].max()
+		# log.out("Taking only the maximum")
+		# for i in range(10000):
+		# 	DBM.h2_test[i]=DBM.h2_test[i]==DBM.h2_test[i].max()
 
 		log.reset()
 		log.info("Reconstr. error: ",(DBM.test_error), "learnrate: ",dbm_learnrate)
@@ -428,12 +473,21 @@ class DBM_class(object):
 		plt.close(fig)
 
 	def export(self):
-		# carefull: w1 is tf vriable and numpy array !
+		# convert weights and biases to numpy arrays
 		self.w1_np    = self.w1.eval() 
 		self.w2_np    = self.w2.eval()
 		self.bias1_np = self.bias_v.eval()
 		self.bias2_np = self.bias_h1.eval()
 		self.bias3_np = self.bias_h2.eval()
+
+		# convert arrays to numpy arrays 
+		self.h1_activity_np = self.h1_activity_.eval()
+		self.h2_activity_np = self.h2_activity_.eval()
+		self.train_error_np = self.train_error_.eval()
+		self.w1_mean_np     = self.w1_mean_.eval()
+		self.CD1_mean_np    = self.CD1_mean_.eval()
+		self.CD2_mean_np    = self.CD2_mean_.eval()
+		
 		self.exported = 1
 
 	def write_to_file(self):
@@ -456,21 +510,22 @@ class DBM_class(object):
 num_batches_pretrain = 1000
 dbm_batches          = 1000
 pretrain_epochs      = 2
-dbm_epochs           = 4
+dbm_epochs           = 2
 
 rbm_learnrate = 0.005
-dbm_learnrate = 0.005
+dbm_learnrate = 0.01
+dbm_learnrate_end = 0.01
 
 temp = 1.
 
 pre_training    = 0 #if no pretrain then files are automatically loaded
 save_pretrained = 0
 
-training     = 0
+training     = 1
 plotting     = 1
 
 save_to_file    = 0
-load_from_file  = 1
+load_from_file  = 0
 pathsuffix      = "/Fri Jan 12 16-40-57 2018"
 pathsuffix_pretrained = "Fri Jan 12 11-00-46 2018"
 
@@ -496,7 +551,7 @@ RBMs[1] = RBM(n_second_layer, n_third_layer , 1, 2, learnrate=rbm_learnrate, liv
 log.reset()
 log.info(time_now)
 
-# d_learnrate   = float(learnrate_max-learnrate)/num_of_updates
+# d_learnrate   = float(dbm_learnrate_end-learnrate)/num_of_updates
 
 
 #define a figure for liveplotting
@@ -584,11 +639,11 @@ with tf.Session() as sess:
 	log.end()
 
 
-with tf.Session() as sess:
-	log.start("Gibbs Sampling Session")
-	# start a new session because gibbs sampling only has 1 test input - v has 1 length
-	DBM.gibbs_sampling(test_label[1:2], 10, liveplot=1)
-	log.end()
+# with tf.Session() as sess:
+# 	log.start("Gibbs Sampling Session")
+# 	# start a new session because gibbs sampling only has 1 test input - v has 1 length
+# 	DBM.gibbs_sampling(test_label[1:2], 10, liveplot=1)
+# 	log.end()
 
 if save_to_file:
 	DBM.write_to_file()
@@ -608,12 +663,22 @@ if plotting:
 
 	if training:
 		fig_fr=plt.figure("Fire rates")
-		ax_fr1=fig_fr.add_subplot(211)
-		ax_fr1.plot(DBM.h1_activity[::4])
-		ax_fr2=fig_fr.add_subplot(212)
-		ax_fr2.plot(DBM.h2_activity[::4])
+		
+		ax_fr1=fig_fr.add_subplot(311)
+		ax_fr1.plot(DBM.h1_activity_np[::10])
+		
+		ax_fr2=fig_fr.add_subplot(312)
+		ax_fr2.plot(DBM.CD1_mean_np[::10],label="CD1")
+		ax_fr2.plot(DBM.CD2_mean_np[::10],label="CD2")
+		ax_fr2.plot(DBM.w1_mean_np[::10],label="Weights")
 		ax_fr1.set_title("Firerate h1 layer")
-		ax_fr2.set_title("Firerate h2 layer")
+		ax_fr2.set_title("Weights, CD1 and CD2 mean")
+		ax_fr2.legend(loc="best")
+		
+		ax_fr3.fig_fr.add_subplot(313)
+		ax_fr3.plot(DBM.train_error_np[::10],"k")
+		ax_fr3.set_title("Train Error")
+		
 		plt.tight_layout()
 
 
