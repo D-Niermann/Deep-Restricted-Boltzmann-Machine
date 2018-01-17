@@ -182,6 +182,7 @@ class DBM_class(object):
 		self.learnrate    = learnrate
 		self.exported     = 0
 		self.m            = 0 #laufvariable
+		self.num_of_skipped = 100 # how many tf.array value adds get skipped 
 
 	def load_from_file(self,path):
 		os.chdir(path)
@@ -222,6 +223,14 @@ class DBM_class(object):
 			self.m_tf = tf.placeholder(tf.int32,[],name="running_array_index")
 			self.h2   = tf.placeholder(tf.float32,[None,self.shape[1].hidden_units])
 
+			self.h1_activity_ = tf.Variable(tf.zeros([self.num_of_updates/self.num_of_skipped]))
+			self.h2_activity_ = tf.Variable(tf.zeros([self.num_of_updates/self.num_of_skipped]))
+			self.train_error_ = tf.Variable(tf.zeros([self.num_of_updates/self.num_of_skipped]))
+			self.w1_mean_     = tf.Variable(tf.zeros([self.num_of_updates/self.num_of_skipped]))
+			self.CD1_mean_    = tf.Variable(tf.zeros([self.num_of_updates/self.num_of_skipped]))
+			self.CD2_mean_    = tf.Variable(tf.zeros([self.num_of_updates/self.num_of_skipped]))		
+
+
 		# self.h2      = tf.placeholder(tf.random_uniform([None,self.shape[1].hidden_units],minval=-1e-3,maxval=1e-3),name="h2_placeholder")
 
 		self.w1 = tf.Variable(self.weights[0],name="Weights1")# init with small random values to break symmetriy
@@ -230,13 +239,6 @@ class DBM_class(object):
 		self.bias_v  = tf.Variable(tf.zeros([self.shape[0].visible_units]),name="Visible-Bias")
 		self.bias_h1 = tf.Variable(tf.zeros([self.shape[0].hidden_units]), name="Hidden-Bias")
 		self.bias_h2 = tf.Variable(tf.zeros([self.shape[1].hidden_units]), name="Hidden-Bias")
-
-		self.h1_activity_  = tf.Variable(tf.zeros([self.num_of_updates]))
-		self.h2_activity_  = tf.Variable(tf.zeros([self.num_of_updates]))
-		self.train_error_ = tf.Variable(tf.zeros([self.num_of_updates]))
-		self.w1_mean_     = tf.Variable(tf.zeros([self.num_of_updates]))
-		self.CD1_mean_    = tf.Variable(tf.zeros([self.num_of_updates]))
-		self.CD2_mean_    = tf.Variable(tf.zeros([self.num_of_updates]))		
 
 
 		### Propagation
@@ -287,14 +289,14 @@ class DBM_class(object):
 		self.update_bias_v  = self.bias_v.assign(self.bias_v+self.learnrate*tf.reduce_mean(self.v-self.v_recon,0))
 		
 		
-
-		self.assign_arrays =	[tf.scatter_update(self.train_error_,self.m_tf,self.error),
-						 tf.scatter_update(self.CD1_mean_,self.m_tf,self.CD1_mean),
-						 tf.scatter_update(self.CD2_mean_,self.m_tf,self.CD2_mean),
-						 tf.scatter_update(self.w1_mean_,self.m_tf,self.mean_w1),
-						 tf.scatter_update(self.h1_activity_,self.m_tf,self.h1_sum),
-						 tf.scatter_update(self.h2_activity_,self.m_tf,self.h2_sum),
-						]
+		if train_graph:
+			self.assign_arrays =	[tf.scatter_update(self.train_error_,self.m_tf,self.error),
+							 tf.scatter_update(self.CD1_mean_,self.m_tf,self.CD1_mean),
+							 tf.scatter_update(self.CD2_mean_,self.m_tf,self.CD2_mean),
+							 tf.scatter_update(self.w1_mean_,self.m_tf,self.mean_w1),
+							 tf.scatter_update(self.h1_activity_,self.m_tf,self.h1_sum),
+							 tf.scatter_update(self.h2_activity_,self.m_tf,self.h2_sum),
+							]
 
 		### reverse feed
 		self.h2_rev = tf.placeholder(tf.float32,[None,10],name="reverse_h2")
@@ -360,13 +362,19 @@ class DBM_class(object):
 						self.update_bias_v,
 						self.update_bias_h1,
 						self.update_bias_h2,
-						self.assign_arrays],
+						# self.assign_arrays
+						],
 						feed_dict={	self.v:batch,
-								self.h2:batch_label,
-								self.m_tf:self.m}
+								self.h2:batch_label}
 					)
 				
-			
+				if self.m%self.num_of_skipped==0:
+					sess.run([self.assign_arrays],
+							feed_dict={	self.v:batch,
+									self.h2:batch_label,
+									self.m_tf:self.m/self.num_of_skipped}
+						)
+				
 				# increase the learnrate
 				self.learnrate+=d_learnrate
 
@@ -385,7 +393,6 @@ class DBM_class(object):
 
 		# normalize the activity arrays
 		self.h1_activity_*=1./(n_second_layer*batchsize)
-		self.h2_activity_*=1./(n_third_layer*batchsize)
 
 		self.export()
 
@@ -406,7 +413,6 @@ class DBM_class(object):
 		self.graph_init(0) # 0 because this graph creates the testing variables where only v is given, not h
 		self.import_()
 
-		### starting the testing
 		self.test_error  = self.error.eval({self.v:test_data})
 		self.h1_act_test = self.h1_sum.eval({self.v:test_data})
 		self.h2_act_test = self.h2_sum.eval({self.v:test_data})
@@ -432,8 +438,8 @@ class DBM_class(object):
 		# 	DBM.h2_test[i]=DBM.h2_test[i]==DBM.h2_test[i].max()
 
 		log.reset()
-		log.info("Reconstr. error: ",(DBM.test_error), "learnrate: ",dbm_learnrate)
-		log.info("Class error: ",class_error)
+		log.info("Reconstr. error: ",np.round(DBM.test_error,5), "learnrate: ",np.round(dbm_learnrate,5))
+		log.info("Class error: ",np.round(class_error,5))
 		log.info("Activations of Neurons: ", np.round(self.h1_act_test,2) , np.round(self.h2_act_test,2))
 
 	def reverse_feed(self,my_input_data):
@@ -510,7 +516,7 @@ class DBM_class(object):
 num_batches_pretrain = 1000
 dbm_batches          = 1000
 pretrain_epochs      = 2
-dbm_epochs           = 2
+dbm_epochs           = 5
 
 rbm_learnrate = 0.005
 dbm_learnrate = 0.01
@@ -521,11 +527,12 @@ temp = 1.
 pre_training    = 0 #if no pretrain then files are automatically loaded
 save_pretrained = 0
 
-training     = 1
-plotting     = 1
+training       = 1
+plotting       = 1
+gibbs_sampling = 0
 
 save_to_file    = 0
-load_from_file  = 0
+load_from_file  = 1
 pathsuffix      = "/Fri Jan 12 16-40-57 2018"
 pathsuffix_pretrained = "Fri Jan 12 11-00-46 2018"
 
@@ -567,7 +574,7 @@ batchsize_pretrain = int(55000/num_batches_pretrain)
 
 with tf.Session() as sess:
 	# train session - v has batchsize length
-	log.start("Train Session")
+	log.start("Pretrain Session")
 	sess.run(tf.global_variables_initializer())
 	
 	#iterate through the RBMs , each iteration is a RBM
@@ -614,12 +621,16 @@ with tf.Session() as sess:
 		for i in range(number_of_layers-1):
 			weights.append(np.loadtxt("Pretrained-"+" %i "%i+pathsuffix_pretrained+".txt").astype(np.float32))
 
+	log.end()
 
 
-	######### DBM ##########################################################################
-	#### Pre training is ended - create the DBM with the gained weights
-	DBM = DBM_class(RBMs, weights,learnrate=dbm_learnrate,liveplot=0)
+######### DBM ##########################################################################
+#### Pre training is ended - create the DBM with the gained weights
+DBM = DBM_class(RBMs, weights,learnrate=dbm_learnrate,liveplot=0)
 
+with tf.Session() as sess:
+	log.start("DBM Train Session")
+	
 	if training:
 		DBM.train(epochs=dbm_epochs, num_batches=dbm_batches)
 
@@ -638,12 +649,12 @@ with tf.Session() as sess:
 
 	log.end()
 
-
-# with tf.Session() as sess:
-# 	log.start("Gibbs Sampling Session")
-# 	# start a new session because gibbs sampling only has 1 test input - v has 1 length
-# 	DBM.gibbs_sampling(test_label[1:2], 10, liveplot=1)
-# 	log.end()
+if gibbs_sampling:
+	with tf.Session() as sess:
+		log.start("Gibbs Sampling Session")
+		# start a new session because gibbs sampling only has 1 test input - v has 1 length
+		DBM.gibbs_sampling(test_label[1:2], 10, liveplot=1)
+		log.end()
 
 if save_to_file:
 	DBM.write_to_file()
@@ -662,21 +673,21 @@ if plotting:
 	# plt.colorbar(map2)
 
 	if training:
-		fig_fr=plt.figure("Fire rates")
+		fig_fr=plt.figure(figsize=(7,9))
 		
 		ax_fr1=fig_fr.add_subplot(311)
-		ax_fr1.plot(DBM.h1_activity_np[::10])
+		ax_fr1.plot(DBM.h1_activity_np)
 		
 		ax_fr2=fig_fr.add_subplot(312)
-		ax_fr2.plot(DBM.CD1_mean_np[::10],label="CD1")
-		ax_fr2.plot(DBM.CD2_mean_np[::10],label="CD2")
-		ax_fr2.plot(DBM.w1_mean_np[::10],label="Weights")
+		ax_fr2.plot(DBM.CD1_mean_np,label="CD1")
+		ax_fr2.plot(DBM.CD2_mean_np,label="CD2")
+		ax_fr2.plot(DBM.w1_mean_np,label="Weights")
 		ax_fr1.set_title("Firerate h1 layer")
 		ax_fr2.set_title("Weights, CD1 and CD2 mean")
 		ax_fr2.legend(loc="best")
 		
-		ax_fr3.fig_fr.add_subplot(313)
-		ax_fr3.plot(DBM.train_error_np[::10],"k")
+		ax_fr3=fig_fr.add_subplot(313)
+		ax_fr3.plot(DBM.train_error_np,"k")
 		ax_fr3.set_title("Train Error")
 		
 		plt.tight_layout()

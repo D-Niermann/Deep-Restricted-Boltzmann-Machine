@@ -60,7 +60,7 @@ class Logger(object):
 				self.end_time=time()
 				try:
 					start_len=(len(self.start_time)-1)
-					print str(self.count_save.pop())+".","-"*start_len+"^"+" "*(5-start_len)+"\t"*(len(self.start_time)-2),self.process_name[len(self.process_name)-1]," (took "+str(round(self.end_time-self.start_time[len(self.start_time)-1],1))+" sek)"
+					print str(self.count_save.pop())+".","-"*start_len+"^"+" "*(5-start_len)+"\t"*(len(self.start_time)-2),self.process_name[len(self.process_name)-1]," (took "+str(round(self.end_time-self.start_time[len(self.start_time)-1],3))+" sek)"
 					self.start_time.pop()
 					self.process_name.pop()
 					self.end_time=0
