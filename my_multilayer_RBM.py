@@ -341,11 +341,10 @@ class DBM_class(object):
 			self.h2      = tf.nn.relu(tf.sign(self.h2_prob - tf.random_uniform(tf.shape(self.h2_prob)))) 
 
 		## Backward Feed
-		self.v_recon_prob  = sigmoid(tf.matmul(self.h1,tf.transpose(self.w1))+self.bias_v, temp)
-		self.v_recon       = tf.nn.relu(tf.sign(self.v_recon_prob - tf.random_uniform(tf.shape(self.v_recon_prob)))) 
-		self.h1_recon_prob = sigmoid(tf.matmul(self.h2,tf.transpose(self.w2)), temp)
+		self.h1_recon_prob = sigmoid(tf.matmul(self.v,self.w1)+tf.matmul(self.h2,tf.transpose(self.w2))+self.bias_h1, temp)
 		self.h1_recon      = tf.nn.relu(tf.sign(self.h1_recon_prob - tf.random_uniform(tf.shape(self.h1_recon_prob)))) 
-
+		self.v_recon_prob  = sigmoid(tf.matmul(self.h1_recon,tf.transpose(self.w1))+self.bias_v, temp)
+		self.v_recon       = tf.nn.relu(tf.sign(self.v_recon_prob - tf.random_uniform(tf.shape(self.v_recon_prob)))) 
 
 		## Gibbs step probs
 		self.h1_gibbs = sigmoid(tf.matmul(self.v_recon,self.w1) + tf.matmul(self.h2,tf.transpose(self.w2)) + self.bias_h1,temp)
@@ -388,7 +387,7 @@ class DBM_class(object):
 							]
 
 		### reverse feed
-		self.h2_rev = tf.placeholder(tf.float32,[None,10],name="reverse_h2")
+		self.h2_rev      = tf.placeholder(tf.float32,[None,10],name="reverse_h2")
 		self.h1_rev_prob = sigmoid(tf.matmul(self.h2_rev, tf.transpose(self.w2))+self.bias_h1,temp)
 		self.h1_rev      = tf.nn.relu(tf.sign(self.h1_rev_prob - tf.random_uniform(tf.shape(self.h1_rev_prob)))) 
 		self.v_rev_prob  = sigmoid(tf.matmul(self.h1_rev, tf.transpose(self.w1))+self.bias_v,temp)
@@ -539,32 +538,34 @@ class DBM_class(object):
 		return v_rev
 
 
-	def gibbs_sampling(self,my_input_data,gibbs_steps,liveplot=1):
+	def gibbs_sampling(self,v_input,label_input,gibbs_steps,liveplot=1):
 		if load_from_file and not training:
 			self.load_from_file(workdir+pathsuffix)
-		self.h2   = tf.Variable(tf.random_uniform([len(my_input_data),self.shape[2]],minval=-1e-3,maxval=1e-3),name="h2")
+		self.h2   = tf.Variable(label_input.astype(np.float32),name="h2")
 		tf.variables_initializer([self.h2], name='init_train')
 
 		self.graph_init(train_graph=0)
 		self.import_()
 		if liveplot:
 			log.out("Liveplotting gibbs sampling")
-			fig,ax=plt.subplots(1,1)
+			fig,ax=plt.subplots(1,2)
 		#start with label h2 vector as input
-		self.v_rev_gibbs=self.v_rev_prob.eval({self.h2_rev:my_input_data})
+		self.v_rev_gibbs=self.v_recon_prob.eval({self.v:v_input})
 		#now set self.v_rev_gibbs = v and generate h2
-		h2_gibbs=self.h2.eval({self.v:self.v_rev_gibbs})
+		h2_gibbs=self.h2_prob.eval({self.v:v_input})
 		#and generate self.v_rev_gibbs again
 		for i in range(gibbs_steps):
 			if plt.fignum_exists(fig.number):
-				ax.cla()
-				ax.matshow(self.v_rev_gibbs.reshape(28,28))
-				plt.pause(0.01)
+				ax[0].cla()
+				ax[0].matshow(self.v_rev_gibbs.reshape(28,28))
+				ax[1].cla()
+				ax[1].matshow(h2_gibbs[0][:-1].reshape(3,3))
+				plt.pause(0.0001)
 				self.v_rev_gibbs=self.v_recon_prob.eval({self.v:self.v_rev_gibbs})
+				h2_gibbs=self.h2_prob.eval({self.v:self.v_rev_gibbs})
 			else:
 				break
 
-			# h2_gibbs=self.h2.eval({self.v:self.v_rev_gibbs})
 		
 		plt.close(fig)
 
@@ -636,7 +637,7 @@ class DBM_class(object):
 num_batches_pretrain = 500
 dbm_batches          = 500
 pretrain_epochs      = 1
-dbm_epochs           = 1
+dbm_epochs           = 5
 
 rbm_learnrate     = 0.005
 dbm_learnrate     = 0.01
@@ -646,16 +647,16 @@ temp = 1.
 
 pre_training    = 0 #if no pretrain then files are automatically loaded
 
-training       = 1
+training       = 0
 plotting       = 0
-gibbs_sampling = 0
+gibbs_sampling = 1
 
 save_to_file          = 0
 save_all_params       = 0
 save_pretrained       = 0
 
-load_from_file        = 0
-pathsuffix            = "Fri Jan 12 16-40-57 2018"
+load_from_file        = 1
+pathsuffix            = "/data/Fri Jan 12 16-40-57 2018"
 pathsuffix_pretrained = "Fri Jan 12 11-00-46 2018"
 
 
@@ -663,11 +664,6 @@ number_of_layers = 3
 n_first_layer    = 784
 n_second_layer   = 15*15
 n_third_layer    = 10
-
-
-####################################################################################################################################
-#### Create RBMs and merge them into one list for iteration###
-#RBM(visible units, hidden units, forw_mult, back_mult, liveplot,...)
 
 
 
@@ -714,7 +710,7 @@ if gibbs_sampling:
 	with tf.Session() as sess:
 		log.start("Gibbs Sampling Session")
 		# start a new session because gibbs sampling only has 1 test input - v has 1 length
-		DBM.gibbs_sampling(test_label[1:2], 10, liveplot=1)
+		DBM.gibbs_sampling(test_data[7:8],test_label[7:8], 200, liveplot=1)
 		log.end()
 
 if save_to_file:
