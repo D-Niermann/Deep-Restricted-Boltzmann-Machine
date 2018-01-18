@@ -9,12 +9,12 @@ if True:
 	import tensorflow as tf
 	# import scipy.ndimage.filters as filters
 	# import pandas as pd
-	import os,time
+	import os,time,sys
 	from math import exp,sqrt,sin,pi,cos,log
 	np.set_printoptions(precision=3)
 	
-	workdir="/Users/Niermann/Google Drive/Masterarbeit/Python"
-	# workdir="/home/dario/Downloads"
+	workdir="/Users/Niermann/Google Drive/Masterarbeit/Python/DBM Project"
+	# workdir="/home/dario/Downloads/DBM Project"
 	mpl.rcParams["image.cmap"] = "jet"
 	mpl.rcParams["grid.linewidth"] = 0.0
 
@@ -64,10 +64,14 @@ if "train_data" not in globals():
 	#halfing some images from test_data
 	half_images[1:6,500:] = 0
 
+#### Get the arguments list from terminal
+additional_args=sys.argv
+#clear the first entry becaust that is always just the file name
+if len(additional_args)>0:
+	additional_args.pop(0)
+
 ################################################################################################################################################
 ### Class RBM 
-
-
 class RBM(object):
 	""" defines a 2 layer restricted boltzmann machine - first layer = input, second
 	layer = output. Training with contrastive divergence """
@@ -169,13 +173,11 @@ class DBM_class(object):
 	"""defines a deep boltzmann machine
 	"""
 
-	def __init__(self,shape,learnrate,epochs,num_batches,liveplot):
+	def __init__(self,shape,learnrate,liveplot):
 		self.n_layers     = len(shape)
 		self.liveplot     = liveplot
 		self.shape        = shape  # contains the number of  neurons in a list from v layer to h1 to h2 
-		self.num_batches  = num_batches
-		self.epochs = epochs
-
+		
 		
 		self.learnrate    = learnrate
 		
@@ -190,7 +192,7 @@ class DBM_class(object):
 					["epochs_pretrain",pretrain_epochs],
 					["epochs_train",dbm_epochs],
 					["batches_pretrain",num_batches_pretrain],
-					["batches_dbm_train",num_batches],
+					["batches_dbm_train",dbm_batches],
 					["learnrate_pretrain",rbm_learnrate],
 					["learnrate_dbm_train",dbm_learnrate],
 					["learnrate_dbm_train_end",dbm_learnrate_end],
@@ -396,13 +398,14 @@ class DBM_class(object):
 		self.init_state=1
 
 
-	def train(self):
+	def train(self,epochs,num_batches,cont):
 		""" training the DBM with given h2 as labels """
 		# init all vars for training
-		batchsize      = int(55000/self.num_batches)
-		num_of_updates = self.epochs*self.num_batches
+		batchsize      = int(55000/num_batches)
+		num_of_updates = epochs*num_batches
 		self.num_of_updates = num_of_updates
 		d_learnrate    = float(dbm_learnrate_end-self.learnrate)/num_of_updates
+		self.m=0
 		
 		self.h2        = tf.Variable(tf.random_uniform([batchsize,self.shape[2]],minval=-1e-3,maxval=1e-3),name="h2")
 		tf.variables_initializer([self.h2], name='init_train')
@@ -411,7 +414,7 @@ class DBM_class(object):
 		
 		if load_from_file:
 			# load data from the file
-			self.load_from_file(workdir+pathsuffix)
+			self.load_from_file(workdir+"/data/"+pathsuffix)
 			self.graph_init(1)
 			self.import_()
 
@@ -419,14 +422,19 @@ class DBM_class(object):
 		if self.init_state==0:
 			self.graph_init(1)
 
+		if cont:
+			self.graph_init(1)
+			self.import_()
+
+
 		if self.liveplot:
 			log.info("Liveplot is on!")
 			fig,ax=plt.subplots(1,1,figsize=(15,10))
 
 		
 		# starting the training
-		for epoch in range(self.epochs):
-			log.start("Deep BM Epoch:",epoch+1,"/",self.epochs)
+		for epoch in range(epochs):
+			log.start("Deep BM Epoch:",epoch+1,"/",epochs)
 
 			for start, end in zip( range(0, len(train_data), batchsize), range(batchsize, len(train_data), batchsize)):
 				
@@ -445,6 +453,7 @@ class DBM_class(object):
 								self.h2:batch_label}
 					)
 				
+				# add values to the tf.arrays
 				if self.m%self.num_of_skipped==0:
 					sess.run([self.assign_arrays],
 							feed_dict={	self.v:batch,
@@ -583,7 +592,7 @@ class DBM_class(object):
 	def write_to_file(self):
 		if self.exported!=1:
 			self.export()
-		new_path = os.getcwd()+"/"+str(time_now)
+		new_path = os.getcwd()+"/data/"+str(time_now)
 		os.makedirs(new_path)
 		os.chdir(new_path)
 		np.savetxt("w1.txt", self.w1_np)
@@ -596,7 +605,7 @@ class DBM_class(object):
 		if save_all_params:
 			with open("logfile.txt","w") as log_file:
 				for i in range(len(self.log_list)):
-					log_file.write(str(self.log_list[i])+"\n")
+					log_file.write(self.log_list[i][0]+","+str(self.log_list[i][1])+"\n")
 
 			if training:
 				np.savetxt("h1_activity.txt", self.h1_activity_np)
@@ -641,12 +650,12 @@ training       = 1
 plotting       = 0
 gibbs_sampling = 0
 
-save_to_file    = 1
-save_all_params = 0
-save_pretrained = 0
+save_to_file          = 0
+save_all_params       = 0
+save_pretrained       = 0
 
 load_from_file        = 0
-pathsuffix            = "/Fri Jan 12 16-40-57 2018"
+pathsuffix            = "Fri Jan 12 16-40-57 2018"
 pathsuffix_pretrained = "Fri Jan 12 11-00-46 2018"
 
 
@@ -667,8 +676,6 @@ n_third_layer    = 10
 # if i == 0,1,2,...: (das ist das i von der echo cluster schleife) in der dbm class stehen dann die parameter für das jeweilige i 
 DBM = DBM_class(	shape=[n_first_layer,n_second_layer,n_third_layer],
 			learnrate = dbm_learnrate,
-			epochs = dbm_epochs,
-			num_batches = dbm_batches,
 			liveplot=0
 			)
 
@@ -677,28 +684,31 @@ DBM = DBM_class(	shape=[n_first_layer,n_second_layer,n_third_layer],
 log.reset()
 log.info(time_now)
 
-
 DBM.pretrain()
 
-with tf.Session() as sess:
-	log.start("DBM Train Session")
-	
+for i in range(1):
 	if training:
-		DBM.train()
+		with tf.Session() as sess:
+			log.start("DBM Train Session")
+			
+			
+			DBM.train(	epochs = dbm_epochs,
+					num_batches = dbm_batches,
+					cont=i)
 
-	log.end()
+			log.end()
 
-# test session
-with tf.Session() as sess:
-	log.start("Test Session")
-	# new session for test images - v has 10.000 length 
-	#testing the network , this also inits the graph so do not comment it out
-	DBM.test(test_data) 
+	# test session
+	with tf.Session() as sess:
+		log.start("Test Session")
+		# new session for test images - v has 10.000 length 
+		#testing the network , this also inits the graph so do not comment it out
+		DBM.test(test_data) 
 
-	# make a reverse feed with all 10.000 label - later only a few get plottet 
-	v_rev=DBM.reverse_feed(test_label)
+		# make a reverse feed with all 10.000 label - later only a few get plottet 
+		v_rev=DBM.reverse_feed(test_label)
 
-	log.end()
+		log.end()
 
 if gibbs_sampling:
 	with tf.Session() as sess:
