@@ -327,8 +327,8 @@ class DBM_class(object):
 
 		# self.h2      = tf.placeholder(tf.random_uniform([None,self.shape[1].hidden_units],minval=-1e-3,maxval=1e-3),name="h2_placeholder")
 
-		self.w1 = tf.Variable(self.weights[0],name="Weights1")# init with small random values to break symmetriy
-		self.w2 = tf.Variable(self.weights[1],name="Weights2")# init with small random values to break symmetriy
+		self.w1 = tf.Variable(self.weights[0],name="Weights1")
+		self.w2 = tf.Variable(self.weights[1],name="Weights2")
 
 		self.bias_v  = tf.Variable(tf.zeros([self.shape[0]]),name="Visible-Bias")
 		self.bias_h1 = tf.Variable(tf.zeros([self.shape[1]]), name="Hidden-Bias")
@@ -550,39 +550,41 @@ class DBM_class(object):
 	def gibbs_sampling(self,v_input,label_input,gibbs_steps,liveplot=1):
 		if load_from_file and not training:
 			self.load_from_file(workdir+"/data/"+pathsuffix)
-	
+		self.num_of_updates=10 #just needs to be defined because it will make a train graph with tf.arrays where this number is needed
 		# "verarsche" tf graph init weil h2 einfach nur fur die erste def gebraucht wird im graph und danach anders definiert	
-		self.h2   = tf.Variable(label_input.astype(np.float32),name="h2_init")
-		self.v_rev   = tf.Variable(v_input,name="v_rev_init")
-		tf.variables_initializer([self.h2,self.v_rev], name='init_train')
+		# self.h2   = tf.Variable(label_input.astype(np.float32),name="h2_init")
+		# self.v_rev   = tf.Variable(v_input,name="v_rev_init")
+		# tf.variables_initializer([self.h2,self.v_rev], name='init_train')
 
-		self.graph_init(train_graph=0)
+		self.graph_init(train_graph=1) #v and h2 are placeholers now
 		self.import_()
 		if liveplot:
 			log.out("Liveplotting gibbs sampling")
 			fig,ax=plt.subplots(1,2)
-		#start with label h2 vector as input
-		self.v_rev_gibbs=self.v_recon_prob.eval({self.v:v_input})
-		#now set self.v_rev_gibbs = v and generate h2
-		self.h2_gibbs_=self.h2_prob.eval({self.v:v_input})
-		#and generate self.v_rev_gibbs again
+		
+		#start with label h2 vector as input or with image v_input
+		v_gibbs=v_input#self.v_rev_prob.eval({self.h2_rev:label_input})
+		
+		#now set v_gibbs = v and generate h1, still keeping the same h2 
+		h1=self.h1.eval({self.v:v_gibbs,self.h2:label_input})
+		
+		#and generate v_gibbs again
 		for i in range(gibbs_steps):
 			if plt.fignum_exists(fig.number):
-				# self.h2_gibbs_[0][9]=0;
-				# self.h2_gibbs_[0][4]=1;
-				# self.h2_gibbs_[0][5]=0;
+				if i%100==0:
+					label_input[0][:]=0.0;
+					label_input[0][rnd.randint(10)]=1;
+
 				ax[0].cla()
-				ax[0].matshow(self.v_rev_gibbs.reshape(28,28))
+				ax[0].matshow(v_gibbs.reshape(28,28))
 				ax[1].cla()
-				ax[1].plot(self.h2_gibbs_[0])
+				ax[1].plot(label_input[0])
 				ax[1].set_ylim(0,1)
 				plt.pause(0.0001)
 				
-				self.v_rev_gibbs=self.v_recon_prob.eval({self.v:self.v_rev_gibbs})
-				
-				# self.v_rev_gibbs=self.v_rev_prob.eval({self.h2_rev:self.h2_gibbs_})
-				
-				self.h2_gibbs_=self.h2_prob.eval({self.v:self.v_rev_gibbs})
+				v_gibbs=self.v_recon_prob.eval({self.v:v_gibbs,self.h2:label_input})				
+				h1=self.h1.eval({self.v:v_gibbs,self.h2:label_input})
+
 			else:
 				break
 
@@ -685,7 +687,7 @@ pathsuffix_pretrained = "Fri Jan 12 11-00-46 2018"
 
 number_of_layers = 3
 n_first_layer    = 784
-n_second_layer   = 25*25
+n_second_layer   = 15*15
 n_third_layer    = 10
 
 saveto_path=data_dir+"/"+time_now
@@ -740,7 +742,7 @@ if gibbs_sampling:
 	with tf.Session() as sess:
 		log.start("Gibbs Sampling Session")
 		# start a new session because gibbs sampling only has 1 test input - v has 1 length
-		DBM.gibbs_sampling(test_data[7:8],test_label[7:8], 400, liveplot=1)
+		DBM.gibbs_sampling(test_data[1:2],test_label[1:2], 400, liveplot=1)
 		log.end()
 
 if training and save_to_file:
