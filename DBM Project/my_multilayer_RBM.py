@@ -184,12 +184,12 @@ class DBM_class(object):
 		
 		self.learnrate    = learnrate
 		
-		self.init_state   = 0
-		self.exported     = 0
-		self.m            = 0 #laufvariable
+		self.init_state     = 0
+		self.exported       = 0
+		self.m              = 0 #laufvariable
 		self.num_of_skipped = 100 # how many tf.array value adds get skipped 
-
-		self.log_list=[	["n_units_first_layer",shape[0]],
+		self.train_time     = 0
+		self.log_list = [	["n_units_first_layer",shape[0]],
 					["n_units_second_layer",shape[1]],
 					["n_units_third_layer",shape[2]],
 					["epochs_pretrain",pretrain_epochs],
@@ -483,7 +483,7 @@ class DBM_class(object):
 			# self.train_error_np=self.train_error_.eval()
 			# log.out("error:",np.round(self.train_error_np[m],4)," learnrate:",self.learnrate)
 			
-			log.end()
+			log.end() #ending the epoch
 		log.reset()
 
 		# normalize the activity arrays
@@ -550,11 +550,8 @@ class DBM_class(object):
 	def gibbs_sampling(self,v_input,label_input,gibbs_steps,liveplot=1):
 		if load_from_file and not training:
 			self.load_from_file(workdir+"/data/"+pathsuffix)
-		self.num_of_updates=10 #just needs to be defined because it will make a train graph with tf.arrays where this number is needed
-		# "verarsche" tf graph init weil h2 einfach nur fur die erste def gebraucht wird im graph und danach anders definiert	
-		# self.h2   = tf.Variable(label_input.astype(np.float32),name="h2_init")
-		# self.v_rev   = tf.Variable(v_input,name="v_rev_init")
-		# tf.variables_initializer([self.h2,self.v_rev], name='init_train')
+		
+		self.num_of_updates=1000 #just needs to be defined because it will make a train graph with tf.arrays where this number is needed
 
 		self.graph_init(train_graph=1) #v and h2 are placeholers now
 		self.import_()
@@ -563,7 +560,7 @@ class DBM_class(object):
 			fig,ax=plt.subplots(1,2)
 		
 		#start with label h2 vector as input or with image v_input
-		v_gibbs=v_input#self.v_rev_prob.eval({self.h2_rev:label_input})
+		v_gibbs=np.zeros(v_input.shape)#self.v_rev_prob.eval({self.h2_rev:label_input})
 		
 		#now set v_gibbs = v and generate h1, still keeping the same h2 
 		h1=self.h1.eval({self.v:v_gibbs,self.h2:label_input})
@@ -571,9 +568,9 @@ class DBM_class(object):
 		#and generate v_gibbs again
 		for i in range(gibbs_steps):
 			if plt.fignum_exists(fig.number):
-				if i%100==0:
-					label_input[0][:]=0.0;
-					label_input[0][rnd.randint(10)]=1;
+				# if i%100==0:
+				# 	label_input[0][:]=0.0;
+				# 	label_input[0][rnd.randint(10)]=1;
 
 				ax[0].cla()
 				ax[0].matshow(v_gibbs.reshape(28,28))
@@ -624,6 +621,7 @@ class DBM_class(object):
 		np.savetxt("bias2.txt", self.bias2_np)
 		np.savetxt("bias3.txt", self.bias3_np)
 		
+		self.log_list.append(["train_time",self.train_time])
 
 		with open("logfile.txt","w") as log_file:
 				for i in range(len(self.log_list)):
@@ -662,7 +660,7 @@ class DBM_class(object):
 num_batches_pretrain = 500
 dbm_batches          = 500
 pretrain_epochs      = 3
-dbm_epochs           = 60
+dbm_epochs           = 1
 
 rbm_learnrate     = 0.005
 dbm_learnrate     = 0.005
@@ -672,12 +670,13 @@ temp = 1.0
 
 pre_training    = 0 	#if no pretrain then files are automatically loaded
 
-training       = 0
-plotting       = 0
-gibbs_sampling = 1
+training       = 1
+testing 	   = 1
+plotting       = 1
+gibbs_sampling = 0
 
-save_to_file          = 0 	# only save biases and weights for further training
-save_all_params       = 0	# also save all test data and reconstructed images (memory heavy)
+save_to_file          = 1 	# only save biases and weights for further training
+save_all_params       = 1	# also save all test data and reconstructed images (memory heavy)
 save_pretrained       = 0	
 
 load_from_file        = 1
@@ -724,19 +723,21 @@ for i in range(1):
 					num_batches = dbm_batches,
 					cont=i)
 
-			log.end()
+			DBM.train_time=log.end()
 
 	# test session
-	with tf.Session() as sess:
-		log.start("Test Session")
-		# new session for test images - v has 10.000 length 
-		#testing the network , this also inits the graph so do not comment it out
-		DBM.test(test_data) 
+	if testing:
+		with tf.Session() as sess:
+			log.start("Test Session")
+			# new session for test images - v has 10.000 length 
+			#testing the network , this also inits the graph so do not comment it out
+			DBM.test(test_data) 
 
-		# make a reverse feed with all 10.000 label - later only a few get plottet 
-		v_rev=DBM.reverse_feed(test_label)
+			# make a reverse feed with all 10.000 label - later only a few get plottet 
+			v_rev=DBM.reverse_feed(test_label)
 
-		log.end()
+			log.end()
+
 
 if gibbs_sampling:
 	with tf.Session() as sess:
@@ -747,6 +748,8 @@ if gibbs_sampling:
 
 if training and save_to_file:
 	DBM.write_to_file()
+
+
 
 ####################################################################################################################################
 #### Plot
@@ -776,7 +779,7 @@ if plotting:
 		ax_fr1.set_title("Firerate h1 layer")
 		ax_fr2.set_title("Weights mean")
 		ax_fr2.legend(loc="best")
-		
+		ax_fr2.set_ylim([0,np.max(DBM.w1_mean_np)*1.1])
 		ax_fr3=fig_fr.add_subplot(313)
 		ax_fr3.plot(x,DBM.train_error_np,"k")
 		ax_fr3.set_title("Train Error")
