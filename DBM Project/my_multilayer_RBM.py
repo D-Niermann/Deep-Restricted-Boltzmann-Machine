@@ -18,7 +18,7 @@ if True:
 	# workdir="/home/dario/Dokumente/DBM Project"
 	data_dir=workdir+"/data"
 	mpl.rcParams["image.cmap"] = "jet"
-	mpl.rcParams["grid.linewidth"] = 0.0
+	mpl.rcParams["grid.linewidth"] = 0.5
 
 	os.chdir(workdir)
 	from Logger import *
@@ -310,10 +310,13 @@ class DBM_class(object):
 		"""
 		log.out("Initializing graph")
 		self.v  = tf.placeholder(tf.float32,[None,self.shape[0]],name="Visible-Layer") # has self.shape [number of images per batch,number of visible units]
-		
+		if train_graph==2:
+			self.temp=tf.placeholder(tf.float32,[],name="Temperature")
+		else:
+			self.temp=temp
 
 		
-		if train_graph:
+		if train_graph==1:
 			self.m_tf = tf.placeholder(tf.int32,[],name="running_array_index")
 			self.h2   = tf.placeholder(tf.float32,[None,self.shape[2]])
 
@@ -334,26 +337,27 @@ class DBM_class(object):
 		self.bias_h1 = tf.Variable(tf.zeros([self.shape[1]]), name="Hidden-Bias")
 		self.bias_h2 = tf.Variable(tf.zeros([self.shape[2]]), name="Hidden-Bias")
 
-
+		# self.temp_tf     = tf.Variable(temp, name="Temperature")
+	
 		### Propagation
 		## Forward Feed
 		# h1 gets both inputs from h2 and v
-		self.h1_prob = sigmoid(tf.matmul(self.v,self.w1) + tf.matmul(self.h2,tf.transpose(self.w2)) + self.bias_h1,temp)
+		self.h1_prob = sigmoid(tf.matmul(self.v,self.w1) + tf.matmul(self.h2,tf.transpose(self.w2)) + self.bias_h1,self.temp)
 		self.h1      = tf.nn.relu(tf.sign(self.h1_prob - tf.random_uniform(tf.shape(self.h1_prob)))) 
 		# h2 only from h1
-		if not train_graph:
-			self.h2_prob = sigmoid(tf.matmul(self.h1,self.w2) + self.bias_h2,temp)
-			self.h2      = tf.nn.relu(tf.sign(self.h2_prob - tf.random_uniform(tf.shape(self.h2_prob)))) 
+		if not train_graph or train_graph==2:
+			self.h2_prob = sigmoid(tf.matmul(self.h1,self.w2) + self.bias_h2,self.temp)
+			self.h2      = tf.nn.relu(tf.sign(self.h2_prob - tf.random_uniform(tf.shape(self.h2_prob))))
 
 		## Backward Feed
-		self.h1_recon_prob = sigmoid(tf.matmul(self.v,self.w1)+tf.matmul(self.h2,tf.transpose(self.w2))+self.bias_h1, temp)
+		self.h1_recon_prob = sigmoid(tf.matmul(self.v,self.w1)+tf.matmul(self.h2,tf.transpose(self.w2))+self.bias_h1, self.temp)
 		self.h1_recon      = tf.nn.relu(tf.sign(self.h1_recon_prob - tf.random_uniform(tf.shape(self.h1_recon_prob)))) 
-		self.v_recon_prob  = sigmoid(tf.matmul(self.h1_recon,tf.transpose(self.w1))+self.bias_v, temp)
+		self.v_recon_prob  = sigmoid(tf.matmul(self.h1_recon,tf.transpose(self.w1))+self.bias_v, self.temp)
 		self.v_recon       = tf.nn.relu(tf.sign(self.v_recon_prob - tf.random_uniform(tf.shape(self.v_recon_prob)))) 
 
 		## Gibbs step probs
-		self.h1_gibbs = sigmoid(tf.matmul(self.v_recon,self.w1) + tf.matmul(self.h2,tf.transpose(self.w2)) + self.bias_h1,temp)
-		self.h2_gibbs = sigmoid(tf.matmul(self.h1_recon,self.w2), temp)
+		self.h1_gibbs = sigmoid(tf.matmul(self.v_recon_prob,self.w1) + tf.matmul(self.h2,tf.transpose(self.w2)) + self.bias_h1,self.temp)
+		self.h2_gibbs = sigmoid(tf.matmul(self.h1_recon_prob,self.w2), self.temp)
 		
 		#Error and stuff
 		self.error  = tf.reduce_mean(tf.square(self.v-self.v_recon))
@@ -382,7 +386,7 @@ class DBM_class(object):
 		self.update_bias_v  = self.bias_v.assign(self.bias_v+self.learnrate*tf.reduce_mean(self.v-self.v_recon,0))
 		
 		
-		if train_graph:
+		if train_graph==1:
 			self.assign_arrays =	[tf.scatter_update(self.train_error_,self.m_tf,self.error),
 							 #tf.scatter_update(self.CD1_mean_,self.m_tf,self.CD1_mean),
 							 #tf.scatter_update(self.CD2_mean_,self.m_tf,self.CD2_mean),
@@ -393,9 +397,9 @@ class DBM_class(object):
 
 		### reverse feed
 		self.h2_rev      = tf.placeholder(tf.float32,[None,10],name="reverse_h2")
-		self.h1_rev_prob = sigmoid(tf.matmul(self.v_rev, self.w1)+tf.matmul(self.h2_rev, tf.transpose(self.w2))+self.bias_h1,temp)
+		self.h1_rev_prob = sigmoid(tf.matmul(self.v, self.w1)+tf.matmul(self.h2_rev, tf.transpose(self.w2))+self.bias_h1,self.temp)
 		self.h1_rev      = tf.nn.relu(tf.sign(self.h1_rev_prob - tf.random_uniform(tf.shape(self.h1_rev_prob)))) 
-		self.v_rev_prob  = sigmoid(tf.matmul(self.h1_rev, tf.transpose(self.w1))+self.bias_v,temp)
+		self.v_rev_prob  = sigmoid(tf.matmul(self.h1_rev, tf.transpose(self.w1))+self.bias_v,self.temp)
 		self.v_rev       = tf.nn.relu(tf.sign(self.v_rev_prob - tf.random_uniform(tf.shape(self.v_rev_prob)))) 
 
 		sess.run(tf.global_variables_initializer())
@@ -411,9 +415,9 @@ class DBM_class(object):
 		d_learnrate    = float(dbm_learnrate_end-self.learnrate)/num_of_updates
 		self.m=0
 		
-		self.h2        = tf.Variable(tf.random_uniform([batchsize,self.shape[2]],minval=-1e-3,maxval=1e-3),name="h2")
+		self.h2_prob        = tf.Variable(tf.random_uniform([batchsize,self.shape[2]],minval=-1e-3,maxval=1e-3),name="h2")
 		self.v_rev   = tf.Variable(tf.random_uniform([batchsize,self.shape[0]],minval=-1e-3,maxval=1e-3),name="v_rev_init")
-		tf.variables_initializer([self.h2,self.v_rev], name='init_train')
+		tf.variables_initializer([self.h2_prob,self.v_rev], name='init_train')
 			
 
 		
@@ -474,7 +478,7 @@ class DBM_class(object):
 				
 				if self.liveplot and plt.fignum_exists(fig.number) and start%40==0:
 					ax.cla()
-					matrix_new=tile_raster_images(X=self.w1.eval().T, img_shape=(28, 28), tile_shape=(12, 12), tile_spacing=(0,0))
+					matrix_new=tile(self.w1.eval())
 					ax.matshow(matrix_new)
 					plt.pause(0.00001)
 
@@ -506,7 +510,7 @@ class DBM_class(object):
 		if load_from_file and not training:
 			self.load_from_file(workdir+"/data/"+pathsuffix)
 
-		self.graph_init(0) # 0 because this graph creates the testing variables where only v is given, not h
+		self.graph_init(0) # 0 because this graph creates the testing variables where only v is given, not h2
 
 		self.import_()
 
@@ -537,57 +541,71 @@ class DBM_class(object):
 		log.reset()
 		log.info("Reconstr. error: ",np.round(DBM.test_error,5), "learnrate: ",np.round(dbm_learnrate,5))
 		log.info("Class error: ",np.round(self.class_error,5))
-		log.info("Activations of Neurons: ", np.round(self.h1_act_test,2) , np.round(self.h2_act_test,2))
+		log.info("Activations of Neurons: ", np.round(self.h1_act_test,4) , np.round(self.h2_act_test,4))
 
 
-	def reverse_feed(self,my_input_data):
-		""" use this in the test sesion to feed a h2 labeled vector to
-		genereate numbers """
-		v_rev=self.v_rev_prob.eval({self.h2_rev:my_input_data})
-		return v_rev
 
 
-	def gibbs_sampling(self,v_input,label_input,gibbs_steps,liveplot=1):
+	def gibbs_sampling(self,v_input,gibbs_steps,temp_start,temp_end,modification,liveplot=1):
+
 		if load_from_file and not training:
 			self.load_from_file(workdir+"/data/"+pathsuffix)
+
+		self.v_rev = tf.Variable(tf.random_uniform([1,self.shape[0]],minval=-1e-3,maxval=1e-3),name="v_rev_init")
+		self.h2    = tf.Variable(tf.random_uniform([1,self.shape[2]],minval=-1e-3,maxval=1e-3),name="h2")
 		
+		tf.variables_initializer([self.h2,self.v_rev], name='init_train')
+		
+		h2_        = []
+		temp=temp_start
+		temp_delta = (temp_end-temp_start)/gibbs_steps
+
 		self.num_of_updates=1000 #just needs to be defined because it will make a train graph with tf.arrays where this number is needed
 
-		self.graph_init(train_graph=1) #v and h2 are placeholers now
+		self.graph_init(train_graph=2) #v and h2 are placeholers now
 		self.import_()
+		# tf.variables_initializer([temp], name='init_train')
+
 		if liveplot:
-			log.out("Liveplotting gibbs sampling")
+			log.info("Liveplotting gibbs sampling")
 			fig,ax=plt.subplots(1,2)
 		
-		#start with label h2 vector as input or with image v_input
-		v_gibbs=np.zeros(v_input.shape)#self.v_rev_prob.eval({self.h2_rev:label_input})
+		# set v as input 
+		v_gibbs = v_input 
+		#calculate forward feed h2
+		h2      = self.h2_prob.eval({self.v:v_gibbs,self.temp:1.0})
 		
-		#now set v_gibbs = v and generate h1, still keeping the same h2 
-		h1=self.h1.eval({self.v:v_gibbs,self.h2:label_input})
-		
-		#and generate v_gibbs again
-		for i in range(gibbs_steps):
-			if plt.fignum_exists(fig.number):
-				# if i%100==0:
-				# 	label_input[0][:]=0.0;
-				# 	label_input[0][rnd.randint(10)]=1;
 
+		log.start("Gibbs Sampling")
+		for i in range(gibbs_steps):
+			if liveplot and plt.fignum_exists(fig.number):
 				ax[0].cla()
 				ax[0].matshow(v_gibbs.reshape(28,28))
 				ax[1].cla()
-				ax[1].plot(label_input[0])
+				ax[1].plot(h2[0],"-o")
 				ax[1].set_ylim(0,1)
+				ax[1].grid()
+				ax[1].set_title("Temp.: %s, Steps: %s"%(str(temp),str(i)))
 				plt.pause(0.0001)
-				
-				v_gibbs=self.v_recon_prob.eval({self.v:v_gibbs,self.h2:label_input})				
-				h1=self.h1.eval({self.v:v_gibbs,self.h2:label_input})
+			if liveplot and not plt.fignum_exists(fig.number):
+				break 
 
-			else:
-				break
+			# assign temp
+			temp+=temp_delta
+			# calculate the backward and forward pass 
+			v_gibbs   = self.v_rev_prob.eval({self.v:v_gibbs,self.h2_rev:h2,self.temp:temp})
+			h2        = self.h2_prob.eval({self.v:v_gibbs,self.temp:temp})
+			
+			# here the h2 vector can be changed like: h2[0][1:4]=0
+			h2[0]*=modification
+			# h2[0][9]=1
+			h2_.append(h2[0])
 
-		
-		plt.close(fig)
+		if liveplot:
+			plt.close(fig)
+		log.end()
 
+		return v_gibbs,np.array(h2_)
 
 	def export(self):
 		# convert weights and biases to numpy arrays
@@ -647,7 +665,7 @@ class DBM_class(object):
 			np.savetxt("h1_test.txt", self.h1_test) 
 			np.savetxt("h2_prob_test.txt", self.h2_test) 
 
-			log.info("Saved Parameters to:",new_path)
+			log.info("Saved Parameters to same path")
 
 
 		
@@ -660,28 +678,28 @@ class DBM_class(object):
 num_batches_pretrain = 500
 dbm_batches          = 500
 pretrain_epochs      = 3
-dbm_epochs           = 1
+dbm_epochs           = 20
 
 rbm_learnrate     = 0.005
 dbm_learnrate     = 0.005
-dbm_learnrate_end = 0.005
+dbm_learnrate_end = 0.01   # bringt nichts
 
-temp = 1.0
+temp = 1.		# als tf.placeholder oder var machen 
 
 pre_training    = 0 	#if no pretrain then files are automatically loaded
 
-training       = 1
-testing 	   = 1
-plotting       = 1
-gibbs_sampling = 0
+training       = 0
+testing 	   = 0
+plotting       = 0
+gibbs_sampling = 1
 
-save_to_file          = 1 	# only save biases and weights for further training
-save_all_params       = 1	# also save all test data and reconstructed images (memory heavy)
-save_pretrained       = 0	
+save_to_file          = 0 	# only save biases and weights for further training
+save_all_params       = 0	# also save all test data and reconstructed images (memory heavy)
+save_pretrained       = 1
 
 load_from_file        = 1
 pathsuffix            = "Thu Jan 18 17-22-41 2018 20 epochen"
-pathsuffix_pretrained = "Fri Jan 12 11-00-46 2018"
+pathsuffix_pretrained = "Thu Jan 25 11-28-08 2018"
 
 
 number_of_layers = 3
@@ -711,6 +729,7 @@ log.reset()
 log.info(time_now)
 
 
+
 DBM.pretrain()
 
 for i in range(1):
@@ -733,8 +752,6 @@ for i in range(1):
 			#testing the network , this also inits the graph so do not comment it out
 			DBM.test(test_data) 
 
-			# make a reverse feed with all 10.000 label - later only a few get plottet 
-			v_rev=DBM.reverse_feed(test_label)
 
 			log.end()
 
@@ -742,21 +759,25 @@ for i in range(1):
 if gibbs_sampling:
 	with tf.Session() as sess:
 		log.start("Gibbs Sampling Session")
+		
 		# start a new session because gibbs sampling only has 1 test input - v has 1 length
-		DBM.gibbs_sampling(test_data[1:2],test_label[1:2], 400, liveplot=1)
+		v_gibbs1,h2_1=DBM.gibbs_sampling(test_data[1:2], 1000, 1.1, 0.5, modification=[1,1,1,1,1,1,1,1,1,1], liveplot=1)
+		# v_gibbs2,h2_2=DBM.gibbs_sampling(test_data[1:2], 500, modification=[1,1,1,0,1,1,1,1,1,1], liveplot=0)
+		
 		log.end()
+
 
 if training and save_to_file:
 	DBM.write_to_file()
-
 
 
 ####################################################################################################################################
 #### Plot
 # Plot the Weights, Errors and other informations
 if plotting:
-	
-	map1=plt.matshow(tile_raster_images(X=DBM.w1_np.T, img_shape=(28, 28), tile_shape=(12, 12), tile_spacing=(0,0)))
+	log.out("Plotting...")
+	map1=plt.matshow(tile(DBM.w1_np))
+	plt.colorbar(map1)
 	plt.title("W 1")
 
 
@@ -824,11 +845,11 @@ if plotting:
 	plt.tight_layout(pad=0.0)
 
 	# plot the reverse_feed:
-	fig5,ax5 = plt.subplots(2,14,figsize=(16,4))
-	for i in range(14):
-		ax5[0][i].matshow(test_label[i,:9].reshape(3,3))
-		ax5[1][i].matshow(v_rev[i].reshape(28,28))
-	plt.tight_layout(pad=0.0)
+	# fig5,ax5 = plt.subplots(2,14,figsize=(16,4))
+	# for i in range(14):
+	# 	ax5[0][i].matshow(test_label[i,:9].reshape(3,3))
+	# 	ax5[1][i].matshow(v_rev[i].reshape(28,28))
+	# plt.tight_layout(pad=0.0)
 
 
 	plt.matshow(np.mean(v_rev[index_for_number[:]],0).reshape(28,28))

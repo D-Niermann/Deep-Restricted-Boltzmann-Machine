@@ -8,37 +8,26 @@ def scale_to_unit_interval(ndar, eps=1e-8):
     ndar *= 1.0 / (ndar.max() + eps)
     return ndar
 
+
+def tile(w):
+    a=np.zeros(w.T.shape)
+    j,k=0,0
+    for i in range(w.T.shape[0]):
+        try:
+            pic=w.T[i,:].reshape(28,28)
+            a[k:k+28,j:j+28]=pic
+            k+=28
+            if k+28>w.T.shape[0]:
+                k=0
+                j+=28
+        except:
+            break
+        # j+=28
+    return a
+
+
 def tile_raster_images(X, img_shape, tile_shape, tile_spacing=(0, 0),scale_rows_to_unit_interval=True,output_pixel_vals=True):
-    """
-    Transform an array with one flattened image per row, into an array in
-    which images are reshaped and layed out like tiles on a floor.
-
-    This function is useful for visualizing datasets whose rows are images,
-    and also columns of matrices for transforming those rows
-    (such as the first layer of a neural net).
-
-    :type X: a 2-D ndarray or a tuple of 4 channels, elements of which can
-    be 2-D ndarrays or None;
-    :param X: a 2-D array in which every row is a flattened image.
-
-    :type img_shape: tuple; (height, width)
-    :param img_shape: the original shape of each image
-
-    :type tile_shape: tuple; (rows, cols)
-    :param tile_shape: the number of images to tile (rows, cols)
-
-    :param output_pixel_vals: if output should be pixel values (i.e. int8
-    values) or floats
-
-    :param scale_rows_to_unit_interval: if the values need to be scaled before
-    being plotted to [0,1] or not
-
-
-    :returns: array suitable for viewing as an image.
-    (See:`Image.fromarray`.)
-    :rtype: a 2-d array with same dtype as X.
-
-    """
+    
 
     assert len(img_shape) == 2
     assert len(tile_shape) == 2
