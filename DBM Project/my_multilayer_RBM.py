@@ -228,10 +228,11 @@ class DBM_class(object):
 		with tf.Session() as sess:
 			# train session - v has batchsize length
 			log.start("Pretrain Session")
-			sess.run(tf.global_variables_initializer())
+			
 			
 			#iterate through the RBMs , each iteration is a RBM
 			if pre_training:	
+				sess.run(tf.global_variables_initializer())
 				for RBM_i,RBM in enumerate(self.RBMs):
 					log.start("Pretraining ",str(RBM_i+1)+".", "RBM")
 
@@ -302,23 +303,32 @@ class DBM_class(object):
 	################################################################################################################################################
 	####  DBM Graph 
 	################################################################################################################################################
-	def graph_init(self,train_graph):
+	def graph_init(self,graph_mode):
 		""" sets the graph up and loads the pretrained weights in , these are given
 		at class definition
-		train_grpah :: 1 if the graph is used in training - this will set h2 to placeholder for the label data
-				   0 if the graph is used in testing - this will set h2 to a random value outside this function and to be calculated from h1 
+		graph_mode  :: "training" if the graph is used in training - this will set h2 to placeholder for the label data
+				   "testing"  if the graph is used in testing - this will set h2 to a random value and to be calculated from h1 
+				   "gibbs"    if the graph is used in gibbs sampling - this will set temperature to a placeholder
 		"""
 		log.out("Initializing graph")
+
+		# these variables need to be init to random for use in h1 , later they get changed to something else
+		self.h2 = tf.Variable(tf.random_uniform([self.batchsize,self.shape[2]],minval=-1e-3,maxval=1e-3),name="h2")
+		self.v_rev   = tf.Variable(tf.random_uniform([self.batchsize,self.shape[0]],minval=-1e-3,maxval=1e-3),name="v_rev_init")
+
+		tf.variables_initializer([self.h2,self.v_rev], name='init_train')
+
+
 		self.v  = tf.placeholder(tf.float32,[None,self.shape[0]],name="Visible-Layer") # has self.shape [number of images per batch,number of visible units]
-		if train_graph==2:
+		if graph_mode=="gibbs":
 			self.temp=tf.placeholder(tf.float32,[],name="Temperature")
 		else:
 			self.temp=temp
 
 		
-		if train_graph==1:
+		if graph_mode=="training":
 			self.m_tf = tf.placeholder(tf.int32,[],name="running_array_index")
-			self.h2   = tf.placeholder(tf.float32,[None,self.shape[2]])
+			self.h2   = tf.placeholder(tf.float32,[None,self.shape[2]],name="placeholder_h2")
 
 			self.h1_activity_ = tf.Variable(tf.zeros([self.num_of_updates/self.num_of_skipped]))
 			self.h2_activity_ = tf.Variable(tf.zeros([self.num_of_updates/self.num_of_skipped]))
@@ -345,7 +355,7 @@ class DBM_class(object):
 		self.h1_prob = sigmoid(tf.matmul(self.v,self.w1) + tf.matmul(self.h2,tf.transpose(self.w2)) + self.bias_h1,self.temp)
 		self.h1      = tf.nn.relu(tf.sign(self.h1_prob - tf.random_uniform(tf.shape(self.h1_prob)))) 
 		# h2 only from h1
-		if not train_graph or train_graph==2:
+		if graph_mode=="testing" or graph_mode=="gibbs":
 			self.h2_prob = sigmoid(tf.matmul(self.h1,self.w2) + self.bias_h2,self.temp)
 			self.h2      = tf.nn.relu(tf.sign(self.h2_prob - tf.random_uniform(tf.shape(self.h2_prob))))
 
@@ -386,7 +396,7 @@ class DBM_class(object):
 		self.update_bias_v  = self.bias_v.assign(self.bias_v+self.learnrate*tf.reduce_mean(self.v-self.v_recon,0))
 		
 		
-		if train_graph==1:
+		if graph_mode=="training":
 			self.assign_arrays =	[tf.scatter_update(self.train_error_,self.m_tf,self.error),
 							 #tf.scatter_update(self.CD1_mean_,self.m_tf,self.CD1_mean),
 							 #tf.scatter_update(self.CD2_mean_,self.m_tf,self.CD2_mean),
@@ -409,30 +419,28 @@ class DBM_class(object):
 	def train(self,epochs,num_batches,cont):
 		""" training the DBM with given h2 as labels """
 		# init all vars for training
-		batchsize      = int(55000/num_batches)
-		num_of_updates = epochs*num_batches
+		self.batchsize      = int(55000/num_batches)
+		num_of_updates      = epochs*num_batches
 		self.num_of_updates = num_of_updates
-		d_learnrate    = float(dbm_learnrate_end-self.learnrate)/num_of_updates
-		self.m=0
+		d_learnrate         = float(dbm_learnrate_end-self.learnrate)/num_of_updates
+		self.m              = 0
 		
-		self.h2_prob        = tf.Variable(tf.random_uniform([batchsize,self.shape[2]],minval=-1e-3,maxval=1e-3),name="h2")
-		self.v_rev   = tf.Variable(tf.random_uniform([batchsize,self.shape[0]],minval=-1e-3,maxval=1e-3),name="v_rev_init")
-		tf.variables_initializer([self.h2_prob,self.v_rev], name='init_train')
+		
 			
 
 		
 		if load_from_file:
 			# load data from the file
 			self.load_from_file(workdir+"/data/"+pathsuffix)
-			self.graph_init(1)
+			self.graph_init("training")
 			self.import_()
 
 		# if no files loaded then init the graph with pretrained vars
 		if self.init_state==0:
-			self.graph_init(1)
+			self.graph_init("training")
 
 		if cont:
-			self.graph_init(1)
+			self.graph_init("training")
 			self.import_()
 
 
@@ -445,7 +453,7 @@ class DBM_class(object):
 		for epoch in range(epochs):
 			log.start("Deep BM Epoch:",epoch+1,"/",epochs)
 
-			for start, end in zip( range(0, len(train_data), batchsize), range(batchsize, len(train_data), batchsize)):
+			for start, end in zip( range(0, len(train_data), self.batchsize), range(self.batchsize, len(train_data), self.batchsize)):
 				
 				# define a batch
 				batch = train_data[start:end]
@@ -491,7 +499,7 @@ class DBM_class(object):
 		log.reset()
 
 		# normalize the activity arrays
-		self.h1_activity_*=1./(n_second_layer*batchsize)
+		self.h1_activity_*=1./(n_second_layer*self.batchsize)
 
 		self.export()
 
@@ -501,16 +509,17 @@ class DBM_class(object):
 		by the DBM """
 		#init the vars and reset the weights and biases 
 		log.start("Testing DBM")
+		self.batchsize=1
 
 		# "verarsche" tf graph init weil h2 einfach nur fur die erste def gebraucht wird im graph und danach anders definiert
-		self.h2   = tf.Variable(tf.random_uniform([len(test_data),self.shape[2]],minval=-1e-3,maxval=1e-3),name="h2")
-		self.v_rev   = tf.Variable(tf.random_uniform([len(test_data),self.shape[0]],minval=-1e-3,maxval=1e-3),name="v_rev_init")
-		tf.variables_initializer([self.h2,self.v_rev], name='init_train')
+		# self.h2   = tf.Variable(tf.random_uniform([len(test_data),self.shape[2]],minval=-1e-3,maxval=1e-3),name="h2")
+		# self.v_rev   = tf.Variable(tf.random_uniform([len(test_data),self.shape[0]],minval=-1e-3,maxval=1e-3),name="v_rev_init")
+		# tf.variables_initializer([self.h2,self.v_rev], name='init_train')
 
 		if load_from_file and not training:
 			self.load_from_file(workdir+"/data/"+pathsuffix)
 
-		self.graph_init(0) # 0 because this graph creates the testing variables where only v is given, not h2
+		self.graph_init("testing") # "testing" because this graph creates the testing variables where only v is given, not h2
 
 		self.import_()
 
@@ -547,22 +556,27 @@ class DBM_class(object):
 
 
 	def gibbs_sampling(self,v_input,gibbs_steps,temp_start,temp_end,modification,liveplot=1):
-
+		""" Repeatedly samples v and h2 , where h2 can be modified be the user with the multiplication
+		by the modification array - clamping the labels to certain numbers.
+		v_input :: starting with an image as input 
+		temp_end, temp_start :: temperature will decrease or increase to temp_end and start at temp_start 
+		"""
 		if load_from_file and not training:
 			self.load_from_file(workdir+"/data/"+pathsuffix)
 
-		self.v_rev = tf.Variable(tf.random_uniform([1,self.shape[0]],minval=-1e-3,maxval=1e-3),name="v_rev_init")
-		self.h2    = tf.Variable(tf.random_uniform([1,self.shape[2]],minval=-1e-3,maxval=1e-3),name="h2")
+		# self.v_rev = tf.Variable(tf.random_uniform([1,self.shape[0]],minval=-1e-3,maxval=1e-3),name="v_rev_init")
+		# self.h2    = tf.Variable(tf.random_uniform([1,self.shape[2]],minval=-1e-3,maxval=1e-3),name="h2")
 		
-		tf.variables_initializer([self.h2,self.v_rev], name='init_train')
-		
-		h2_        = []
-		temp=temp_start
-		temp_delta = (temp_end-temp_start)/gibbs_steps
+		# tf.variables_initializer([self.h2,self.v_rev], name='init_train')
+
+		self.batchsize = 1
+		h2_            = []
+		temp           = temp_start
+		temp_delta     = (temp_end-temp_start)/gibbs_steps
 
 		self.num_of_updates=1000 #just needs to be defined because it will make a train graph with tf.arrays where this number is needed
 
-		self.graph_init(train_graph=2) #v and h2 are placeholers now
+		self.graph_init("gibbs") #v and h2 are placeholers now
 		self.import_()
 		# tf.variables_initializer([temp], name='init_train')
 
@@ -681,23 +695,23 @@ pretrain_epochs      = 3
 dbm_epochs           = 20
 
 rbm_learnrate     = 0.005
-dbm_learnrate     = 0.005
+dbm_learnrate     = 0.01
 dbm_learnrate_end = 0.01   # bringt nichts
 
 temp = 1.		# als tf.placeholder oder var machen 
 
 pre_training    = 0 	#if no pretrain then files are automatically loaded
 
-training       = 0
-testing 	   = 0
-plotting       = 0
-gibbs_sampling = 1
+training       = 1
+testing 	   = 1
+plotting       = 1
+gibbs_sampling = 0
 
 save_to_file          = 0 	# only save biases and weights for further training
 save_all_params       = 0	# also save all test data and reconstructed images (memory heavy)
-save_pretrained       = 1
+save_pretrained       = 0
 
-load_from_file        = 1
+load_from_file        = 0
 pathsuffix            = "Thu Jan 18 17-22-41 2018 20 epochen"
 pathsuffix_pretrained = "Thu Jan 25 11-28-08 2018"
 
@@ -851,7 +865,5 @@ if plotting:
 	# 	ax5[1][i].matshow(v_rev[i].reshape(28,28))
 	# plt.tight_layout(pad=0.0)
 
-
-	plt.matshow(np.mean(v_rev[index_for_number[:]],0).reshape(28,28))
 
 plt.show()
