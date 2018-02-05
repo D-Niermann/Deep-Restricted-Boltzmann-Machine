@@ -1,0 +1,16 @@
+n_units_first_layer,784
+n_units_second_layer,225
+n_units_third_layer,10
+epochs_pretrain,3
+epochs_dbm_train,2
+batches_pretrain,500
+batches_dbm_train,500
+learnrate_pretrain,0.005
+learnrate_dbm_train,0.02
+learnrate_dbm_train_end,0.02
+Temperature,1.0
+pathsuffix_pretrained,Thu Jan 25 11-28-08 2018
+pathsuffix,Thu Jan 18 17-22-41 2018 20 epochen
+loaded_from_file,0
+save_all_params,1
+train_time,14.281355
