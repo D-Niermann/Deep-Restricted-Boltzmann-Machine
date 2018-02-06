@@ -603,8 +603,6 @@ class DBM_class(object):
 		mode 	:: "sampling" calculates h2 and v back and forth usign previous steps
 			:: "context" clamps v and only calculates h1 based on previous h2
 		"""
-		if load_from_file and not training:
-			self.load_from_file(workdir+"/data/"+pathsuffix)
 
 		# self.v_rev = tf.Variable(tf.random_uniform([1,self.shape[0]],minval=-1e-3,maxval=1e-3),name="v_rev_init")
 		# self.h2    = tf.Variable(tf.random_uniform([1,self.shape[2]],minval=-1e-3,maxval=1e-3),name="h2")
@@ -618,13 +616,12 @@ class DBM_class(object):
 
 		self.num_of_updates=1000 #just needs to be defined because it will make a train graph with tf.arrays where this number is needed
 
-		self.graph_init("gibbs") #v and h2 are placeholers now
-		self.import_()
+
 		# tf.variables_initializer([temp], name='init_train')
 
 		if liveplot:
 			log.info("Liveplotting gibbs sampling")
-			fig,ax=plt.subplots(1,2)
+			fig,ax=plt.subplots(1,3)
 		
 		# set v as input 
 		v_gibbs = v_input 
@@ -637,15 +634,14 @@ class DBM_class(object):
 		for i in range(gibbs_steps):
 			if liveplot and plt.fignum_exists(fig.number):
 				ax[0].cla()
-				if mode=="sampling":
-					ax[0].matshow(v_gibbs.reshape(28,28))
-				else:
-					ax[0].matshow(h1.reshape(int(sqrt(self.shape[1])),int(sqrt(self.shape[1]))))
+				ax[0].matshow(v_gibbs.reshape(28,28))
+				if mode=="context":
+					ax[2].matshow(h1.reshape(int(sqrt(self.shape[1])),int(sqrt(self.shape[1]))))
 				ax[1].cla()
 				ax[1].plot(h2[0],"-o")
 				ax[1].set_ylim(0,1)
 				ax[1].grid()
-				ax[1].set_title("Temp.: %s, Steps: %s"%(str(temp),str(i)))
+				ax[1].set_title("Temp.: %s, Steps: %s"%(str(round(temp,3)),str(i)))
 				plt.pause(0.0001)
 			# if liveplot and not plt.fignum_exists(fig.number):
 			# 	break 
@@ -663,9 +659,18 @@ class DBM_class(object):
 			
 				
 			if mode=="context":
-				# v is clamped here , calc only h1 and h2 
-				h1 = self.h1_rev.eval({self.v:v_input,self.h2_rev:h2,self.temp:temp})
-				h2 = self.h2_sample.eval({self.h1_place:h1,self.temp:temp})
+				# v is clamped here , calc only h1 and h2 , v_gibbs only for plotting and will not be used to calc h1 or h2
+				v_gibbs = self.v_rev_prob.eval({self.v:	 v_gibbs, 
+								   	self.h2_rev: h2, 
+								   	self.temp:	 temp})
+				
+				h1 = self.h1_rev.eval({self.v:	 v_input,
+								self.h2_rev: h2,
+								self.temp:	 temp})
+
+				h2 = self.h2_sample.eval({self.h1_place: 	h1,
+									self.temp: 	temp})
+				
 				# here the h2 vector can be changed like: h2[0][1:4]=0
 				h2[0]*=modification
 			
@@ -833,22 +838,47 @@ if gibbs_sampling:
 	with tf.Session() as sess:
 		log.start("Gibbs Sampling Session")
 
+		if load_from_file and not training:
+			DBM.load_from_file(workdir+"/data/"+pathsuffix)
+
+		DBM.batchsize=1
+		DBM.graph_init("gibbs")
+		DBM.import_()
+
 		# v_gibbs1,h2_1=DBM.gibbs_sampling(test_data[18:19], 500, 1.1, 0.5, 
 		# 						mode         = "sampling", 
 		# 						modification = [2,2,2,2,2,0,0,0,0,0],
 		# 						liveplot     = 0)
 
-		_v_,h2_2=DBM.gibbs_sampling(test_data[18:19], 300, 1.1, 0.5, 
-								mode         = "context", 
-								modification = [6,6,6,6,0,0,0,0,0,0],
-								liveplot     = 0)
+		desired_digits=[]
+		wrong_digits=[]
 
-		
+		for i in range(70):
+			#find the digit that was presented
+			digit=np.where(test_label[i])[0][0] 
+			if digit<5:
+				_,h2_2=DBM.gibbs_sampling(test_data[i:i+1], 200, 0.9, 0.5, 
+										mode         = "context", 
+										modification = [1,1,1,1,1,0,0,0,0,0],
+										liveplot     = 0)
+
+
+				# append all to array
+				desired_digits.append(h2_2[:,digit])
+				for i in range(10):
+					if i!=digit:
+						wrong_digits.append(h2_2[:,i])
+
+
+		for i in range(len(desired_digits)):
+			plt.plot(smooth(desired_digits[i],20))
+
+		log.info("Desired Digits:\t",np.mean(desired_digits))
+		log.info("Wrong Digits:\t",np.mean(wrong_digits))
 
 		# v_gibbs2,h2_2=DBM.gibbs_sampling(test_data[1:2], 500, modification=[1,1,1,0,1,1,1,1,1,1], liveplot=0)
-		plt.plot(smooth(h2_1[:,3],20))
-		plt.plot(smooth(h2_2[:,3],20))
-		print "Mean: 1: %f, 2: %f"%(np.mean(h2_1[:,3]),np.mean(h2_2[:,3]))
+		# plt.plot(smooth(h2_2[:,3],20))
+		# print "Mean: 1: %f, 2: %f"%(np.mean(h2_1[:,3]),np.mean(h2_2[:,3]))
 
 		log.end()
 
