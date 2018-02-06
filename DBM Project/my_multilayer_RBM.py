@@ -19,22 +19,22 @@ if True:
 	data_dir=workdir+"/data"
 	mpl.rcParams["image.cmap"] = "jet"
 	mpl.rcParams["grid.linewidth"] = 0.5
-
+	mpl.rcParams["lines.linewidth"] = 1.	
 	os.chdir(workdir)
 	from Logger import *
 	from RBM_Functions import *
 	### import seaborn? ###
-	if 0:
+	if 1:
 		import seaborn
 
 		seaborn.set(font_scale=1.4)
 		seaborn.set_style("ticks",
 			{
-			'axes.grid':            False,
+			'axes.grid':            True,
 			'grid.linestyle':       u':',
 			'legend.numpoints':     1,
 			'legend.scatterpoints': 1,
-			'axes.linewidth':       1,
+			'axes.linewidth':       1.0,
 			'xtick.direction':      'in',
 			'ytick.direction':      'in',
 			'xtick.major.size': 	5,
@@ -43,8 +43,9 @@ if True:
 			'ytick.major.size': 	5,
 			'ytick.minor.size': 	1.0
 			})
+		mpl.rcParams["lines.linewidth"] = 1.
 	# plt.rcParams['image.cmap'] = 'coolwarm'
-	log=Logger(True)
+	log=Logger(False)
 
 from tensorflow.examples.tutorials.mnist import input_data
 time_now = time.asctime()
@@ -567,10 +568,17 @@ class DBM_class(object):
 		self.probs      = self.v_recon_prob.eval({self.v:test_data})
 		self.rec        = self.v_recon.eval({self.v:test_data})
 
-		# self.rec_h1     = self.h1_recon_prob.eval({self.v:test_data})
-		# self.h1_test    = self.h1_prob.eval({self.v:test_data})
-		self.h2_test    = self.h2_prob.eval({self.v:test_data})
-		self.CD1_np=self.CD1.eval({self.v:test_data[0:10]})
+		# self.rec_h1  = self.h1_recon_prob.eval({self.v:test_data})
+		# self.h1_test = self.h1_prob.eval({self.v:test_data})
+		self.h2_test   = self.h2_prob.eval({self.v:test_data})
+
+		N=5
+		log.info("sampling h2 with %i steps"%N)
+		for i in range(N):
+			h1           = self.h1_rev.eval({self.v:test_data,self.h2_rev:self.h2_test})
+			self.h2_test = self.h2_sample.eval({self.h1_place:h1})
+
+		self.CD1_np    = self.CD1.eval({self.v:test_data[0:10]})
 
 		log.end()
 
@@ -660,9 +668,10 @@ class DBM_class(object):
 				
 			if mode=="context":
 				# v is clamped here , calc only h1 and h2 , v_gibbs only for plotting and will not be used to calc h1 or h2
-				v_gibbs = self.v_rev_prob.eval({self.v:	 v_gibbs, 
-								   	self.h2_rev: h2, 
-								   	self.temp:	 temp})
+				if liveplot:
+					v_gibbs = self.v_rev_prob.eval({self.v:	 v_gibbs, 
+								  	   	  self.h2_rev: h2, 
+									   	  self.temp:	 temp})
 				
 				h1 = self.h1_rev.eval({self.v:	 v_input,
 								self.h2_rev: h2,
@@ -960,12 +969,41 @@ if plotting:
 		m+=1
 	plt.tight_layout(pad=0.0)
 
-	# plot the reverse_feed:
-	# fig5,ax5 = plt.subplots(2,14,figsize=(16,4))
-	# for i in range(14):
-	# 	ax5[0][i].matshow(test_label[i,:9].reshape(3,3))
-	# 	ax5[1][i].matshow(v_rev[i].reshape(28,28))
-	# plt.tight_layout(pad=0.0)
 
+	################################################################
+	# testing gibbs sampling over many modifications of the h2 layer
+	p=[0.1,0.5,1,1.5,2,3,4,5,6,8,10,12.5,15,20] #these numbers got multiplied with the modification array
+	# probabilities with context
+	desired_digits_over_p = [0.80640159547328949, 0.82167047262191772, 0.83882582187652588, 0.85585602124532068, 0.86991548538208008, 0.90607881546020508, 0.94210529327392578, 0.95626087188720699, 0.96995854377746582, 0.98190242052078247, 0.99379148483276369, 0.99767951965332036, 0.99822775522867835, 0.9984889030456543]
+	wrong_digits_over_p   = [0.0015471759252250195, 0.0015633093426004052, 0.0017149694031104445, 0.0018502858777840931, 0.0019634012132883072, 0.0023058781710763774, 0.0024199127219617367, 0.00279025137424469, 0.00348813117792209, 0.004610900767147541, 0.0064419105648994444, 0.0079443323612213134, 0.0061491583784421284, 0.0061628293246030804]
+	desired_digits_2      = [0.80583520233631134, 0.82191574573516846, 0.83803170919418335, 0.85540072123209632, 0.86944085359573364, 0.90658744176228845, 0.94008892774581909, 0.95626268386840818, 0.96439274152119958, 0.98135823011398315, 0.99306621551513674, 0.99789230346679691, 0.99853598276774092, 0.99869537353515625]
+	wrong_digits_2        = [0.0015377264935523272, 0.0015565203502774239, 0.001785394037142396, 0.0018755611963570118, 0.0020598522387444973, 0.0022898244981964431, 0.0026173447258770466, 0.0026787821203470229, 0.0037500973170002303, 0.0051107890903949738, 0.00655594989657402, 0.0060179907083511355, 0.0061404620607693992, 0.0061886712908744814]
+	# probabilities without context
+	ddop_without_context = [0.80610930919647217, 0.82122015953063965, 0.83745294809341431, 0.85311230023701989, 0.86831140518188477, 0.90243776639302575, 0.92270117998123169, 0.94199895858764648, 0.953989585240682, 0.94873136281967163, 0.95728034973144527, 0.99521774291992182, 0.9966789881388346, 0.96240415573120119]
+	wdop_without_context = [0.0048744000378064811, 0.004970890935510397, 0.0050847684033215046, 0.0052712932229042053, 0.0058184107765555382, 0.0063610939929882688, 0.0074063506908714771, 0.0073866151273250576, 0.0078328941017389297, 0.013778538443148136, 0.023100455105304719, 0.029490821361541748, 0.031936140855153401, 0.045664882659912108]
+	ddop_2               = [0.8067350834608078, 0.8209959864616394, 0.83829581737518311, 0.85257585843404138, 0.86803656816482544, 0.90377529462178552, 0.93026214838027954, 0.94240379333496094, 0.94716699918111169, 0.96492099761962891, 0.99420833587646484, 0.98004898071289059, 0.98042990366617844, 0.99876918792724612]
+	wdop_2               = [0.0049126538215205073, 0.0049005607143044472, 0.0050443466752767563, 0.0050863595679402351, 0.0055811582133173943, 0.006029374897480011, 0.0066346805542707443, 0.0070121817290782927, 0.0094013145814339314, 0.015882818028330803, 0.025212761759757996, 0.026714997291564943, 0.031787083546320601, 0.041276022791862488]
+	ddop_3               = [0.80640904605388641, 0.82181340456008911, 0.83851081132888794, 0.85183501243591309, 0.86774682998657227, 0.90586384137471521, 0.93356776237487793, 0.94218845367431636, 0.95204973220825195, 0.96456295251846313, 0.9717504501342773, 0.9981513977050781, 0.99148705800374348, 0.98064994812011719]
+	wdop_3               = [0.0047834438737481833, 0.0048483698628842831, 0.0050470237620174885, 0.0052577226112286253, 0.0057063968852162361, 0.0062649156898260117, 0.0062738531269133091, 0.0072391480207443237, 0.0081891076018412914, 0.015927791595458984, 0.023759242892265321, 0.025030362606048583, 0.033309272925059003, 0.043433874845504761]
+	#without context
+	fig,ax=plt.subplots(2,1,sharex=True)
+	# with context (black)
+	ax[0].plot(p,desired_digits_over_p,"-^",color="k",label="With Context")
+	ax[1].plot(p,wrong_digits_over_p,"-^",color="k")
+	ax[0].plot(p,desired_digits_2,"-^",color="k")
+	ax[1].plot(p,wrong_digits_2,"-^",color="k")
+	# without context (red)
+	ax[0].plot(p,ddop_without_context,"-o",color="r",label="Without Context")
+	ax[1].plot(p,wdop_without_context,"-o",color="r")
+	ax[0].plot(p,ddop_2,"-o",color="r")
+	ax[1].plot(p,wdop_2,"-o",color="r")
+	ax[0].plot(p,ddop_3,"-o",color="r")
+	ax[1].plot(p,wdop_3,"-o",color="r")
 
+	ax[0].legend(loc="best")
+	ax[0].set_ylabel("Probability")
+	ax[0].set_title("Correct Digit")
+	ax[1].set_title("Wrong Digits")
+	ax[1].set_ylabel("Probability")
+	ax[1].set_xlabel("Multiplicator p")
 plt.show()
