@@ -16,10 +16,8 @@ if True:
 	
 	workdir="/Users/Niermann/Google Drive/Masterarbeit/Python/DBM Project"
 	# workdir="/home/dario/Dokumente/DBM Project"
-	data_dir=workdir+"/data"
-	mpl.rcParams["image.cmap"] = "jet"
-	mpl.rcParams["grid.linewidth"] = 0.5
-	mpl.rcParams["lines.linewidth"] = 1.	
+
+	data_dir=workdir+"/data"	
 	os.chdir(workdir)
 	from Logger import *
 	from RBM_Functions import *
@@ -27,7 +25,7 @@ if True:
 	if 1:
 		import seaborn
 
-		seaborn.set(font_scale=1.4)
+		seaborn.set(font_scale=1.3)
 		seaborn.set_style("ticks",
 			{
 			'axes.grid':            True,
@@ -38,14 +36,22 @@ if True:
 			'xtick.direction':      'in',
 			'ytick.direction':      'in',
 			'xtick.major.size': 	5,
-			'xtick.minor.size': 	1.0,
+			'xtick.minor.size': 	2,
 			'legend.frameon':       True,
 			'ytick.major.size': 	5,
-			'ytick.minor.size': 	1.0
+			'ytick.minor.size': 	2
 			})
-		mpl.rcParams["lines.linewidth"] = 1.
+
+	mpl.rcParams["image.cmap"] = "jet"
+	mpl.rcParams["grid.linewidth"] = 0.5
+	mpl.rcParams["lines.linewidth"] = 1.
+	mpl.rcParams["font.family"]= "serif"
 	# plt.rcParams['image.cmap'] = 'coolwarm'
-	log=Logger(False)
+
+	log=Logger(True)
+
+
+
 
 from tensorflow.examples.tutorials.mnist import input_data
 time_now = time.asctime()
@@ -459,9 +465,6 @@ class DBM_class(object):
 		self.num_of_updates = num_of_updates
 		d_learnrate         = float(dbm_learnrate_end-self.learnrate)/num_of_updates
 		self.m              = 0
-		
-		
-			
 
 		
 		if load_from_file:
@@ -485,6 +488,7 @@ class DBM_class(object):
 
 		
 		# starting the training
+		log.info("!Training without bias!")
 		for epoch in range(epochs):
 			log.start("Deep BM Epoch:",epoch+1,"/",epochs)
 
@@ -497,9 +501,9 @@ class DBM_class(object):
 				# run all updates 
 				sess.run([	self.update_w1,
 						self.update_w2,
-						self.update_bias_v,
-						self.update_bias_h1,
-						self.update_bias_h2,
+						# self.update_bias_v,
+						# self.update_bias_h1,
+						# self.update_bias_h2,
 						],
 						feed_dict={	self.v:batch,
 								self.h2:batch_label}
@@ -572,13 +576,12 @@ class DBM_class(object):
 		# self.h1_test = self.h1_prob.eval({self.v:test_data})
 		self.h2_test   = self.h2_prob.eval({self.v:test_data})
 
-		N=5
+		N=20
 		log.info("sampling h2 with %i steps"%N)
 		for i in range(N):
 			h1           = self.h1_rev.eval({self.v:test_data,self.h2_rev:self.h2_test})
 			self.h2_test = self.h2_sample.eval({self.h1_place:h1})
 
-		self.CD1_np    = self.CD1.eval({self.v:test_data[0:10]})
 
 		log.end()
 
@@ -629,7 +632,7 @@ class DBM_class(object):
 
 		if liveplot:
 			log.info("Liveplotting gibbs sampling")
-			fig,ax=plt.subplots(1,3)
+			fig,ax=plt.subplots(1,3,figsize=(12,5))
 		
 		# set v as input 
 		v_gibbs = v_input 
@@ -642,6 +645,8 @@ class DBM_class(object):
 		for i in range(gibbs_steps):
 			if liveplot and plt.fignum_exists(fig.number):
 				ax[0].cla()
+				ax[1].cla()
+				ax[2].cla()
 				ax[0].matshow(v_gibbs.reshape(28,28))
 				if mode=="context":
 					ax[2].matshow(h1.reshape(int(sqrt(self.shape[1])),int(sqrt(self.shape[1]))))
@@ -673,15 +678,15 @@ class DBM_class(object):
 								  	   	  self.h2_rev: h2, 
 									   	  self.temp:	 temp})
 				
-				h1 = self.h1_rev.eval({self.v:	 v_input,
-								self.h2_rev: h2,
+				h1 = self.h1_rev.eval({	self.v:	 v_input,
+								self.h2_rev: np.reshape(modification,[1,10]),
 								self.temp:	 temp})
 
 				h2 = self.h2_sample.eval({self.h1_place: 	h1,
 									self.temp: 	temp})
 				
 				# here the h2 vector can be changed like: h2[0][1:4]=0
-				h2[0]*=modification
+				# h2[0]*=modification
 			
 			# assign new temp
 			temp+=temp_delta
@@ -764,7 +769,7 @@ class DBM_class(object):
 
 num_batches_pretrain = 500
 dbm_batches          = 500
-pretrain_epochs      = 3
+pretrain_epochs      = 1
 dbm_epochs           = 50
 
 
@@ -772,7 +777,7 @@ rbm_learnrate     = 0.005
 dbm_learnrate     = 0.02
 dbm_learnrate_end = 0.02  # bringt nichts
 
-temp = 1.0		# als tf.placeholder oder var machen 
+temp = 1.0		
 
 pre_training    = 0 	#if no pretrain then files are automatically loaded
 
@@ -783,16 +788,16 @@ gibbs_sampling = 1
 
 save_to_file          = 0 	# only save biases and weights for further training
 save_all_params       = 0	# also save all test data and reconstructed images (memory heavy)
-save_pretrained       = 0
+save_pretrained       = 1
 
 load_from_file        = 1
-pathsuffix            = "Thu Jan 18 20-04-17 2018 80 epochen"
-pathsuffix_pretrained = "Thu Jan 25 11-28-08 2018"
+pathsuffix            = "50 epochen ohne bias 20x20"#"Thu Jan 18 20-04-17 2018 80 epochen"
+pathsuffix_pretrained =  "Thu Feb  8 11-55-48 2018" #"Thu Jan 25 11-28-08 2018"
 
 
 number_of_layers = 3
 n_first_layer    = 784
-n_second_layer   = 15*15
+n_second_layer   = 20*20
 n_third_layer    = 10
 
 saveto_path=data_dir+"/"+time_now
@@ -859,32 +864,62 @@ if gibbs_sampling:
 		# 						modification = [2,2,2,2,2,0,0,0,0,0],
 		# 						liveplot     = 0)
 
-		desired_digits=[]
-		wrong_digits=[]
+		# arrays for h2 act without context
+		desired_digits_c  = []
+		wrong_digits_c    = []
+		# arrays for h2 act without context
+		desired_digits_nc = []
+		wrong_digits_nc   = []
 
-		for i in range(70):
-			#find the digit that was presented
+		# multiplication for the whole h2 layer:
+		p = 5
+
+		# loop through images from test_data
+		for i in range(30,33):
+			## find the digit that was presented
 			digit=np.where(test_label[i])[0][0] 
+			## set desired digit range
 			if digit<5:
-				_,h2_2=DBM.gibbs_sampling(test_data[i:i+1], 200, 0.9, 0.5, 
+				# calculte h2 firerates over all gibbs_steps with no context
+				_,h2_2_no_context=DBM.gibbs_sampling(test_data[i:i+1], 100, 0.8 , 0.1, 
 										mode         = "context", 
-										modification = [1,1,1,1,1,0,0,0,0,0],
+										modification = np.array([1,1,1,1,1,1,1,1,1,1])*p,
+										liveplot     = 1)
+				# with context
+				_,h2_2_context=DBM.gibbs_sampling(test_data[i:i+1], 100, 0.8 , 0.1, 
+										mode         = "context", 
+										modification = np.array([1,1,1,1,1,0,0,0,0,0])*p,
 										liveplot     = 0)
-
-
-				# append all to array
-				desired_digits.append(h2_2[:,digit])
+				
+				# append h2 activity to array, but only the unit that corresponst to the given digit picture
+				desired_digits_c.append(h2_2_context[:,digit])
+				desired_digits_nc.append(h2_2_no_context[:,digit])
+				# append all other h2 activities 
 				for i in range(10):
 					if i!=digit:
-						wrong_digits.append(h2_2[:,i])
+						wrong_digits_c.append(h2_2_context[:,i])
+						wrong_digits_nc.append(h2_2_no_context[:,i])
 
+		# plot
+		fig_gs,ax_gs = plt.subplots(2,1,sharex="all")
+		for i in range(len(desired_digits_c)):
+			ax_gs[0].plot(smooth(desired_digits_c[i],20))
+			ax_gs[1].plot(smooth(desired_digits_nc[i],20))
+			ax_gs[0].set_title("Desired Digit with Context")
+			ax_gs[1].set_title("Desired Digit without Context")
+			ax_gs[0].set_ylim(0,1)
+			ax_gs[1].set_ylim(0,1)
+			plt.xlabel("gibbs_steps")
+			ax_gs[0].set_ylabel("Probability")
+			ax_gs[1].set_ylabel("Probability")
+		
 
-		for i in range(len(desired_digits)):
-			plt.plot(smooth(desired_digits[i],20))
-
-		log.info("Desired Digits:\t",np.mean(desired_digits))
-		log.info("Wrong Digits:\t",np.mean(wrong_digits))
-
+		log.out("With Context:")
+		log.info("Desired Digits:\t",np.mean(desired_digits_c))
+		log.info("Wrong Digits:\t",np.mean(wrong_digits_c))
+		log.out("Without Context")
+		log.info("Desired Digits:\t",np.mean(desired_digits_nc))
+		log.info("Wrong Digits:\t",np.mean(wrong_digits_nc))
 		# v_gibbs2,h2_2=DBM.gibbs_sampling(test_data[1:2], 500, modification=[1,1,1,0,1,1,1,1,1,1], liveplot=0)
 		# plt.plot(smooth(h2_2[:,3],20))
 		# print "Mean: 1: %f, 2: %f"%(np.mean(h2_1[:,3]),np.mean(h2_2[:,3]))
@@ -972,19 +1007,19 @@ if plotting:
 
 	################################################################
 	# testing gibbs sampling over many modifications of the h2 layer
-	p=[0.1,0.5,1,1.5,2,3,4,5,6,8,10,12.5,15,20] #these numbers got multiplied with the modification array
+	p=[0.1,0.5,1,1.5,2,3,4,5,6,8,10,12.5,15,20] #these numbers got multiplied with the modification array, modification was [1,1,1,1,1,0,0,0,0,0]
 	# probabilities with context
-	desired_digits_over_p = [0.80640159547328949, 0.82167047262191772, 0.83882582187652588, 0.85585602124532068, 0.86991548538208008, 0.90607881546020508, 0.94210529327392578, 0.95626087188720699, 0.96995854377746582, 0.98190242052078247, 0.99379148483276369, 0.99767951965332036, 0.99822775522867835, 0.9984889030456543]
-	wrong_digits_over_p   = [0.0015471759252250195, 0.0015633093426004052, 0.0017149694031104445, 0.0018502858777840931, 0.0019634012132883072, 0.0023058781710763774, 0.0024199127219617367, 0.00279025137424469, 0.00348813117792209, 0.004610900767147541, 0.0064419105648994444, 0.0079443323612213134, 0.0061491583784421284, 0.0061628293246030804]
-	desired_digits_2      = [0.80583520233631134, 0.82191574573516846, 0.83803170919418335, 0.85540072123209632, 0.86944085359573364, 0.90658744176228845, 0.94008892774581909, 0.95626268386840818, 0.96439274152119958, 0.98135823011398315, 0.99306621551513674, 0.99789230346679691, 0.99853598276774092, 0.99869537353515625]
-	wrong_digits_2        = [0.0015377264935523272, 0.0015565203502774239, 0.001785394037142396, 0.0018755611963570118, 0.0020598522387444973, 0.0022898244981964431, 0.0026173447258770466, 0.0026787821203470229, 0.0037500973170002303, 0.0051107890903949738, 0.00655594989657402, 0.0060179907083511355, 0.0061404620607693992, 0.0061886712908744814]
+	desired_digits_over_p = [0.8064, 0.8216, 0.8388, 0.8558, 0.8699, 0.9060, 0.9421, 0.9562, 0.9699, 0.9819, 0.9937, 0.9976, 0.9982, 0.998]
+	wrong_digits_over_p   = [0.001547, 0.001563, 0.001714, 0.001850, 0.001963, 0.002305, 0.002419, 0.0027, 0.0034, 0.00461, 0.006441, 0.007944, 0.006149, 0.006162]
+	desired_digits_2      = [0.8058, 0.8219, 0.8380, 0.8554, 0.8694, 0.9065, 0.9400, 0.9562, 0.9643, 0.9813, 0.9930, 0.9978, 0.9985, 0.9986]
+	wrong_digits_2        = [0.001537, 0.001556, 0.00178, 0.001875, 0.002059, 0.002289, 0.002617, 0.002678, 0.003750, 0.005110, 0.0065, 0.006017, 0.006140, 0.006188]
 	# probabilities without context
-	ddop_without_context = [0.80610930919647217, 0.82122015953063965, 0.83745294809341431, 0.85311230023701989, 0.86831140518188477, 0.90243776639302575, 0.92270117998123169, 0.94199895858764648, 0.953989585240682, 0.94873136281967163, 0.95728034973144527, 0.99521774291992182, 0.9966789881388346, 0.96240415573120119]
-	wdop_without_context = [0.0048744000378064811, 0.004970890935510397, 0.0050847684033215046, 0.0052712932229042053, 0.0058184107765555382, 0.0063610939929882688, 0.0074063506908714771, 0.0073866151273250576, 0.0078328941017389297, 0.013778538443148136, 0.023100455105304719, 0.029490821361541748, 0.031936140855153401, 0.045664882659912108]
-	ddop_2               = [0.8067350834608078, 0.8209959864616394, 0.83829581737518311, 0.85257585843404138, 0.86803656816482544, 0.90377529462178552, 0.93026214838027954, 0.94240379333496094, 0.94716699918111169, 0.96492099761962891, 0.99420833587646484, 0.98004898071289059, 0.98042990366617844, 0.99876918792724612]
-	wdop_2               = [0.0049126538215205073, 0.0049005607143044472, 0.0050443466752767563, 0.0050863595679402351, 0.0055811582133173943, 0.006029374897480011, 0.0066346805542707443, 0.0070121817290782927, 0.0094013145814339314, 0.015882818028330803, 0.025212761759757996, 0.026714997291564943, 0.031787083546320601, 0.041276022791862488]
-	ddop_3               = [0.80640904605388641, 0.82181340456008911, 0.83851081132888794, 0.85183501243591309, 0.86774682998657227, 0.90586384137471521, 0.93356776237487793, 0.94218845367431636, 0.95204973220825195, 0.96456295251846313, 0.9717504501342773, 0.9981513977050781, 0.99148705800374348, 0.98064994812011719]
-	wdop_3               = [0.0047834438737481833, 0.0048483698628842831, 0.0050470237620174885, 0.0052577226112286253, 0.0057063968852162361, 0.0062649156898260117, 0.0062738531269133091, 0.0072391480207443237, 0.0081891076018412914, 0.015927791595458984, 0.023759242892265321, 0.025030362606048583, 0.033309272925059003, 0.043433874845504761]
+	ddop_without_context = [0.8061, 0.8212, 0.8374, 0.8531, 0.8683, 0.9024, 0.9227, 0.9419, 0.95, 0.9487, 0.9572, 0.9952, 0.996, 0.9624]
+	wdop_without_context = [0.004874, 0.00497, 0.005084, 0.005271, 0.005818, 0.006361, 0.007406, 0.007386, 0.007832, 0.01377, 0.02310, 0.02949, 0.03193, 0.04566]
+	ddop_2               = [0.806, 0.820, 0.8382, 0.8525, 0.8680, 0.9037, 0.9302, 0.9424, 0.9471, 0.9649, 0.9942, 0.9800, 0.9804, 0.9987]
+	wdop_2               = [0.004912, 0.004900, 0.005044, 0.005086, 0.005581, 0.00602, 0.006634, 0.007012, 0.009401, 0.01588, 0.02521, 0.02671, 0.03178, 0.04127]
+	ddop_3               = [0.8064, 0.8218, 0.8385, 0.8518, 0.8677, 0.9058, 0.9335, 0.9421, 0.9520, 0.9645, 0.971, 0.998, 0.9914, 0.9806]
+	wdop_3               = [0.004783, 0.004848, 0.005047, 0.005257, 0.005706, 0.006264, 0.006273, 0.007239, 0.008189, 0.01592, 0.02375, 0.02503, 0.03330, 0.04343]
 	#without context
 	fig,ax=plt.subplots(2,1,sharex=True)
 	# with context (black)
