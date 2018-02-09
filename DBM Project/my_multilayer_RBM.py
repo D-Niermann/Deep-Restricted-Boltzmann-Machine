@@ -276,6 +276,7 @@ class DBM_class(object):
 				if save_pretrained:
 					for i in range(len(self.weights)):
 						np.savetxt("Pretrained-"+" %i "%i+str(time_now)+".txt", self.weights[i])
+						log.out("Saved Pretrained")
 			else:
 				self.weights=[]
 				log.out("Loading Pretrained from file")
@@ -488,7 +489,6 @@ class DBM_class(object):
 
 		
 		# starting the training
-		log.info("!Training without bias!")
 		for epoch in range(epochs):
 			log.start("Deep BM Epoch:",epoch+1,"/",epochs)
 
@@ -501,9 +501,9 @@ class DBM_class(object):
 				# run all updates 
 				sess.run([	self.update_w1,
 						self.update_w2,
-						# self.update_bias_v,
-						# self.update_bias_h1,
-						# self.update_bias_h2,
+						self.update_bias_v,
+						self.update_bias_h1,
+						self.update_bias_h2,
 						],
 						feed_dict={	self.v:batch,
 								self.h2:batch_label}
@@ -606,13 +606,17 @@ class DBM_class(object):
 
 
 
-	def gibbs_sampling(self,v_input,gibbs_steps,temp_start,temp_end,modification,mode,liveplot=1):
+	def gibbs_sampling(self,v_input,gibbs_steps,temp_start,temp_end,modification,mode,p=1,liveplot=1):
 		""" Repeatedly samples v and h2 , where h2 can be modified by the user with the multiplication
 		by the modification array - clamping the labels to certain numbers.
 		v_input :: starting with an image as input 
+		
 		temp_end, temp_start :: temperature will decrease or increase to temp_end and start at temp_start 
+		
 		mode 	:: "sampling" calculates h2 and v back and forth usign previous steps
 			:: "context" clamps v and only calculates h1 based on previous h2
+		
+		p :: multiplication of the h2 array to increase the importance of the layer
 		"""
 
 		# self.v_rev = tf.Variable(tf.random_uniform([1,self.shape[0]],minval=-1e-3,maxval=1e-3),name="v_rev_init")
@@ -641,7 +645,7 @@ class DBM_class(object):
 		h2 = self.h2_prob.eval({self.v:v_gibbs,self.temp:1.0})
 		h1 = self.h1_rev.eval({self.v:v_input,self.h2_rev:h2,self.temp:temp})
 
-		log.start("Gibbs Sampling")
+
 		for i in range(gibbs_steps):
 			if liveplot and plt.fignum_exists(fig.number):
 				ax[0].cla()
@@ -663,7 +667,7 @@ class DBM_class(object):
 
 			if mode=="sampling":
 				# calculate the backward and forward pass 
-				v_gibbs = self.v_rev_prob.eval({self.v:v_gibbs, self.h2_rev:h2, self.temp:temp})
+				v_gibbs = self.v_rev_prob.eval({self.v:v_gibbs, self.h2_rev:p*h2, self.temp:temp})
 				h2      = self.h2_prob.eval({self.v:v_gibbs, self.temp:temp})
 				
 				# here the h2 vector can be changed like: h2[0][1:4]=0
@@ -679,14 +683,14 @@ class DBM_class(object):
 									   	  self.temp:	 temp})
 				
 				h1 = self.h1_rev.eval({	self.v:	 v_input,
-								self.h2_rev: np.reshape(modification,[1,10]),
+								self.h2_rev: p*h2,#np.reshape(modification,[1,10]),
 								self.temp:	 temp})
 
 				h2 = self.h2_sample.eval({self.h1_place: 	h1,
 									self.temp: 	temp})
 				
 				# here the h2 vector can be changed like: h2[0][1:4]=0
-				# h2[0]*=modification
+				h2[0]*=modification
 			
 			# assign new temp
 			temp+=temp_delta
@@ -695,7 +699,7 @@ class DBM_class(object):
 
 		if liveplot:
 			plt.close(fig)
-		log.end()
+
 
 		return v_gibbs,np.array(h2_)
 
@@ -788,16 +792,16 @@ gibbs_sampling = 1
 
 save_to_file          = 0 	# only save biases and weights for further training
 save_all_params       = 0	# also save all test data and reconstructed images (memory heavy)
-save_pretrained       = 1
+save_pretrained       = 0
 
 load_from_file        = 1
-pathsuffix            = "50 epochen ohne bias 20x20"#"Thu Jan 18 20-04-17 2018 80 epochen"
-pathsuffix_pretrained =  "Thu Feb  8 11-55-48 2018" #"Thu Jan 25 11-28-08 2018"
+pathsuffix            = "Thu Jan 18 20-04-17 2018 80 epochen"
+pathsuffix_pretrained = "Thu Jan 25 11-28-08 2018"
 
 
 number_of_layers = 3
 n_first_layer    = 784
-n_second_layer   = 20*20
+n_second_layer   = 15*15
 n_third_layer    = 10
 
 saveto_path=data_dir+"/"+time_now
@@ -863,42 +867,67 @@ if gibbs_sampling:
 		# 						mode         = "sampling", 
 		# 						modification = [2,2,2,2,2,0,0,0,0,0],
 		# 						liveplot     = 0)
+		dd_c=[]
+		dd_nc=[]
+		wd_c=[]
+		wd_nc=[]
+		for p in [1]:
+			log.start(p)
+			# arrays for h2 act without context
+			desired_digits_c  = []
+			wrong_digits_c    = []
+			# arrays for h2 act without context
+			desired_digits_nc = []
+			wrong_digits_nc   = []
 
-		# arrays for h2 act without context
-		desired_digits_c  = []
-		wrong_digits_c    = []
-		# arrays for h2 act without context
-		desired_digits_nc = []
-		wrong_digits_nc   = []
+			check_wrongs=[]
+			# multiplication for the whole h2 layer:
+			# p = 1
 
-		# multiplication for the whole h2 layer:
-		p = 5
+			# loop through images from test_data
+			for i in range(10,500):
+				## find the digit that was presented
+				digit=np.where(test_label[i])[0][0] 
+				## set desired digit range
+				if digit<5:
+					# calculte h2 firerates over all gibbs_steps with no context
+					_,h2_2_no_context=DBM.gibbs_sampling(test_data[i:i+1], 100, 0.8 , 0.2, 
+											mode         = "context", 
+											modification = np.array([1,1,1,1,1,1,1,1,1,1]),
+											p            = p,
+											liveplot     = 0)
+					# with context
+					# _,h2_2_context=DBM.gibbs_sampling(test_data[i:i+1], 100, 0.8 , 0.2, 
+					# 						mode         = "context", 
+					# 						modification = np.array([1,1,1,1,1,0,0,0,0,0]),
+					# 						p            = p,
+					# 						liveplot     = 0)
+					
+					# append h2 activity to array, but only the unit that corresponst to the given digit picture
+					desired_digits_c.append(h2_2_context[:,digit])
+					desired_digits_nc.append(h2_2_no_context[:,digit])
+					# append all other h2 activities 
+					for i in range(10):
+						if i!=digit:
+							wrong_digits_c.append(h2_2_context[:,i])
+							wrong_digits_nc.append(h2_2_no_context[:,i])
 
-		# loop through images from test_data
-		for i in range(30,33):
-			## find the digit that was presented
-			digit=np.where(test_label[i])[0][0] 
-			## set desired digit range
-			if digit<5:
-				# calculte h2 firerates over all gibbs_steps with no context
-				_,h2_2_no_context=DBM.gibbs_sampling(test_data[i:i+1], 100, 0.8 , 0.1, 
-										mode         = "context", 
-										modification = np.array([1,1,1,1,1,1,1,1,1,1])*p,
-										liveplot     = 1)
-				# with context
-				_,h2_2_context=DBM.gibbs_sampling(test_data[i:i+1], 100, 0.8 , 0.1, 
-										mode         = "context", 
-										modification = np.array([1,1,1,1,1,0,0,0,0,0])*p,
-										liveplot     = 0)
-				
-				# append h2 activity to array, but only the unit that corresponst to the given digit picture
-				desired_digits_c.append(h2_2_context[:,digit])
-				desired_digits_nc.append(h2_2_no_context[:,digit])
-				# append all other h2 activities 
-				for i in range(10):
-					if i!=digit:
-						wrong_digits_c.append(h2_2_context[:,i])
-						wrong_digits_nc.append(h2_2_no_context[:,i])
+					# check if h2 has classified digits over 4
+					check_wrongs.append(h2_2_no_context[-1][5:].max())
+	
+			log.out("With Context:")
+			log.info("Desired Digits:\t",np.mean(desired_digits_c))
+			log.info("Wrong Digits:\t",np.mean(wrong_digits_c))
+			log.out("Without Context")
+			log.info("Desired Digits:\t",np.mean(desired_digits_nc))
+			log.info("Wrong Digits:\t",np.mean(wrong_digits_nc))
+
+			dd_c.append(np.round(np.mean(desired_digits_c),4))
+			dd_nc.append(np.round(np.mean(desired_digits_nc),4))
+			wd_c.append(np.round(np.mean(wrong_digits_c),4))
+			wd_nc.append(np.round(np.mean(wrong_digits_nc),4))
+
+			log.end()
 
 		# plot
 		fig_gs,ax_gs = plt.subplots(2,1,sharex="all")
@@ -912,14 +941,8 @@ if gibbs_sampling:
 			plt.xlabel("gibbs_steps")
 			ax_gs[0].set_ylabel("Probability")
 			ax_gs[1].set_ylabel("Probability")
-		
 
-		log.out("With Context:")
-		log.info("Desired Digits:\t",np.mean(desired_digits_c))
-		log.info("Wrong Digits:\t",np.mean(wrong_digits_c))
-		log.out("Without Context")
-		log.info("Desired Digits:\t",np.mean(desired_digits_nc))
-		log.info("Wrong Digits:\t",np.mean(wrong_digits_nc))
+
 		# v_gibbs2,h2_2=DBM.gibbs_sampling(test_data[1:2], 500, modification=[1,1,1,0,1,1,1,1,1,1], liveplot=0)
 		# plt.plot(smooth(h2_2[:,3],20))
 		# print "Mean: 1: %f, 2: %f"%(np.mean(h2_1[:,3]),np.mean(h2_2[:,3]))
@@ -1007,38 +1030,79 @@ if plotting:
 
 	################################################################
 	# testing gibbs sampling over many modifications of the h2 layer
-	p=[0.1,0.5,1,1.5,2,3,4,5,6,8,10,12.5,15,20] #these numbers got multiplied with the modification array, modification was [1,1,1,1,1,0,0,0,0,0]
-	# probabilities with context
-	desired_digits_over_p = [0.8064, 0.8216, 0.8388, 0.8558, 0.8699, 0.9060, 0.9421, 0.9562, 0.9699, 0.9819, 0.9937, 0.9976, 0.9982, 0.998]
-	wrong_digits_over_p   = [0.001547, 0.001563, 0.001714, 0.001850, 0.001963, 0.002305, 0.002419, 0.0027, 0.0034, 0.00461, 0.006441, 0.007944, 0.006149, 0.006162]
-	desired_digits_2      = [0.8058, 0.8219, 0.8380, 0.8554, 0.8694, 0.9065, 0.9400, 0.9562, 0.9643, 0.9813, 0.9930, 0.9978, 0.9985, 0.9986]
-	wrong_digits_2        = [0.001537, 0.001556, 0.00178, 0.001875, 0.002059, 0.002289, 0.002617, 0.002678, 0.003750, 0.005110, 0.0065, 0.006017, 0.006140, 0.006188]
-	# probabilities without context
-	ddop_without_context = [0.8061, 0.8212, 0.8374, 0.8531, 0.8683, 0.9024, 0.9227, 0.9419, 0.95, 0.9487, 0.9572, 0.9952, 0.996, 0.9624]
-	wdop_without_context = [0.004874, 0.00497, 0.005084, 0.005271, 0.005818, 0.006361, 0.007406, 0.007386, 0.007832, 0.01377, 0.02310, 0.02949, 0.03193, 0.04566]
-	ddop_2               = [0.806, 0.820, 0.8382, 0.8525, 0.8680, 0.9037, 0.9302, 0.9424, 0.9471, 0.9649, 0.9942, 0.9800, 0.9804, 0.9987]
-	wdop_2               = [0.004912, 0.004900, 0.005044, 0.005086, 0.005581, 0.00602, 0.006634, 0.007012, 0.009401, 0.01588, 0.02521, 0.02671, 0.03178, 0.04127]
-	ddop_3               = [0.8064, 0.8218, 0.8385, 0.8518, 0.8677, 0.9058, 0.9335, 0.9421, 0.9520, 0.9645, 0.971, 0.998, 0.9914, 0.9806]
-	wdop_3               = [0.004783, 0.004848, 0.005047, 0.005257, 0.005706, 0.006264, 0.006273, 0.007239, 0.008189, 0.01592, 0.02375, 0.02503, 0.03330, 0.04343]
-	#without context
-	fig,ax=plt.subplots(2,1,sharex=True)
-	# with context (black)
-	ax[0].plot(p,desired_digits_over_p,"-^",color="k",label="With Context")
-	ax[1].plot(p,wrong_digits_over_p,"-^",color="k")
-	ax[0].plot(p,desired_digits_2,"-^",color="k")
-	ax[1].plot(p,wrong_digits_2,"-^",color="k")
-	# without context (red)
-	ax[0].plot(p,ddop_without_context,"-o",color="r",label="Without Context")
-	ax[1].plot(p,wdop_without_context,"-o",color="r")
-	ax[0].plot(p,ddop_2,"-o",color="r")
-	ax[1].plot(p,wdop_2,"-o",color="r")
-	ax[0].plot(p,ddop_3,"-o",color="r")
-	ax[1].plot(p,wdop_3,"-o",color="r")
+	# p=[0.1,0.5,1,1.5,2,3,4,5,6,8,10,12.5,15,20] #these numbers got multiplied with the modification array, modification was [1,1,1,1,1,0,0,0,0,0]
+	# # probabilities with context
+	# desired_digits_over_p = [0.8064, 0.8216, 0.8388, 0.8558, 0.8699, 0.9060, 0.9421, 0.9562, 0.9699, 0.9819, 0.9937, 0.9976, 0.9982, 0.998]
+	# wrong_digits_over_p   = [0.001547, 0.001563, 0.001714, 0.001850, 0.001963, 0.002305, 0.002419, 0.0027, 0.0034, 0.00461, 0.006441, 0.007944, 0.006149, 0.006162]
+	# desired_digits_2      = [0.8058, 0.8219, 0.8380, 0.8554, 0.8694, 0.9065, 0.9400, 0.9562, 0.9643, 0.9813, 0.9930, 0.9978, 0.9985, 0.9986]
+	# wrong_digits_2        = [0.001537, 0.001556, 0.00178, 0.001875, 0.002059, 0.002289, 0.002617, 0.002678, 0.003750, 0.005110, 0.0065, 0.006017, 0.006140, 0.006188]
+	# # probabilities without context
+	# ddop_without_context = [0.8061, 0.8212, 0.8374, 0.8531, 0.8683, 0.9024, 0.9227, 0.9419, 0.95, 0.9487, 0.9572, 0.9952, 0.996, 0.9624]
+	# wdop_without_context = [0.004874, 0.00497, 0.005084, 0.005271, 0.005818, 0.006361, 0.007406, 0.007386, 0.007832, 0.01377, 0.02310, 0.02949, 0.03193, 0.04566]
+	# ddop_2               = [0.806, 0.820, 0.8382, 0.8525, 0.8680, 0.9037, 0.9302, 0.9424, 0.9471, 0.9649, 0.9942, 0.9800, 0.9804, 0.9987]
+	# wdop_2               = [0.004912, 0.004900, 0.005044, 0.005086, 0.005581, 0.00602, 0.006634, 0.007012, 0.009401, 0.01588, 0.02521, 0.02671, 0.03178, 0.04127]
+	# ddop_3               = [0.8064, 0.8218, 0.8385, 0.8518, 0.8677, 0.9058, 0.9335, 0.9421, 0.9520, 0.9645, 0.971, 0.998, 0.9914, 0.9806]
+	# wdop_3               = [0.004783, 0.004848, 0.005047, 0.005257, 0.005706, 0.006264, 0.006273, 0.007239, 0.008189, 0.01592, 0.02375, 0.02503, 0.03330, 0.04343]
+	# #without context
+	# fig,ax=plt.subplots(2,1,sharex=True)
+	# # with context (black)
+	# ax[0].plot(p,desired_digits_over_p,"-^",color="k",label="With Context")
+	# ax[1].plot(p,wrong_digits_over_p,"-^",color="k")
+	# ax[0].plot(p,desired_digits_2,"-^",color="k")
+	# ax[1].plot(p,wrong_digits_2,"-^",color="k")
+	# # without context (red)
+	# ax[0].plot(p,ddop_without_context,"-o",color="r",label="Without Context")
+	# ax[1].plot(p,wdop_without_context,"-o",color="r")
+	# ax[0].plot(p,ddop_2,"-o",color="r")
+	# ax[1].plot(p,wdop_2,"-o",color="r")
+	# ax[0].plot(p,ddop_3,"-o",color="r")
+	# ax[1].plot(p,wdop_3,"-o",color="r")
 
-	ax[0].legend(loc="best")
+	# ax[0].legend(loc="best")
+	# ax[0].set_ylabel("Probability")
+	# ax[0].set_title("Correct Digit")
+	# ax[1].set_title("Wrong Digits")
+	# ax[1].set_ylabel("Probability")
+	# ax[1].set_xlabel("Multiplicator p")
+
+	################################################################
+	# testing the same but with modification as bias as david suggested, with 100 samples , 15x15 h1 units and 100 digits inputs
+	p  = [0.5,1,1.5,2,5,7.5,10]
+
+	# dd= desired digit, wd= wrong digit , c=context, nc=no context 
+	# h2 as bias
+	dd_with_context    = [[0.845553 , 0.8711,0.8899,0.908,0.977,0.99,0.991],[0.8452, 0.86989999, 0.889, 0.90700001, 0.97680002, 0.99070001, 0.9914],[0.84670001, 0.86970001, 0.89060003, 0.90670002, 0.97799999, 0.99070001, 0.99199998]]
+	dd_without_context = [[0.849274 ,0.868754 ,0.887845 ,0.898609,0.906878 , 0.879146 ,0.852557 ],[0.8477, 0.86940002, 0.88679999, 0.90020001, 0.90609998, 0.88050002, 0.85259998],[0.847, 0.86970001, 0.88669997, 0.89990002, 0.90609998, 0.87900001, 0.8527]]
+	wd_with_context    = [[0.00264,0.00307,0.0036,0.0045,0.028,0.06,0.11],[0.0026, 0.0029, 0.0035000001, 0.0044999998, 0.027799999, 0.069499999, 0.1098],[0.0026, 0.0031000001, 0.0037, 0.0044999998, 0.028000001, 0.069300003, 0.11]]
+	wd_without_context = [[0.00379,0.006,0.009,0.012,0.088,0.18,0.24],[0.0038999999, 0.0060000001, 0.0088999998, 0.013, 0.088399999, 0.1788, 0.2482],[0.0038000001, 0.0060000001, 0.0087000001, 0.0128, 0.088399999, 0.1787, 0.2484]]
+
+	# h2 clamped with multiplcation
+	dd_context  = [[0.8367, 0.85079, 0.86800, 0.88475, 0.94230, 0.96696, 0.97930],[0.83740001, 0.85180002, 0.8681999, 0.88235002, 0.94233999, 0.95167999, 0.9691499],[0.83840000, 0.85430002, 0.8688000, 0.88270002, 0.94247999, 0.95963999, 0.96673002]]
+	dd_ncontext = [[0.83780, 0.85229, 0.86686, 0.8805, 0.93409, 0.95723, 0.96122],[0.8375999, 0.8529999, 0.86633332, 0.88164997, 0.9348199, 0.95102666, 0.96147003],[0.8367999, 0.85049998, 0.86519996, 0.87964999, 0.93521995, 0.95128002, 0.97672996]]
+	wd_context  = [[0.00060000, 0.00060000, 0.00066666, 0.000699, 0.001119, 0.0027866, 0.0041000],[0.00060000, 0.000699, 0.00066666, 0.00065000, 0.0011599, 0.0021733, 0.003099],[0.00060000, 0.00060000, 0.00066666, 0.00065000, 0.0012000, 0.00294, 0.00406]]
+	wd_ncontext = [[0.0024000, 0.0026000, 0.0028666, 0.0031999, 0.0058400, 0.0092400, 0.013150],[0.0024000, 0.0027000, 0.0028666, 0.0032500, 0.0060199, 0.0082399, 0.011140],[0.0026000, 0.0027000, 0.0027333, 0.0034000, 0.0064599, 0.010186, 0.01094]]
+
+	# plot
+	fig,ax=plt.subplots(2,1,sharex=True)
+
+	seaborn.tsplot(dd_with_context,p,color="red",ax=ax[0],err_style="ci_bars")
+	seaborn.tsplot(dd_without_context,p,linestyle="--",color="red",ax=ax[0],err_style="ci_bars")
+	seaborn.tsplot(wd_with_context,p,color="red",condition="as bias / with context",ax=ax[1],err_style="ci_bars")
+	seaborn.tsplot(wd_without_context,p,linestyle="--",color="red",condition="as bias / without context",ax=ax[1],err_style="ci_bars")
+
+
+	seaborn.tsplot(dd_context,p,color="blue",ax=ax[0],err_style="ci_bars")
+	seaborn.tsplot(dd_ncontext,p,linestyle="--",color="blue",ax=ax[0],err_style="ci_bars")
+	seaborn.tsplot(wd_context,p,color="blue",condition="clamped / with context",ax=ax[1],err_style="ci_bars")
+	seaborn.tsplot(wd_ncontext,p,linestyle="--",color="blue",condition="clamped / without context",ax=ax[1],err_style="ci_bars")
+
+	# plt.legend(loc="best")
+	plt.xlabel("Multiplicator n")
 	ax[0].set_ylabel("Probability")
-	ax[0].set_title("Correct Digit")
-	ax[1].set_title("Wrong Digits")
 	ax[1].set_ylabel("Probability")
-	ax[1].set_xlabel("Multiplicator p")
+	ax[1].set_xticks(range(11))
+	ax[0].set_title("Desired Digit")
+	ax[1].set_title("Wrong Digits")
+
+
 plt.show()
