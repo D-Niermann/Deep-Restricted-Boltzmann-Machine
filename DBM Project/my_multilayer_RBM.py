@@ -47,6 +47,7 @@ if True:
 	mpl.rcParams["lines.linewidth"] = 1.
 	mpl.rcParams["font.family"]= "serif"
 	# plt.rcParams['image.cmap'] = 'coolwarm'
+	# seaborn.set_palette(seaborn.color_palette("Set2", 10))
 
 	log=Logger(True)
 
@@ -296,7 +297,7 @@ class DBM_class(object):
 		self.bias3_np=np.loadtxt("bias3.txt")
 		os.chdir(workdir)
 
-
+	
 	def import_(self):
 		""" setting up the graph and setting the weights and biases tf variables to the 
 		saved numpy arrays """
@@ -417,8 +418,9 @@ class DBM_class(object):
 		self.pos_grad1  = tf.matmul(self.v, self.h1_prob,transpose_a=True)
 		self.neg_grad1  = tf.matmul(self.v_recon,self.h1_gibbs,transpose_a=True)
 		self.numpoints1 = tf.cast(tf.shape(self.v)[0],tf.float32) #number of train inputs per batch (for averaging the CD matrix -> see practical paper by hinton)
+		# self.weight_decay1 = tf.reduce_sum(tf.abs(self.w1))*0.00001
 		self.CD1        = (self.pos_grad1 - self.neg_grad1)/self.numpoints1
-		self.CD1_mean   = tf.reduce_mean(tf.square(self.CD1))
+		# self.CD1_mean   = tf.reduce_mean(tf.square(self.CD1))
 		self.update_w1  = self.w1.assign(self.w1+self.learnrate*self.CD1)
 		self.mean_w1    = tf.reduce_mean(tf.square(self.w1))
 		# second weight matrix
@@ -426,7 +428,7 @@ class DBM_class(object):
 		self.neg_grad2  = tf.matmul(self.h1_recon, self.h2_gibbs,transpose_a=True)
 		self.numpoints2 = tf.cast(tf.shape(self.h2)[0],tf.float32) #number of train inputs per batch (for averaging the CD matrix -> see practical paper by hinton)
 		self.CD2	    = (self.pos_grad2 - self.neg_grad2)/self.numpoints2
-		self.CD2_mean   = tf.reduce_mean(tf.square(self.CD2))
+		# self.CD2_mean   = tf.reduce_mean(tf.square(self.CD2))
 		self.update_w2  = self.w2.assign(self.w2+self.learnrate*self.CD2)
 		# bias updates
 		self.update_bias_h1 = self.bias_h1.assign(self.bias_h1+self.learnrate*tf.reduce_mean(self.h1-self.h1_gibbs,0))
@@ -445,9 +447,9 @@ class DBM_class(object):
 
 		### reverse feed
 		self.h2_rev      = tf.placeholder(tf.float32,[None,10],name="reverse_h2")
-		self.h1_rev_prob = sigmoid(tf.matmul(self.v, self.w1)+tf.matmul(self.h2_rev, tf.transpose(self.w2))+self.bias_h1,self.temp)
+		self.h1_rev_prob = sigmoid(tf.matmul(self.v, self.w1)+tf.matmul(self.h2_rev, (self.w2),transpose_b=True)+self.bias_h1,self.temp)
 		self.h1_rev      = tf.nn.relu(tf.sign(self.h1_rev_prob - tf.random_uniform(tf.shape(self.h1_rev_prob)))) 
-		self.v_rev_prob  = sigmoid(tf.matmul(self.h1_rev, tf.transpose(self.w1))+self.bias_v,self.temp)
+		self.v_rev_prob  = sigmoid(tf.matmul(self.h1_rev, (self.w1),transpose_b=True)+self.bias_v,self.temp)
 		self.v_rev       = tf.nn.relu(tf.sign(self.v_rev_prob - tf.random_uniform(tf.shape(self.v_rev_prob)))) 
 
 		#test sample
@@ -457,6 +459,43 @@ class DBM_class(object):
 		sess.run(tf.global_variables_initializer())
 		self.init_state=1
 
+	def test_noise_stability(self,input_data,input_label):
+		self.batchsize=len(input_data)
+		if load_from_file:
+			self.load_from_file(workdir+"/data/"+pathsuffix)
+		self.graph_init("testing")
+		self.import_()
+
+		n=20
+		h2_=[]
+		r=rnd.random([self.batchsize,784])
+		v_noise=np.copy(input_data)
+		
+		for i in range(200):
+			h2            = self.h2_prob.eval({self.v:v_noise})
+			v_noise_recon = self.v_recon_prob.eval({self.v:v_noise})
+			
+			for i in range(n):
+				v_noise_recon+=self.v_recon_prob.eval({self.v:v_noise})
+			v_noise_recon*=1./(n+1)
+			
+			# classify the reconstructed image
+			h1 = self.h1.eval({self.v:v_noise})
+			for i in range(n):
+				h1 += self.h1_rev.eval({self.v:v_noise_recon,self.h2_rev:[[1,1,-3,1,-3,1,1,1,1,1]]})
+			h1*=1./(n+1)
+			for i in range(n):	
+				h2 += self.h2_sample.eval({self.h1_place:h1})
+			h2*=1./(n+1)
+			
+			
+			# make the input more noisy
+			v_noise += (abs(r-0.5)*0.01)
+			v_noise*=1./v_noise.max()
+
+			h2_.append(h2[0])
+		
+		return np.array(h2_),v_noise_recon
 
 	def train(self,epochs,num_batches,cont):
 		""" training the DBM with given h2 as labels """
@@ -497,7 +536,7 @@ class DBM_class(object):
 				# define a batch
 				batch = train_data[start:end]
 				batch_label = train_label[start:end]
-				
+
 				# run all updates 
 				sess.run([	self.update_w1,
 						self.update_w2,
@@ -625,7 +664,10 @@ class DBM_class(object):
 		# tf.variables_initializer([self.h2,self.v_rev], name='init_train')
 
 		self.batchsize = 1
-		h2_            = []
+		h2_            = np.zeros([gibbs_steps,self.shape[2]])
+		h1_            = np.zeros([gibbs_steps,self.shape[1]])
+		v_g_           = np.zeros([gibbs_steps,self.shape[0]])
+		temp_          = np.zeros([gibbs_steps])
 		temp           = temp_start
 		temp_delta     = (temp_end-temp_start)/gibbs_steps
 
@@ -647,23 +689,8 @@ class DBM_class(object):
 
 
 		for i in range(gibbs_steps):
-			if liveplot and plt.fignum_exists(fig.number):
-				ax[0].cla()
-				ax[1].cla()
-				ax[2].cla()
-				ax[0].matshow(v_gibbs.reshape(28,28))
-				if mode=="context":
-					ax[2].matshow(h1.reshape(int(sqrt(self.shape[1])),int(sqrt(self.shape[1]))))
-				ax[1].cla()
-				ax[1].plot(h2[0],"-o")
-				ax[1].set_ylim(0,1)
-				ax[1].grid()
-				ax[1].set_title("Temp.: %s, Steps: %s"%(str(round(temp,3)),str(i)))
-				plt.pause(0.0001)
 			# if liveplot and not plt.fignum_exists(fig.number):
 			# 	break 
-			
-
 
 			if mode=="sampling":
 				# calculate the backward and forward pass 
@@ -683,21 +710,42 @@ class DBM_class(object):
 									   	  self.temp:	 temp})
 				
 				h1 = self.h1_rev.eval({	self.v:	 v_input,
-								self.h2_rev: p*h2,#np.reshape(modification,[1,10]),
+								self.h2_rev: p*np.reshape(modification,[1,10]),
 								self.temp:	 temp})
 
 				h2 = self.h2_sample.eval({self.h1_place: 	h1,
 									self.temp: 	temp})
 				
 				# here the h2 vector can be changed like: h2[0][1:4]=0
-				h2[0]*=modification
+				# h2[0]*=modification
 			
 			# assign new temp
-			temp+=temp_delta
-			# save values to array
-			h2_.append(h2[0])
+			temp+=temp_delta 
 
-		if liveplot:
+			# save values to array
+			h2_[i]   = h2[0]
+			h1_[i]   = h1
+			v_g_[i]  = v_gibbs
+			temp_[i] = temp
+
+
+		if liveplot and plt.fignum_exists(fig.number):
+			a0=ax[0].matshow(v_g_[0].reshape(28,28))
+			if mode=="context":
+				a2=ax[2].matshow(h1_[0].reshape(int(sqrt(self.shape[1])),int(sqrt(self.shape[1]))))
+			a1,=ax[1].plot(h2_[0],"-o")
+			ax[1].set_ylim(0,1)
+			ax[1].grid()
+			ax[1].set_title("Temp.: %s, Steps: %s"%(str(round(temp_[0],3)),str(i)))
+			for i in range(1,len(h2_)):
+				ax[1].set_title("Temp.: %s, Steps: %s"%(str(round(temp_[i],3)),str(i)))
+				
+				a0.set_data(v_g_[i].reshape(28,28))
+				a1.set_data(range(10),h2_[i])
+				a2.set_data(h1_[i].reshape(int(sqrt(self.shape[1])),int(sqrt(self.shape[1]))))
+				
+				plt.pause(1/30.)
+		
 			plt.close(fig)
 
 
@@ -778,24 +826,25 @@ dbm_epochs           = 50
 
 
 rbm_learnrate     = 0.005
-dbm_learnrate     = 0.02
-dbm_learnrate_end = 0.02  # bringt nichts
+dbm_learnrate     = 0.01
+dbm_learnrate_end = 0.01  # bringt nichts
 
 temp = 1.0		
 
 pre_training    = 0 	#if no pretrain then files are automatically loaded
 
-training       = 0
-testing 	   = 0
-plotting       = 0
-gibbs_sampling = 1
+training        = 0
+testing         = 0
+plotting        = 0
+gibbs_sampling  = 1
+noise_stab_test = 0
 
 save_to_file          = 0 	# only save biases and weights for further training
 save_all_params       = 0	# also save all test data and reconstructed images (memory heavy)
 save_pretrained       = 0
 
 load_from_file        = 1
-pathsuffix            = "Thu Jan 18 20-04-17 2018 80 epochen"
+pathsuffix            = "Sun Feb 11 20-20-39 2018"#"Thu Jan 18 20-04-17 2018 80 epochen"
 pathsuffix_pretrained = "Thu Jan 25 11-28-08 2018"
 
 
@@ -863,20 +912,17 @@ if gibbs_sampling:
 		DBM.graph_init("gibbs")
 		DBM.import_()
 
-		# v_gibbs1,h2_1=DBM.gibbs_sampling(test_data[18:19], 500, 1.1, 0.5, 
-		# 						mode         = "sampling", 
-		# 						modification = [2,2,2,2,2,0,0,0,0,0],
-		# 						liveplot     = 0)
+
 		dd_c=[]
 		dd_nc=[]
 		wd_c=[]
 		wd_nc=[]
-		for p in [1]:
-			log.start(p)
+		for p in [1]: 
+			log.start("p =",p) 
 			# arrays for h2 act without context
 			desired_digits_c  = []
-			wrong_digits_c    = []
-			# arrays for h2 act without context
+			wrong_digits_c    = []  
+			# arrays for h2 act without context 
 			desired_digits_nc = []
 			wrong_digits_nc   = []
 
@@ -885,23 +931,23 @@ if gibbs_sampling:
 			# p = 1
 
 			# loop through images from test_data
-			for i in range(10,500):
+			for i in range(18,200):
 				## find the digit that was presented
 				digit=np.where(test_label[i])[0][0] 
 				## set desired digit range
 				if digit<5:
 					# calculte h2 firerates over all gibbs_steps with no context
-					_,h2_2_no_context=DBM.gibbs_sampling(test_data[i:i+1], 100, 0.8 , 0.2, 
+					_,h2_2_no_context=DBM.gibbs_sampling(test_data[i:i+1], 200, 1. , 0.2, 
 											mode         = "context", 
 											modification = np.array([1,1,1,1,1,1,1,1,1,1]),
 											p            = p,
 											liveplot     = 0)
 					# with context
-					# _,h2_2_context=DBM.gibbs_sampling(test_data[i:i+1], 100, 0.8 , 0.2, 
-					# 						mode         = "context", 
-					# 						modification = np.array([1,1,1,1,1,0,0,0,0,0]),
-					# 						p            = p,
-					# 						liveplot     = 0)
+					_,h2_2_context=DBM.gibbs_sampling(test_data[i:i+1], 200, 1. , 0.2, 
+											mode         = "context", 
+											modification = np.array([1,1,1,1,1,0,0,0,0,0]),
+											p            = p,
+											liveplot     = 0)
 					
 					# append h2 activity to array, but only the unit that corresponst to the given digit picture
 					desired_digits_c.append(h2_2_context[:,digit])
@@ -926,21 +972,32 @@ if gibbs_sampling:
 			dd_nc.append(np.round(np.mean(desired_digits_nc),4))
 			wd_c.append(np.round(np.mean(wrong_digits_c),4))
 			wd_nc.append(np.round(np.mean(wrong_digits_nc),4))
+			# clac how many digits got badly classified
+			wrong_class_nc=[np.sum(np.array(desired_digits_nc)[:,-1]<i) for i in np.linspace(0,1,100)]
+			wrong_class_c=[np.sum(np.array(desired_digits_c)[:,-1]<i) for i in np.linspace(0,1,100)]
 
 			log.end()
 
-		# plot
-		fig_gs,ax_gs = plt.subplots(2,1,sharex="all")
-		for i in range(len(desired_digits_c)):
-			ax_gs[0].plot(smooth(desired_digits_c[i],20))
-			ax_gs[1].plot(smooth(desired_digits_nc[i],20))
-			ax_gs[0].set_title("Desired Digit with Context")
-			ax_gs[1].set_title("Desired Digit without Context")
-			ax_gs[0].set_ylim(0,1)
-			ax_gs[1].set_ylim(0,1)
-			plt.xlabel("gibbs_steps")
-			ax_gs[0].set_ylabel("Probability")
-			ax_gs[1].set_ylabel("Probability")
+		### plot
+		# fig_gs,ax_gs = plt.subplots(2,1,sharex="all")
+		# for i in range(len(desired_digits_c)):
+		# 	ax_gs[0].plot(smooth(desired_digits_c[i],20))
+		# 	ax_gs[1].plot(smooth(desired_digits_nc[i],20))
+		# 	ax_gs[0].set_title("Desired Digit with Context")
+		# 	ax_gs[1].set_title("Desired Digit without Context")
+		# 	ax_gs[0].set_ylim(0,1)
+		# 	ax_gs[1].set_ylim(0,1)
+		# 	plt.xlabel("gibbs_steps")
+		# 	ax_gs[0].set_ylabel("Probability")
+		# 	ax_gs[1].set_ylabel("Probability")
+
+		plt.figure()
+		plt.plot(np.linspace(0,1,100),wrong_class_c,"-",label="With Context")
+		plt.plot(np.linspace(0,1,100),wrong_class_nc,"-",label="Without Context")
+		plt.title("How many digits got classified below Threshhold")
+		plt.xlabel("Threshhold")
+		plt.ylabel("Number of Digits")
+		plt.legend()
 
 
 		# v_gibbs2,h2_2=DBM.gibbs_sampling(test_data[1:2], 500, modification=[1,1,1,0,1,1,1,1,1,1], liveplot=0)
@@ -949,6 +1006,16 @@ if gibbs_sampling:
 
 		log.end()
 
+if noise_stab_test:
+	with tf.Session() as sess:
+		s=34
+		my_pal=["#FF3045","#77d846","#466dd8","#ffa700","#48e8ff","#a431e5","#333333","#a5a5a5","#ecbdf9","#b1f6b6"]
+		noise_h2_,v_noise=DBM.test_noise_stability(test_data[s:s+1], test_label[s:s+1])
+		with seaborn.color_palette(my_pal, 10):
+			for i in range(10):
+				plt.plot(smooth(noise_h2_[:,i],20),label=str(i))
+			plt.legend()
+		plt.matshow(v_noise.reshape(28,28))
 
 if training and save_to_file:
 	DBM.write_to_file()
@@ -959,14 +1026,14 @@ if training and save_to_file:
 # Plot the Weights, Errors and other informations
 if plotting:
 	log.out("Plotting...")
-	map1=plt.matshow(tile(DBM.w1_np/DBM.w1_np.max()))
+	map1=plt.matshow(tile(DBM.w1_np))
 	plt.colorbar(map1)
 	plt.title("W 1")
 
 	# plt.matshow(tile(DBM.CD1_np))
-	# map2=plt.matshow(tile_raster_images(X=DBM.w1_np.T, img_shape=(28,28), tile_shape=(12, 12), tile_spacing=(0,0)))
+	map2=plt.matshow(tile_raster_images(X=DBM.w2_np.T, img_shape=(15,15), tile_shape=(12, 12), tile_spacing=(0,0)))
 	# plt.title("W 2")
-	# plt.colorbar(map2)
+	# plt.colorbar(map2)	
 
 	if training:
 		x=np.linspace(0,dbm_epochs,len(DBM.w1_mean_np))
