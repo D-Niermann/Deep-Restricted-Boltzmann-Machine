@@ -150,3 +150,6 @@ def init_pretrained(name_extension="0.0651765",w=None,bias_v=None,bias_h=None):
 
 def sigmoid(x,T):
 	return 1./(1.+tf.exp(-1./T*x))
+
+def sigmoid_np(x,T):
+    return 1./(1.+np.exp(-1./T*x))

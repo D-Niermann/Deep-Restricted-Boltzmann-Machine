@@ -480,12 +480,8 @@ class DBM_class(object):
 			v_noise_recon*=1./(n+1)
 			
 			# classify the reconstructed image
-			h1 = self.h1.eval({self.v:v_noise})
-			for i in range(n):
-				h1 += self.h1_rev.eval({self.v:v_noise_recon,self.h2_rev:[[1,1,-3,1,-3,1,1,1,1,1]]})
-			h1*=1./(n+1)
 			for i in range(n):	
-				h2 += self.h2_sample.eval({self.h1_place:h1})
+				h2 += self.h2_prob.eval({self.v:v_noise_recon})
 			h2*=1./(n+1)
 			
 			
@@ -668,6 +664,7 @@ class DBM_class(object):
 		h1_            = np.zeros([gibbs_steps,self.shape[1]])
 		v_g_           = np.zeros([gibbs_steps,self.shape[0]])
 		temp_          = np.zeros([gibbs_steps])
+		self.energy_   = []
 		temp           = temp_start
 		temp_delta     = (temp_end-temp_start)/gibbs_steps
 
@@ -687,6 +684,7 @@ class DBM_class(object):
 		h2 = self.h2_prob.eval({self.v:v_gibbs,self.temp:1.0})
 		h1 = self.h1_rev.eval({self.v:v_input,self.h2_rev:h2,self.temp:temp})
 
+		self.energy_.append(-10)
 
 		for i in range(gibbs_steps):
 			# if liveplot and not plt.fignum_exists(fig.number):
@@ -695,19 +693,27 @@ class DBM_class(object):
 			if mode=="sampling":
 				# calculate the backward and forward pass 
 				v_gibbs = self.v_rev_prob.eval({self.v:v_gibbs, self.h2_rev:p*h2, self.temp:temp})
+				h1      = self.h1.eval({self.v:v_gibbs, self.temp:temp})
 				h2      = self.h2_prob.eval({self.v:v_gibbs, self.temp:temp})
+
+				# calc the energy
+				energy1=-np.dot(v_gibbs, np.dot(self.w1_np,h1.T))[0][0]
+				energy2=-np.dot(h1, np.dot(self.w2_np,h2.T))[0][0]
 				
+				
+
+				self.energy_.append(energy1+energy2)
 				# here the h2 vector can be changed like: h2[0][1:4]=0
-				h2[0]*=modification
+				# h2[0]*=modification
 
 			
 				
 			if mode=="context":
 				# v is clamped here , calc only h1 and h2 , v_gibbs only for plotting and will not be used to calc h1 or h2
 				if liveplot:
-					v_gibbs = self.v_rev_prob.eval({self.v:	 v_gibbs, 
+					v_gibbs = self.v_rev_prob.eval({self.v:	   v_gibbs, 
 								  	   	  self.h2_rev: h2, 
-									   	  self.temp:	 temp})
+									   	  self.temp:   temp})
 				
 				h1 = self.h1_rev.eval({	self.v:	 v_input,
 								self.h2_rev: p*np.reshape(modification,[1,10]),
@@ -738,13 +744,15 @@ class DBM_class(object):
 			ax[1].grid()
 			ax[1].set_title("Temp.: %s, Steps: %s"%(str(round(temp_[0],3)),str(i)))
 			for i in range(1,len(h2_)):
-				ax[1].set_title("Temp.: %s, Steps: %s"%(str(round(temp_[i],3)),str(i)))
-				
-				a0.set_data(v_g_[i].reshape(28,28))
-				a1.set_data(range(10),h2_[i])
-				a2.set_data(h1_[i].reshape(int(sqrt(self.shape[1])),int(sqrt(self.shape[1]))))
-				
-				plt.pause(1/30.)
+				if plt.fignum_exists(fig.number):
+					ax[1].set_title("Temp.: %s, Steps: %s"%(str(round(temp_[i],3)),str(i)))
+					
+					a0.set_data(v_g_[i].reshape(28,28))
+					a1.set_data(range(10),h2_[i])
+					if mode=="context":
+						a2.set_data(h1_[i].reshape(int(sqrt(self.shape[1])),int(sqrt(self.shape[1]))))
+					
+					plt.pause(1/50.)
 		
 			plt.close(fig)
 
@@ -822,12 +830,12 @@ class DBM_class(object):
 num_batches_pretrain = 500
 dbm_batches          = 500
 pretrain_epochs      = 1
-dbm_epochs           = 50
+dbm_epochs           = 100
 
 
 rbm_learnrate     = 0.005
-dbm_learnrate     = 0.01
-dbm_learnrate_end = 0.01  # bringt nichts
+dbm_learnrate     = 0.005
+dbm_learnrate_end = 0.005  # bringt nichts
 
 temp = 1.0		
 
@@ -917,7 +925,7 @@ if gibbs_sampling:
 		dd_nc=[]
 		wd_c=[]
 		wd_nc=[]
-		for p in [1]: 
+		for p in [5]: 
 			log.start("p =",p) 
 			# arrays for h2 act without context
 			desired_digits_c  = []
@@ -927,27 +935,26 @@ if gibbs_sampling:
 			wrong_digits_nc   = []
 
 			check_wrongs=[]
-			# multiplication for the whole h2 layer:
-			# p = 1
+
 
 			# loop through images from test_data
-			for i in range(18,200):
+			for i in range(18,1000):
 				## find the digit that was presented
 				digit=np.where(test_label[i])[0][0] 
 				## set desired digit range
 				if digit<5:
 					# calculte h2 firerates over all gibbs_steps with no context
-					_,h2_2_no_context=DBM.gibbs_sampling(test_data[i:i+1], 200, 1. , 0.2, 
-											mode         = "context", 
-											modification = np.array([1,1,1,1,1,1,1,1,1,1]),
-											p            = p,
-											liveplot     = 0)
+					_,h2_2_no_context=DBM.gibbs_sampling(test_data[i:i+1], 100, 1. , 0.5, 
+										mode         = "context", 
+										modification = np.array([1,1,1,1,1,1,1,1,1,1]),
+										p            = p,
+										liveplot     = 0)
 					# with context
-					_,h2_2_context=DBM.gibbs_sampling(test_data[i:i+1], 200, 1. , 0.2, 
-											mode         = "context", 
-											modification = np.array([1,1,1,1,1,0,0,0,0,0]),
-											p            = p,
-											liveplot     = 0)
+					_,h2_2_context=DBM.gibbs_sampling(test_data[i:i+1], 100, 1. , 0.5, 
+										mode         = "context",
+										modification = np.array([1,1,1,1,1,0,0,0,0,0]),
+										p            = p,
+										liveplot     = 0)
 					
 					# append h2 activity to array, but only the unit that corresponst to the given digit picture
 					desired_digits_c.append(h2_2_context[:,digit])
@@ -973,8 +980,8 @@ if gibbs_sampling:
 			wd_c.append(np.round(np.mean(wrong_digits_c),4))
 			wd_nc.append(np.round(np.mean(wrong_digits_nc),4))
 			# clac how many digits got badly classified
-			wrong_class_nc=[np.sum(np.array(desired_digits_nc)[:,-1]<i) for i in np.linspace(0,1,100)]
-			wrong_class_c=[np.sum(np.array(desired_digits_c)[:,-1]<i) for i in np.linspace(0,1,100)]
+			wrong_class_nc = [np.sum(np.array(desired_digits_nc)[:,-1]<i) for i in np.linspace(0,1,100)]
+			wrong_class_c  = [np.sum(np.array(desired_digits_c)[:,-1]<i)  for i in np.linspace(0,1,100)]
 
 			log.end()
 
@@ -997,7 +1004,7 @@ if gibbs_sampling:
 		plt.title("How many digits got classified below Threshhold")
 		plt.xlabel("Threshhold")
 		plt.ylabel("Number of Digits")
-		plt.legend()
+		plt.legend(loc="best")
 
 
 		# v_gibbs2,h2_2=DBM.gibbs_sampling(test_data[1:2], 500, modification=[1,1,1,0,1,1,1,1,1,1], liveplot=0)
