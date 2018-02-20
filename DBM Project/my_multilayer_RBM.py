@@ -711,10 +711,12 @@ class DBM_class(object):
 			if mode=="context":
 				# v is clamped here , calc only h1 and h2 , v_gibbs only for plotting and will not be used to calc h1 or h2
 				if liveplot:
-					v_gibbs = self.v_rev_prob.eval({self.v:	   v_gibbs, 
-								  	   	  self.h2_rev: h2, 
-									   	  self.temp:   temp})
-				
+					v_gibbs =  sigmoid_np(np.dot(self.w1_np,h1[0])+self.bias1_np,temp)
+							#self.v_rev_prob.eval({self.v:   v_gibbs, 
+							#	  	   	  self.h2_rev: h2, 
+							#		   	  self.temp:   temp})
+							#sigmoid_np(np.dot(self.w1_np,h1[0])+self.bias1_np,temp)
+
 				h1 = self.h1_rev.eval({	self.v:	 v_input,
 								self.h2_rev: p*np.reshape(modification,[1,10]),
 								self.temp:	 temp})
@@ -722,8 +724,8 @@ class DBM_class(object):
 				h2 = self.h2_sample.eval({self.h1_place: 	h1,
 									self.temp: 	temp})
 				# calc the energy
-				energy1=-np.dot(v_gibbs, np.dot(self.w1_np,h1.T))[0][0]
-				energy2=-np.dot(h1, np.dot(self.w2_np,h2.T))[0][0]
+				energy1=-np.dot(v_input, np.dot(self.w1_np,h1.T))[0]
+				energy2=-np.dot(h1, np.dot(self.w2_np,h2.T))[0]
 				self.energy_.append(energy1+energy2)
 
 
@@ -957,14 +959,14 @@ if gibbs_sampling:
 
 
 			# loop through images from test_data
-			for i in range(19,20):
+			for i in range(13,14):
 				## find the digit that was presented
 				digit=np.where(test_label[i])[0][0] 
 				## set desired digit range
 				if digit<5:
 					# calculte h2 firerates over all gibbs_steps with no context
-					_,h2_2_no_context=DBM.gibbs_sampling(test_data[i:i+1], 200, 1.8 , 0.5, 
-										mode         = "sampling", 
+					_,h2_2_no_context=DBM.gibbs_sampling(test_data[i:i+1], 300, 1. , 0.5, 
+										mode         = "context", 
 										modification = np.array([1,1,1,1,1,1,1,1,1,1]),
 										p            = p,
 										liveplot     = 1)
