@@ -183,7 +183,7 @@ class DBM_class(object):
 
 	def __init__(self,shape,learnrate,liveplot):
 		self.n_layers     = len(shape)
-		self.liveplot     = liveplot
+		self.liveplot     = liveplot # if true will open a lifeplot of the weight matrix 
 		self.shape        = shape  # contains the number of  neurons in a list from v layer to h1 to h2 
 		
 		
@@ -215,8 +215,8 @@ class DBM_class(object):
 
 		self.RBMs    = [0]*(len(self.shape)-1)
 		self.RBMs[0] = RBM(self.shape[0],self.shape[1], 2, 1, learnrate=rbm_learnrate, liveplot=0)
-		self.RBMs[1] = RBM(self.shape[1],self.shape[2], 1, 2, learnrate=rbm_learnrate, liveplot=0)
-
+		self.RBMs[1] = RBM(self.shape[1],self.shape[2], 2, 2, learnrate=rbm_learnrate, liveplot=0)
+		# self.RBMs[2] = RBM(self.shape[2],self.shape[3], 1, 2, learnrate=rbm_learnrate, liveplot=0)
 
 	def pretrain(self):
 		""" this function will pretrain the RBMs and define a self.weights list where every
@@ -292,9 +292,11 @@ class DBM_class(object):
 		log.out("Loading data from:","...",path[-20:])
 		self.w1_np=np.loadtxt("w1.txt")
 		self.w2_np=np.loadtxt("w2.txt")
+		# self.w3_np=np.loadtxt("w3.txt")
 		self.bias1_np=np.loadtxt("bias1.txt")
 		self.bias2_np=np.loadtxt("bias2.txt")
 		self.bias3_np=np.loadtxt("bias3.txt")
+		# self.bias4_np=np.loadtxt("bias4.txt")
 		os.chdir(workdir)
 
 	
@@ -304,10 +306,11 @@ class DBM_class(object):
 		log.out("loading numpy vars into graph")
 		sess.run(self.w1.assign(self.w1_np))
 		sess.run(self.w2.assign(self.w2_np))
+		# sess.run(self.w3.assign(self.w3_np))
 		sess.run(self.bias_v.assign(self.bias1_np))
 		sess.run(self.bias_h1.assign(self.bias2_np))
 		sess.run(self.bias_h2.assign(self.bias3_np))
-
+		# sess.run(self.bias_h3.assign(self.bias4_np))
 
 	def sample(self,x):
 		""" takes sample from x where x is a probability vector.
@@ -675,7 +678,7 @@ class DBM_class(object):
 
 		if liveplot:
 			log.info("Liveplotting gibbs sampling")
-			fig,ax=plt.subplots(1,3,figsize=(12,5))
+			fig,ax=plt.subplots(1,4,figsize=(15,5))
 		
 		# set v as input 
 		v_gibbs = v_input 
@@ -699,9 +702,6 @@ class DBM_class(object):
 				# calc the energy
 				energy1=-np.dot(v_gibbs, np.dot(self.w1_np,h1.T))[0][0]
 				energy2=-np.dot(h1, np.dot(self.w2_np,h2.T))[0][0]
-				
-				
-
 				self.energy_.append(energy1+energy2)
 				# here the h2 vector can be changed like: h2[0][1:4]=0
 				# h2[0]*=modification
@@ -721,7 +721,12 @@ class DBM_class(object):
 
 				h2 = self.h2_sample.eval({self.h1_place: 	h1,
 									self.temp: 	temp})
-				
+				# calc the energy
+				energy1=-np.dot(v_gibbs, np.dot(self.w1_np,h1.T))[0][0]
+				energy2=-np.dot(h1, np.dot(self.w2_np,h2.T))[0][0]
+				self.energy_.append(energy1+energy2)
+
+
 				# here the h2 vector can be changed like: h2[0][1:4]=0
 				# h2[0]*=modification
 			
@@ -736,22 +741,34 @@ class DBM_class(object):
 
 
 		if liveplot and plt.fignum_exists(fig.number):
-			a0=ax[0].matshow(v_g_[0].reshape(28,28))
-			if mode=="context":
-				a2=ax[2].matshow(h1_[0].reshape(int(sqrt(self.shape[1])),int(sqrt(self.shape[1]))))
-			a1,=ax[1].plot(h2_[0],"-o")
+			a0 = ax[0].matshow(v_g_[0].reshape(28,28))
+
+			a2=ax[2].matshow(h1_[0].reshape(int(sqrt(self.shape[1])),int(sqrt(self.shape[1]))))
+			a1, = ax[1].plot(h2_[0],"-o")
+			a3, = ax[3].plot([],[])
+			ax[0].set_title("Visible Layer")
+			ax[2].set_title("Hidden Layer")
+
+			ax[3].set_xlim(0,len(self.energy_))
+			ax[3].set_ylim(np.min(self.energy_),0)
+			ax[3].set_title("Energy")
+
 			ax[1].set_ylim(0,1)
+			ax[1].set_title("Classification")
 			ax[1].grid()
 			ax[1].set_title("Temp.: %s, Steps: %s"%(str(round(temp_[0],3)),str(i)))
+			
 			for i in range(1,len(h2_)):
 				if plt.fignum_exists(fig.number):
 					ax[1].set_title("Temp.: %s, Steps: %s"%(str(round(temp_[i],3)),str(i)))
 					
 					a0.set_data(v_g_[i].reshape(28,28))
 					a1.set_data(range(10),h2_[i])
-					if mode=="context":
-						a2.set_data(h1_[i].reshape(int(sqrt(self.shape[1])),int(sqrt(self.shape[1]))))
 					
+
+					a2.set_data(h1_[i].reshape(int(sqrt(self.shape[1])),int(sqrt(self.shape[1]))))
+					
+					a3.set_data(range(i),self.energy_[:i])
 					plt.pause(1/50.)
 		
 			plt.close(fig)
@@ -921,15 +938,17 @@ if gibbs_sampling:
 		DBM.import_()
 
 
-		dd_c=[]
-		dd_nc=[]
-		wd_c=[]
-		wd_nc=[]
-		for p in [5]: 
+		dd_c  = []
+		dd_nc = []
+		wd_c  = []
+		wd_nc = []
+
+
+		for p in [1]:
 			log.start("p =",p) 
 			# arrays for h2 act without context
 			desired_digits_c  = []
-			wrong_digits_c    = []  
+			wrong_digits_c    = []
 			# arrays for h2 act without context 
 			desired_digits_nc = []
 			wrong_digits_nc   = []
@@ -938,19 +957,19 @@ if gibbs_sampling:
 
 
 			# loop through images from test_data
-			for i in range(18,1000):
+			for i in range(19,20):
 				## find the digit that was presented
 				digit=np.where(test_label[i])[0][0] 
 				## set desired digit range
 				if digit<5:
 					# calculte h2 firerates over all gibbs_steps with no context
-					_,h2_2_no_context=DBM.gibbs_sampling(test_data[i:i+1], 100, 1. , 0.5, 
-										mode         = "context", 
+					_,h2_2_no_context=DBM.gibbs_sampling(test_data[i:i+1], 200, 1.8 , 0.5, 
+										mode         = "sampling", 
 										modification = np.array([1,1,1,1,1,1,1,1,1,1]),
 										p            = p,
-										liveplot     = 0)
+										liveplot     = 1)
 					# with context
-					_,h2_2_context=DBM.gibbs_sampling(test_data[i:i+1], 100, 1. , 0.5, 
+					_,h2_2_context=DBM.gibbs_sampling(test_data[i:i+1], 200, 1. , 0.2, 
 										mode         = "context",
 										modification = np.array([1,1,1,1,1,0,0,0,0,0]),
 										p            = p,
