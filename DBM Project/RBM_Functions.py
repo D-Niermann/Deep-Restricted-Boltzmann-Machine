@@ -153,3 +153,18 @@ def sigmoid(x,T):
 
 def sigmoid_np(x,T):
     return 1./(1.+np.exp(-1./T*x))
+
+
+def shuffle(x,seed):
+    """ will shuffle an array using a seed, so the shuffling can be the same for mutlliple 
+        arrays. 
+    x       :: array to be shuffled (needs to be 1d)
+    seed    :: arrays of tuple (shape = Nx2) where each tuple says which elements to swap. 
+                These tuple will be applied sequential. Example: seed=rnd.randint(5,size=[6,2])
+    """
+    y=np.copy(x)
+    for i,j in seed:
+        _saved_i_=y[i]
+        y[i]=y[j]
+        y[j]=_saved_i_
+    return y
