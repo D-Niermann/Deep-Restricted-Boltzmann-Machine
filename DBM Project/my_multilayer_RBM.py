@@ -44,7 +44,7 @@ if True:
 
 	mpl.rcParams["image.cmap"] = "gray"
 	mpl.rcParams["grid.linewidth"] = 0.5
-	mpl.rcParams["lines.linewidth"] = 1.
+	mpl.rcParams["lines.linewidth"] = 1.25
 	mpl.rcParams["font.family"]= "serif"
 	# plt.rcParams['image.cmap'] = 'coolwarm'
 	# seaborn.set_palette(seaborn.color_palette("Set2", 10))
@@ -131,7 +131,7 @@ class RBM(object):
 		        		) 
 
 		# and the same for visible units
-		self.v_prob  = sigmoid(tf.matmul(self.h,tf.transpose(self.back_mult*self.w)) + self.bias_v,temp)
+		self.v_prob  = sigmoid(tf.matmul(self.h,(self.back_mult*self.w),transpose_b=True) + self.bias_v,temp)
 		self.v_recon = tf.nn.relu(
 					tf.sign(
 						self.v_prob - tf.random_uniform(tf.shape(self.v_prob))
@@ -148,8 +148,8 @@ class RBM(object):
 		#### Training with Contrastive Divergence
 		#matrix shape is untouched throu the batches because w*v=h even if v has more columns, but dividing be numpoints is recomended since CD
 		# [] = [784,batchsize]-transposed v * [batchsize,500] -> [784,500] - like w 
-		self.pos_grad  = tf.matmul(tf.transpose(self.v),self.h)
-		self.neg_grad  = tf.matmul(tf.transpose(self.v_recon),self.h_gibbs)
+		self.pos_grad  = tf.matmul(self.v,self.h,transpose_a=True)
+		self.neg_grad  = tf.matmul(self.v_recon,self.h_gibbs,transpose_a=True)
 		self.numpoints = tf.cast(tf.shape(self.v)[0],tf.float32) #number of train inputs per batch (for averaging the CD matrix -> see practical paper by hinton)
 		# contrastive divergence
 		self.CD        = (self.pos_grad - self.neg_grad)/self.numpoints
@@ -166,7 +166,7 @@ class RBM(object):
 
 		# reverse feed
 		self.h_rev       = tf.placeholder(tf.float32,[None,self.hidden_units],name="Reverse-hidden")
-		self.v_prob_rev  = sigmoid(tf.matmul(self.h_rev,tf.transpose(self.w)) + self.bias_v,temp)
+		self.v_prob_rev  = sigmoid(tf.matmul(self.h_rev,(self.w),transpose_b=True) + self.bias_v,temp)
 		self.v_recon_rev = tf.nn.relu(tf.sign(self.v_prob_rev - tf.random_uniform(tf.shape(self.v_prob_rev))))
 
 	def train(self,sess,RBM_i,RBMs,batch):
@@ -344,22 +344,12 @@ class DBM_class(object):
 				:: "gibbs"    if the graph is used in gibbs sampling - this will set temperature to a placeholder
 		"""
 		log.out("Initializing graph")
-
-		# these variables need to be init to random for use in h1 , later they get changed to something else
-		self.h2_var = tf.Variable(tf.random_uniform([self.batchsize,self.shape[2]],minval=-1e-3,maxval=1e-3),name="h2")
-		# self.v_rev   = tf.Variable(tf.random_uniform([self.batchsize,self.shape[0]],minval=-1e-3,maxval=1e-3),name="v_rev_init")
-
-		tf.variables_initializer([self.h2_var], name='init_train')
-
-
+		
 		self.v  = tf.placeholder(tf.float32,[None,self.shape[0]],name="Visible-Layer") # has self.shape [number of images per batch,number of visible units]
-		
-		if graph_mode=="gibbs":
-			self.temp=tf.placeholder(tf.float32,[],name="Temperature")
-		else:
-			self.temp=temp
 
-		
+		self.batch_ph  = tf.placeholder(tf.float32,[self.batchsize,None],name="Batch_placeholder")
+		self.batch_label_ph  = tf.placeholder(tf.float32,[self.batchsize,None],name="Batchlabel_placeholder")
+
 		if graph_mode=="training":
 			self.m_tf      = tf.placeholder(tf.int32,[],name="running_array_index")
 			self.h2        = tf.placeholder(tf.float32,[None,self.shape[2]],name="placeholder_h2")
@@ -369,12 +359,39 @@ class DBM_class(object):
 			self.h2_activity_ = tf.Variable(tf.zeros([self.num_of_updates/self.num_of_skipped]))
 			self.train_error_ = tf.Variable(tf.zeros([self.num_of_updates/self.num_of_skipped]))
 			self.w1_mean_     = tf.Variable(tf.zeros([self.num_of_updates/self.num_of_skipped]))
+
+			self.pos_grad1 = tf.Variable(tf.zeros([self.shape[0],self.shape[1]]))
+			self.neg_grad1 = tf.Variable(tf.zeros([self.shape[0],self.shape[1]]))
+
+			self.pos_grad2 = tf.Variable(tf.zeros([self.shape[1],self.shape[2]]))
+			self.neg_grad2 = tf.Variable(tf.zeros([self.shape[1],self.shape[2]]))
+
+
 			#self.CD1_mean_    = tf.Variable(tf.zeros([self.num_of_updates/self.num_of_skipped]))
 			#self.CD2_mean_    = tf.Variable(tf.zeros([self.num_of_updates/self.num_of_skipped]))		
 
 
-		# self.h2      = tf.placeholder(tf.random_uniform([None,self.shape[1].hidden_units],minval=-1e-3,maxval=1e-3),name="h2_placeholder")
+		# create vars for each layer that get assignt for sampling
+		self.v_var   = tf.Variable(tf.random_uniform([self.batchsize,self.shape[0]],minval=-1e-3,maxval=1e-3),name="v_var")
+		self.h1_var  = tf.Variable(tf.random_uniform([self.batchsize,self.shape[1]],minval=-1e-3,maxval=1e-3),name="h1_var")
+		self.h2_var  = tf.Variable(tf.random_uniform([self.batchsize,self.shape[2]],minval=-1e-3,maxval=1e-3),name="h2_var")
+		self.modification_tf = tf.Variable(tf.ones([self.batchsize,self.shape[2]]),name="Modification")
+		
+			# self.v_rev = tf.Variable(tf.random_uniform([self.batchsize,self.shape[0]],minval=-1e-3,maxval=1e-3),name="v_rev_init")
 
+			# tf.variables_initializer([self.h2_var], name='init_train')
+
+
+			
+			
+		if graph_mode=="gibbs":
+			self.temp = tf.placeholder(tf.float32,[],name="Temperature")
+		else:
+			self.temp = temp
+
+
+
+		### Parameters 
 		self.w1 = tf.Variable(self.weights[0],name="Weights1")
 		self.w2 = tf.Variable(self.weights[1],name="Weights2")
 
@@ -382,7 +399,6 @@ class DBM_class(object):
 		self.bias_h1 = tf.Variable(tf.zeros([self.shape[1]]), name="Hidden-Bias")
 		self.bias_h2 = tf.Variable(tf.zeros([self.shape[2]]), name="Hidden-Bias")
 
-		# self.temp_tf     = tf.Variable(temp, name="Temperature")
 	
 		### Propagation
 		## Forward Feed
@@ -391,12 +407,12 @@ class DBM_class(object):
 		self.h1      = self.sample(self.h1_prob)
 		
 		# h2 only from h1
-		if graph_mode=="testing" or graph_mode=="gibbs":
+		if graph_mode == "testing" or graph_mode == "gibbs":
 			self.h2_prob = sigmoid(tf.matmul(self.h1,self.w2) + self.bias_h2,self.temp)
 			self.h2      = self.sample(self.h2_prob)
 
 		## Backward Feed   
-		self.h1_recon_prob = sigmoid(tf.matmul(self.v,self.w1)+tf.matmul(self.h2,self.w2,transpose_b=True)+self.bias_h1, self.temp)
+		self.h1_recon_prob = sigmoid(tf.matmul(self.v_var,self.w1)+tf.matmul(self.h2_var,self.w2,transpose_b=True)+self.bias_h1, self.temp)
 		self.h1_recon      = self.sample(self.h1_recon_prob)
 		self.v_recon_prob  = sigmoid(tf.matmul(self.h1_recon,self.w1,transpose_b=True)+self.bias_v, self.temp)
 		self.v_recon       = self.sample(self.v_recon_prob)
@@ -422,36 +438,36 @@ class DBM_class(object):
 
 		
 		#Error and stuff
-		self.error  = tf.reduce_mean(tf.square(self.v-self.v_recon))
-		self.h1_sum = tf.reduce_sum(self.h1)
-		self.h2_sum = tf.reduce_sum(self.h2)
+		self.error  = tf.reduce_mean(tf.square(self.batch_ph-self.v_var))
+		self.h1_sum = tf.reduce_sum(self.h1_var)
+		self.h2_sum = tf.reduce_sum(self.h2_var)
 		self.free_energy = -tf.reduce_sum(tf.log(1+tf.exp(tf.matmul(self.v,self.w1)+self.bias_h1)))
 
 		if graph_mode=="training":
 			### Training with contrastive Divergence
 			
 			#first weight matrix
-			self.pos_grad1  = tf.matmul(self.v, self.h1_prob,transpose_a=True)
-			self.neg_grad1  = tf.matmul(self.v_recon,self.h1_gibbs,transpose_a=True)
-			self.numpoints1 = tf.cast(tf.shape(self.v)[0],tf.float32) #number of train inputs per batch (for averaging the CD matrix -> see practical paper by hinton)
-			# self.weight_decay1 = tf.reduce_sum(tf.abs(self.w1))*0.00001
-			self.CD1        = (self.pos_grad1 - self.neg_grad1)/self.numpoints1
-			# self.CD1_mean   = tf.reduce_mean(tf.square(self.CD1))
-			self.update_w1  = self.w1.assign(self.w1+self.learnrate*self.CD1)
-			self.mean_w1    = tf.reduce_mean(tf.square(self.w1))
+			self.update_pos_grad1 = self.pos_grad1.assign(tf.matmul(self.v_var, self.h1_var,transpose_a=True))
+			self.update_neg_grad1 = self.neg_grad1.assign(tf.matmul(self.v_var, self.h1_var,transpose_a=True))
+			self.numpoints1       = tf.cast(tf.shape(self.v_var)[0],tf.float32) #number of train inputs per batch (for averaging the CD matrix -> see practical paper by hinton)
+			# self.weight_decay1  = tf.reduce_sum(tf.abs(self.w1))*0.00001
+			self.CD1              = (self.pos_grad1 - self.neg_grad1)/self.numpoints1
+			# self.CD1_mean       = tf.reduce_mean(tf.squa1,tf.squa2re(self.CD1))
+			self.update_w1        = self.w1.assign(self.w1+self.learnrate*self.CD1)
+			self.mean_w1          = tf.reduce_mean(tf.square(self.w1))
 			
 			# second weight matrix
-			self.pos_grad2  = tf.matmul(self.h1, self.h2,transpose_a=True)
-			self.neg_grad2  = tf.matmul(self.h1_recon, self.h2_gibbs,transpose_a=True)
-			self.numpoints2 = tf.cast(tf.shape(self.h2)[0],tf.float32) #number of train inputs per batch (for averaging the CD matrix -> see practical paper by hinton)
-			self.CD2	    = (self.pos_grad2 - self.neg_grad2)/self.numpoints2
+			self.update_pos_grad2 = self.pos_grad2.assign(tf.matmul(self.h1_var, self.h2_var,transpose_a=True))
+			self.update_neg_grad2 = self.neg_grad2.assign(tf.matmul(self.h1_var, self.h2_var,transpose_a=True))
+			self.numpoints2       = tf.cast(tf.shape(self.h2_var)[0],tf.float32) #number of train inputs per batch (for averaging the CD matrix -> see practical paper by hinton)
+			self.CD2              = (self.pos_grad2 - self.neg_grad2)/self.numpoints2
+			# self.CD2_mean       = tf.reduce_mean(tf.square(self.CD2))
+			self.update_w2        = self.w2.assign(self.w2+self.learnrate*self.CD2)
 
-			# self.CD2_mean   = tf.reduce_mean(tf.square(self.CD2))
-			self.update_w2  = self.w2.assign(self.w2+self.learnrate*self.CD2)
 			# bias updates
-			self.update_bias_h1 = self.bias_h1.assign(self.bias_h1+self.learnrate*tf.reduce_mean(self.h1-self.h1_gibbs,0))
-			self.update_bias_h2 = self.bias_h2.assign(self.bias_h2+self.learnrate*tf.reduce_mean(self.h2-self.h2_gibbs,0))
-			self.update_bias_v  = self.bias_v.assign(self.bias_v+self.learnrate*tf.reduce_mean(self.v-self.v_recon,0))
+			self.update_bias_h1 = self.bias_h1.assign(self.bias_h1+self.learnrate*tf.reduce_mean(self.h1_var-self.h1_gibbs,0))
+			self.update_bias_h2 = self.bias_h2.assign(self.bias_h2+self.learnrate*tf.reduce_mean(self.h2_var-self.h2_gibbs,0))
+			self.update_bias_v  = self.bias_v.assign(self.bias_v+self.learnrate*tf.reduce_mean(self.v_var-self.v_recon,0))
 		
 		
 		
@@ -460,12 +476,23 @@ class DBM_class(object):
 							 #tf.scatter_update(self.CD2_mean_,self.m_tf,self.CD2_mean),
 							 tf.scatter_update(self.w1_mean_,self.m_tf,self.mean_w1),
 							 tf.scatter_update(self.h1_activity_,self.m_tf,self.h1_sum),
-							 tf.scatter_update(self.h2_activity_,self.m_tf,self.h2_sum),
+							 # tf.scatter_update(self.h2_activity_,self.m_tf,self.h2_sum),
 							]
+
+		# updates for each layer (for computing everything "per hand")
+		self.update_h1_with_context = self.h1_var.assign(self.sample(sigmoid(tf.matmul(self.v_var,self.w1)  + tf.matmul(tf.multiply(self.h2_var,self.modification_tf),self.w2,transpose_b=True) + self.bias_h1,self.temp)))
+		self.update_h1_probs = self.h1_var.assign((sigmoid(tf.matmul(self.v_var,self.w1)  + tf.matmul(self.h2_var,self.w2,transpose_b=True) + self.bias_h1,self.temp)))			
+
+		self.update_h1 = self.h1_var.assign(self.sample(sigmoid(tf.matmul(self.v_var,self.w1)  + tf.matmul(self.h2_var,self.w2,transpose_b=True) + self.bias_h1,self.temp)))			
+		self.update_h2 = self.h2_var.assign((sigmoid(tf.matmul(self.h1_var,self.w2) + self.bias_h2,self.temp)))
+		self.update_v  =  self.v_var.assign(self.sample(sigmoid(tf.matmul(self.h1_var, (self.w1),transpose_b=True)+self.bias_v,self.temp)))
+
+		self.init_v = self.v_var.assign(self.batch_ph)
+		self.init_h2 = self.h2_var.assign(self.batch_label_ph)
 
 		### reverse feed
 		self.h2_rev      = tf.placeholder(tf.float32,[None,10],name="reverse_h2")
-		self.h1_rev_prob = sigmoid(tf.matmul(self.v, self.w1)+tf.matmul(self.h2_rev, (self.w2),transpose_b=True)+self.bias_h1,self.temp)
+		self.h1_rev_prob = sigmoid(tf.matmul(self.v, self.w1) + tf.matmul(self.h2_rev, (self.w2),transpose_b=True)+self.bias_h1,self.temp)
 		self.h1_rev      = tf.nn.relu(tf.sign(self.h1_rev_prob - tf.random_uniform(tf.shape(self.h1_rev_prob)))) 
 		self.v_rev_prob  = sigmoid(tf.matmul(self.h1_rev, (self.w1),transpose_b=True)+self.bias_v,self.temp)
 		self.v_rev       = tf.nn.relu(tf.sign(self.v_rev_prob - tf.random_uniform(tf.shape(self.v_rev_prob)))) 
@@ -543,7 +570,9 @@ class DBM_class(object):
 
 		if self.liveplot:
 			log.info("Liveplot is on!")
-			fig,ax=plt.subplots(1,1,figsize=(15,10))
+			fig,ax = plt.subplots(1,1,figsize=(15,10))
+			data   = ax.matshow(tile(self.w1.eval()),vmin=-0.01,vmax=0.01)
+			plt.colorbar(data)
 
 
 		# starting the training
@@ -557,22 +586,37 @@ class DBM_class(object):
 			train_label = shuffle(train_label, self.seed)
 
 			log.out("Running Batch")
+			log.info("Not updating bias!")
 			for start, end in zip( range(0, len(train_data), self.batchsize), range(self.batchsize, len(train_data), self.batchsize)):
 				# define a batch
 				batch = train_data[start:end]
 				batch_label = train_label[start:end]
 
-				# run all updates 
+				# assign v and h2 to the batch data
+				sess.run([self.init_v,self.init_h2],{self.batch_ph : batch,self.batch_label_ph : batch_label})
+
+				# calc h1 probabilities
+				sess.run([self.update_h1_probs])
+
+				# update the positive gradients
+				sess.run([self.update_pos_grad1,self.update_pos_grad2])
+
+				# update all layers N times (free running)
+				for n in range(10):
+					sess.run([self.update_v,self.update_h2,self.update_h1])
+
+				# calc he negatie gradients 
+				sess.run([self.update_neg_grad1,self.update_neg_grad2])
+
+
+				# run all parameter updates 
 				sess.run([	self.update_w1,
 						self.update_w2,
-						self.update_bias_v,
-						self.update_bias_h1,
-						self.update_bias_h2,
+						# self.update_bias_v,
+						# self.update_bias_h1,
+						# self.update_bias_h2,
 						],
-						feed_dict={	self.v  : batch,
-								self.h2 : batch_label,
-								self.learnrate : learnrate
-								}
+						feed_dict={self.learnrate : learnrate}
 					)
 
 
@@ -585,26 +629,29 @@ class DBM_class(object):
 				# self.F_test.append(f_test_)
 
 
-				#### add values to the tf.arrays
+				# #### add values to the tf.arrays
 				if self.m%self.num_of_skipped==0:
 					try:
 						sess.run([self.assign_arrays],
-								feed_dict={	self.v:batch,
-										self.h2:batch_label,
-										self.m_tf:self.m/self.num_of_skipped}
+								feed_dict={	self.batch_ph : batch,
+										self.m_tf:self.m / self.num_of_skipped}
 							)
 					except:
 						log.info("Error for m="+str(self.m))
+
 				# increase the learnrate
 				learnrate+=d_learnrate
 
-				self.m+=1
+				self.m += 1
 
-				
-				if self.liveplot and plt.fignum_exists(fig.number) and start%40==0:
-					ax.cla()
-					matrix_new=tile(self.w1.eval())
-					ax.matshow(matrix_new)
+				### liveplot
+				if self.liveplot and plt.fignum_exists(fig.number) and start%20==0:
+					if start%1000==0:
+						ax.cla()
+						data = ax.matshow(tile(self.w1.eval()),vmin=tile(self.w1.eval()).min()*1.2,vmax=tile(self.w1.eval()).max()*1.2)
+
+					matrix_new = tile(self.w1.eval())
+					data.set_data(matrix_new)
 					plt.pause(0.00001)
 
 
@@ -626,7 +673,7 @@ class DBM_class(object):
 		by the DBM """
 		#init the vars and reset the weights and biases 
 		
-		self.batchsize=1
+		self.batchsize=len(test_data)
 
 		# "verarsche" tf graph init weil h2 einfach nur fur die erste def gebraucht wird im graph und danach anders definiert
 		# self.h2   = tf.Variable(tf.random_uniform([len(test_data),self.shape[2]],minval=-1e-3,maxval=1e-3),name="h2")
@@ -641,30 +688,51 @@ class DBM_class(object):
 		self.import_()
 
 		log.start("Testing DBM")
-		self.test_error  = self.error.eval({self.v:test_data})
-		self.h1_act_test = self.h1_sum.eval({self.v:test_data})
-		self.h2_act_test = self.h2_sum.eval({self.v:test_data})
+		
+		# init the v layers
+		sess.run([self.init_v],{self.batch_ph : test_data})
 
-		self.probs = self.v_recon_prob.eval({self.v:test_data})
+		# update h and h2 N times
+		N = 30
+		log.out("Sampling h1 and h2 %i times"%N)
+		for n in range(N):
+			self.h1_test, self.h2_test = sess.run([self.update_h1, self.update_h2])
+
+		# update v
+		self.probs = self.v_var.eval()
+		for i in range(20):
+			self.probs += sess.run(self.update_v)
+		self.probs *= 1/21.
+
+		self.test_error  = self.error.eval({self.batch_ph : test_data})
+		self.h1_act_test = self.h1_sum.eval()
+		self.h2_act_test = self.h2_sum.eval()
+
+
+		# self.probs = self.v_recon_prob.eval({self.v:test_data})
 
 		# for i in range(5):
 		# 	self.probs =  self.v_recon_prob.eval({self.v:self.probs})
 
 		self.rec = self.v_recon.eval({self.v:self.probs})
 
-		self.rec_h1  = self.h1_recon_prob.eval({self.v:test_data})
-		self.h1_test = self.h1_prob.eval({self.v:test_data})
-		self.h2_test = self.h2_prob.eval({self.v:self.probs})
+		# self.rec_h1  = self.h1_recon_prob.eval({self.v:test_data})
+		# self.h1_test = self.h1_prob.eval({self.v:test_data})
+		# self.h2_test = self.h2_prob.eval({self.v:self.probs})
 
-		N = 20
-		self.save_means = np.zeros([N,2])
-		log.info("sampling h2 with %i steps"%N)
-		for i in range(N):
-			h1           = self.h1_rev.eval({self.v:self.probs,self.h2_rev:self.h2_test})
-			self.h2_test = self.h2_sample.eval({self.h1_place:h1})
+		
 
-			self.save_means[i,0] = np.mean(h1)
-			self.save_means[i,1] = np.mean(self.h2_test)
+		# N = 20
+		# self.save_means = np.zeros([N,2])
+		# log.info("sampling h2 with %i steps"%N)
+		# sess.run(self.v_var.assign(test_data))
+		# for i in range(N):
+		# 	# h1           = self.h1_rev.eval({self.v:self.probs,self.h2_rev:self.h2_test})
+		# 	# self.h2_test = self.h2_sample.eval({self.h1_place:h1})
+		# 	h1,self.h2_test = sess.run([self.update_h1,self.update_h2])
+			
+		# 	self.save_means[i,0] = np.mean(h1)
+		# 	self.save_means[i,1] = np.mean(self.h2_test)
 
 		# self.probs   = self.v_sample.eval({self.h1_place:h1})
 		log.end()
@@ -714,12 +782,12 @@ class DBM_class(object):
 		
 		# tf.variables_initializer([self.h2,self.v_rev], name='init_train')
 
-		self.batchsize = len(v_input)
-		h2_            = np.zeros([gibbs_steps,self.shape[2]])
+		h2_            = np.zeros([gibbs_steps,self.batchsize,self.shape[2]])
 		h1_            = np.zeros([gibbs_steps,self.shape[1]])
 		v_g_           = np.zeros([gibbs_steps,self.shape[0]])
 		temp_          = np.zeros([gibbs_steps])
 		self.energy_   = []
+		self.mean_h1   = []
 		temp           = temp_start
 		temp_delta     = (temp_end-temp_start)/gibbs_steps
 
@@ -733,43 +801,98 @@ class DBM_class(object):
 			fig,ax=plt.subplots(1,4,figsize=(15,5))
 		
 		# set v as input 
-		v_gibbs = v_input # rnd.random(v_input.shape)*0.01
+		# v_gibbs = self.v_var.eval() # rnd.random(v_input.shape)*0.01
 		
 		#calculate forward feed h2
-		h2 = self.h2_prob.eval({self.v:v_gibbs,self.temp:1.0})
-		h1 = self.h1_rev.eval({self.v:v_gibbs,self.h2_rev:h2,self.temp:temp})
 
-		self.energy_.append(-10)
+		# self.energy_[0]=-10
 
 
 
-		if mode=="sampling":
+		if mode=="context":
+			sess.run(self.v_var.assign(v_input))
+			# sess.run(self.h2_var.assign(np.reshape(modification,[1,10])))
+			h2 = self.h2_var.eval()
+			h1 = self.h1_var.eval()
+			v_gibbs = self.v_var.eval()
+
+			sess.run(self.modification_tf.assign(self.batchsize*[modification]))
+			
 			for i in range(gibbs_steps):
 				# calculate the backward and forward pass 
-				v_gibbs = self.v_rev.eval({self.v:v_gibbs, self.h2_rev:p*h2, self.temp:temp})
-				h1      = self.h1.eval({self.v:v_gibbs[-1], self.temp:temp})
-				h2      = self.h2_prob.eval({self.v:v_gibbs[-1], self.temp:temp})
+				h1, h2 = sess.run([self.update_h1_with_context,self.update_h2],{self.temp: temp})
 
-				# calc the energy
-				energy1=-np.dot(v_gibbs, np.dot(self.w1_np,h1.T))[0][0]
-				energy2=-np.dot(h1, np.dot(self.w2_np,h2.T))[0][0]
-				self.energy_.append(energy1+energy2)
+				h2_[i] = h2
+
+
+				if liveplot and self.batchsize==1:
+					# calc the energy
+					energy1=np.dot(v_gibbs, np.dot(self.w1_np,h1.T))[0]
+					energy2=np.dot(h1, np.dot(self.w2_np,h2.T))[0]
+					self.energy_.append(-(energy1+energy2))
+					# save values to array
+					
+					h1_[i]   = h1
+					v_g_[i]  = v_gibbs
+					temp_[i] = temp
 				
-				# here the h2 vector can be changed like: h2[0][1:4]=0
-				# h2[0]=modification
 
 				# assign new temp
-				temp+=temp_delta 
+				temp += temp_delta 
 
-				# save values to array
-				h2_[i]   = h2[0]
-				h1_[i]   = h1
-				v_g_[i]  = v_gibbs
-				temp_[i] = temp
+				#### for checking of the thermal equilibrium
+				# if i%100==0:
+				# 	self.mean_h1.append(np.mean(h1_[i-99:i],axis=0))
+				# 	if len(self.mean_h1)>1:
+				# 		log.out(np.mean(abs(self.mean_h1[-2]-self.mean_h1[-1])))
+	
 
+		if mode=="generate":
+			sess.run(self.h2_var.assign(v_input))
+			# sess.run(self.h2_var.assign(np.reshape(modification,[1,10])))
+			h2 = self.h2_var.eval()
+			h1 = self.h1_var.eval()
+			v_gibbs = self.v_var.eval()
+
+			sess.run(self.modification_tf.assign(self.batchsize*[modification]))
+			
+			for i in range(gibbs_steps):
+				# calculate the backward and forward pass 
+				v_gibbs, h1 = sess.run([self.update_v,self.update_h1],{self.temp: temp})
+
+				h2_[i] = h2
+
+
+				if liveplot:
+					# calc the energy
+					energy1=np.dot(v_gibbs, np.dot(self.w1_np,h1.T))[0]
+					energy2=np.dot(h1, np.dot(self.w2_np,h2.T))[0]
+					self.energy_.append(-(energy1+energy2))
+					# save values to array
+					
+					h1_[i]   = h1
+					v_g_[i]  = v_gibbs
+					temp_[i] = temp
+				
+
+				# assign new temp
+				temp += temp_delta 
+
+				#### for checking of the thermal equilibrium
+				# if i%100==0:
+				# 	self.mean_h1.append(np.mean(h1_[i-99:i],axis=0))
+				# 	if len(self.mean_h1)>1:
+				# 		log.out(np.mean(abs(self.mean_h1[-2]-self.mean_h1[-1])))
+	
+		
 			
 				
-		if mode=="context":
+		if mode=="context_old":
+			v_gibbs = v_input
+
+			h2 = self.h2_prob.eval({self.v:v_gibbs,self.temp:1.0})
+			h1 = self.h1_rev.eval({self.v:v_gibbs,self.h2_rev:h2,self.temp:temp})
+
 			for i in range(gibbs_steps):
 				# v is clamped here , calc only h1 and h2 , v_gibbs only for plotting and will not be used to calc h1 or h2
 				if liveplot:
@@ -795,7 +918,6 @@ class DBM_class(object):
 					energy1=-np.dot(v_input, np.dot(self.w1_np,h1.T))[0]
 					energy2=-np.dot(h1, np.dot(self.w2_np,h2.T))[0]
 					self.energy_.append(energy1+energy2)
-
 			
 				# assign new temp
 				temp+=temp_delta 
@@ -805,13 +927,13 @@ class DBM_class(object):
 				h1_[i]   = h1
 				v_g_[i]  = v_gibbs
 				temp_[i] = temp
+				
 
-
-		if liveplot and plt.fignum_exists(fig.number):
+		if liveplot and plt.fignum_exists(fig.number) and self.batchsize==1:
 			a0 = ax[0].matshow(v_g_[0].reshape(28,28))
 
 			a2=ax[2].matshow(h1_[0].reshape(int(sqrt(self.shape[1])),int(sqrt(self.shape[1]))))
-			a1, = ax[1].plot(h2_[0],"-o")
+			a1, = ax[1].plot(range(10),h2_[i][0],"-o")
 			a3, = ax[3].plot([],[])
 			ax[0].set_title("Visible Layer")
 			ax[2].set_title("Hidden Layer")
@@ -834,7 +956,7 @@ class DBM_class(object):
 					ax[1].set_title("Temp.: %s, Steps: %s"%(str(round(temp_[i],3)),str(i)))
 					
 					a0.set_data(v_g_[i].reshape(28,28))
-					a1.set_data(range(10),h2_[i])
+					a1.set_data(range(10),h2_[i][0])
 					
 
 					a2.set_data(h1_[i].reshape(int(sqrt(self.shape[1])),int(sqrt(self.shape[1]))))
@@ -844,8 +966,8 @@ class DBM_class(object):
 		
 			plt.close(fig)
 
-
-		return np.array(h2_)
+		# return the mean of the last 20 gibbs samples for all images
+		return np.mean(h2_[-20:,:,:],axis=0)
 
 	def export(self):
 		# convert weights and biases to numpy arrays
@@ -917,36 +1039,36 @@ class DBM_class(object):
 
 num_batches_pretrain = 1000
 dbm_batches          = 500
-pretrain_epochs      = 2
-dbm_epochs           = 20
+pretrain_epochs      = 1
+dbm_epochs           = 10
 
 
-rbm_learnrate     = 0.005
-dbm_learnrate     = 0.05
-dbm_learnrate_end = 0.01
+rbm_learnrate     = 0.001
+dbm_learnrate     = 0.001
+dbm_learnrate_end = 0.005
 
-temp = 1.0		
+temp = 0.05
 
 pre_training    = 0 	#if no pretrain then files are automatically loaded
 
-training        = 0
+training        = 1
 testing         = 1
 plotting        = 1
 gibbs_sampling  = 0
 noise_stab_test = 0
 
-save_to_file          = 0 	# only save biases and weights for further training
+save_to_file          = 1 	# only save biases and weights for further training
 save_all_params       = 0	# also save all test data and reconstructed images (memory heavy)
 save_pretrained       = 0
 
 load_from_file        = 1
-pathsuffix            = "Sun Feb 11 20-20-39 2018"#"Thu Jan 18 20-04-17 2018 80 epochen"
-pathsuffix_pretrained = "Thu Jan 25 11-28-08 2018"
+pathsuffix            = "Wed Feb 28 14-25-46 2018"#"Sun Feb 11 20-20-39 2018"#"Thu Jan 18 20-04-17 2018 80 epochen"
+pathsuffix_pretrained = "Tue Feb 27 19-58-15 2018"
 
 
 number_of_layers = 3
 n_first_layer    = 784
-n_second_layer   = 15*15
+n_second_layer   = 20*20
 n_third_layer    = 10
 
 saveto_path=data_dir+"/"+time_now
@@ -960,9 +1082,8 @@ if len(additional_args)>0:
 ######### DBM ##########################################################################
 #### Pre training is ended - create the DBM with the gained weights
 # if i == 0,1,2,...: (das ist das i von der echo cluster schleife) in der dbm class stehen dann die parameter fur das jeweilige i 
-DBM = DBM_class(	shape=[n_first_layer,n_second_layer,n_third_layer],
-			liveplot=1
-			)
+DBM = DBM_class(	shape    = [n_first_layer,n_second_layer,n_third_layer],
+			liveplot = 0 )
 
 ####################################################################################################################################
 #### Sessions ####
@@ -993,7 +1114,7 @@ for i in range(1):
 			log.start("Test Session")
 			# new session for test images - v has 10.000 length 
 			#testing the network , this also inits the graph so do not comment it out
-			DBM.test(test_data) 
+			DBM.test(test_data)
 			# DBM.test(test_data_noise) 
 
 
@@ -1007,109 +1128,121 @@ if gibbs_sampling:
 		if load_from_file and not training:
 			DBM.load_from_file(workdir+"/data/"+pathsuffix)
 
-		DBM.batchsize=1
+		p = 1 # (unused) multiplication for modification context array 
+
+		index_for_number_gibbs=[]
+		# loop through images from test_data and find al images that are <5 
+		for i in range(18,19):			
+			## find the digit that was presented
+			digit=np.where(test_label[i])[0][0] 		
+			## set desired digit range
+			if digit<5:
+				index_for_number_gibbs.append(i)
+		log.info("Found %i Images"%len(index_for_number_gibbs))
+
+		# create graph 
+		DBM.batchsize=len(index_for_number_gibbs)
+		if DBM.batchsize==0:
+			raise ValueError("No Images found")
+
 		DBM.graph_init("gibbs")
 		DBM.import_()
 
+		h2_no_context=DBM.gibbs_sampling([[1,0,0,0,0,0,0,0,0,0]], 1000, 0.05 , 0.05, 
+							mode         = "generate",
+							modification = [0,0,0,1,0,0,0,0,0,0],
+							p            = p,
+							liveplot     = 1)
+		
+		# calculte h2 firerates over all gibbs_steps 
+		log.start("Sampling data")
+		h2_no_context=DBM.gibbs_sampling(test_data[index_for_number_gibbs[:]], 200, 0.05 , 0.05, 
+							mode         = "context",
+							modification = [1,1,1,1,1,1,1,1,1,1],
+							p            = p,
+							liveplot     = 1)
+			
+		# with context
+		h2_context=DBM.gibbs_sampling(test_data[index_for_number_gibbs[:]], 200, 0.05 , 0.05, 
+							mode         = "context",
+							modification = [2,2,2,2,2,0,0,0,0,0],
+							p            = p,
+							liveplot     = 0)
+		log.end()
 
-		dd_c  = []
-		dd_nc = []
-		wd_c  = []
-		wd_nc = []
+		# append h2 activity to array, but only the unit that corresponst to the given digit picture
+		desired_digits_c  = []
+		desired_digits_nc = []
+		wrong_digits_c    = []
+		wrong_digits_nc   = []
+		
+		correct_maxis_c    = []
+		correct_maxis_nc   = []
+		incorrect_maxis_c  = []
+		incorrect_maxis_nc = []
+		
 
+		for i,d in enumerate(index_for_number_gibbs):
+			digit = np.where(test_label[d])[0][0]
 
-		for p in [1]:
-			log.start("p =",p) 
-			# arrays for h2 act without context
-			desired_digits_c  = []
-			wrong_digits_c    = []
-			# arrays for h2 act without context 
-			desired_digits_nc = []
-			wrong_digits_nc   = []
+			### count how many got right (with context)
+			maxi_c    = h2_context[i].max()
+			max_pos_c = np.where(h2_context[i] == maxi_c)[0][0]
+			if max_pos_c == digit:
+				correct_maxis_c.append(maxi_c)
+			else:
+				incorrect_maxis_c.append(maxi_c)
 
-			check_wrongs=[]
-			n_wrongs_nc=0
-			n_wrongs_c=0
+			### count how many got right (no context)
+			maxi_nc    = h2_no_context[i].max()
+			max_pos_nc = np.where(h2_no_context[i] == maxi_nc)[0][0]			
+			if max_pos_nc == digit:
+				correct_maxis_nc.append(maxi_nc)
+			else:
+				incorrect_maxis_nc.append(maxi_nc)
 
-			# loop through images from test_data
-			for i in range(0,4):
-				if i%50==0:
-					log.out("i =",i)
-				## find the digit that was presented
-				digit=np.where(test_label[i])[0][0] 
-				## set desired digit range
-				if digit<5:
-					# calculte h2 firerates over all gibbs_steps with no context
-					h2_no_context=DBM.gibbs_sampling(test_data[i:i+1], 300, 0.8 , 0.8, 
-										mode         = "sampling", 
-										modification = np.array([0,0,1,0,0,0,0,0,0,0]),
-										p            = p,
-										liveplot     = 1)
-					# with context
-					h2_context=DBM.gibbs_sampling(test_data[i:i+1], 200, 1.6 , 0.8, 
-										mode         = "context",
-										modification = np.array([1,1,1,1,1,0,0,0,0,0]),
-										p            = p,
-										liveplot     = 0)
-					
-					# append h2 activity to array, but only the unit that corresponst to the given digit picture
-					desired_digits_c.append(h2_context[:,digit])
-					desired_digits_nc.append(h2_no_context[:,digit])
-					# append all other h2 activities 
-					for j in range(10):
-						if j!=digit:
-							wrong_digits_c.append(h2_context[:,j])
-							wrong_digits_nc.append(h2_no_context[:,j])
+			desired_digits_c.append(h2_context[i,digit])
+			desired_digits_nc.append(h2_no_context[i,digit])
 
-					# check if h2 has classified digits over 4
-					check_wrongs.append(h2_no_context[-1][5:].max())
+			wrong_digits_c.append(np.mean(h2_context[i,digit+1:])+np.mean(h2_context[i,:digit]))
+			wrong_digits_nc.append(np.mean(h2_no_context[i,digit+1:])+np.mean(h2_context[i,:digit]))
 
-					# set the last activity of h2 to 1 where the maximum was and otherwise to 0
-					h2_nc=np.mean(h2_no_context[-20:][:],axis=0)==np.mean(h2_no_context[-20:][:],axis=0).max()
-					h2_c=np.mean(h2_context[-20:][:],axis=0)==np.mean(h2_context[-20:][:],axis=0).max()
-					#look if the digit got classified wrong
-					n_wrongs_nc+=np.sum(h2_nc!=test_label[i])/2
-					n_wrongs_c+=np.sum(h2_c!=test_label[i])/2
-
-			log.out("N Processed images: ",len(check_wrongs))
-			log.out("N wrong classified W/C: ",n_wrongs_c)
-			log.out("N wrong classified W/outC: ",n_wrongs_nc)
-			log.out("With Context:")
-			log.info("Desired Digits_mean:\t",round(np.mean(desired_digits_c),5))
-			log.info("Wrong Digits_mean:\t",round(np.mean(wrong_digits_c),5))
-			log.out("Without Context")
-			log.info("Desired Digits_mean:\t",round(np.mean(desired_digits_nc),5))
-			log.info("Wrong Digits_mean:\t",round(np.mean(wrong_digits_nc),5))
-
-			dd_c.append(np.round(np.mean(desired_digits_c),4))
-			dd_nc.append(np.round(np.mean(desired_digits_nc),4))
-			wd_c.append(np.round(np.mean(wrong_digits_c),4))
-			wd_nc.append(np.round(np.mean(wrong_digits_nc),4))
-			# clac how many digits got badly classified
-			wrong_class_nc = [np.sum(np.array(desired_digits_nc)[:,-1]<i) for i in np.linspace(0,1,100)]
-			wrong_class_c  = [np.sum(np.array(desired_digits_c)[:,-1]<i)  for i in np.linspace(0,1,100)]
+		log.info("Inorrect Context:" , len(incorrect_maxis_c))
+		log.info("Inorrect No Context:" , len(incorrect_maxis_nc))
+		log.info("Diff:     ",abs(len(incorrect_maxis_c)-len(incorrect_maxis_nc)))
 
 
-			log.end()
 
-		### plot
-		fig_gs,ax_gs = plt.subplots(2,1,sharex="all")
-		for i in range(len(desired_digits_c)):
-			ax_gs[0].plot(smooth(desired_digits_c[i],20))
-			ax_gs[1].plot(smooth(desired_digits_nc[i],20))
-			ax_gs[0].set_title("Desired Digit with Context")
-			ax_gs[1].set_title("Desired Digit without Context")
-			ax_gs[0].set_ylim(0,1)
-			ax_gs[1].set_ylim(0,1)
-			plt.xlabel("gibbs_steps")
-			ax_gs[0].set_ylabel("Probability")
-			ax_gs[1].set_ylabel("Probability")
+		# calc how many digits got badly classified under a threshold 
+		wrong_class_nc = [np.sum(np.array(desired_digits_nc)[:]<i) for i in np.linspace(0,1,1000)]
+		wrong_class_c  = [np.sum(np.array(desired_digits_c)[:]<i)  for i in np.linspace(0,1,1000)]
+
+		wrong_class_nc2 = [np.sum(np.array(wrong_digits_nc)[:]>i) for i in np.linspace(0,1,1000)]
+		wrong_class_c2  = [np.sum(np.array(wrong_digits_c)[:]>i)  for i in np.linspace(0,1,1000)]
+
+
+		# 	log.end()
+
+		# ### plot
+		# fig_gs,ax_gs = plt.subplots(2,1,sharex="all")
+		# for i in range(len(desired_digits_c)):
+		# 	ax_gs[0].plot((desired_digits_c[i]))
+		# 	ax_gs[1].plot((desired_digits_nc[i]))
+		# 	ax_gs[0].set_title("Desired Digit with Context")
+		# 	ax_gs[1].set_title("Desired Digit without Context")
+		# 	ax_gs[0].set_ylim(0,1)
+		# 	ax_gs[1].set_ylim(0,1)
+		# 	plt.xlabel("gibbs_steps")
+		# 	ax_gs[0].set_ylabel("Probability")
+		# 	ax_gs[1].set_ylabel("Probability")
 
 		plt.figure()
-		plt.plot(np.linspace(0,1,100),wrong_class_c,"-",label="With Context")
-		plt.plot(np.linspace(0,1,100),wrong_class_nc,"-",label="Without Context")
-		plt.title("How many digits got classified below Threshhold")
-		plt.xlabel("Threshhold")
+		plt.plot(np.linspace(0,1,1000),wrong_class_c,"-",label="With Context")
+		plt.plot(np.linspace(0,1,1000),wrong_class_nc,"-",label="Without Context")
+		plt.plot(np.linspace(0,1,1000),wrong_class_c2,"-",label="With Context / Mean")
+		plt.plot(np.linspace(0,1,1000),wrong_class_nc2,"-",label="Without Context / Mean")
+		plt.title("How many digits got classified below Threshold")
+		plt.xlabel("Threshold")
 		plt.ylabel("Number of Digits")
 		plt.legend(loc="best")
 
@@ -1139,6 +1272,19 @@ if training and save_to_file:
 #### Plot
 # Plot the Weights, Errors and other informations
 if plotting:
+	# plot "receptive fields"
+	for i in range(10):
+		h2=[0,0,0,0,0,0,0,0,0,0]
+		h2[i]=1
+		for n in range(10):
+			h1_=sigmoid_np(np.dot(h2, DBM.w2_np.T),temp)
+			h1_[np.where(h1_<0.7)] = 0
+		
+		v = (np.dot(DBM.w1_np,h1_.T))
+		plt.matshow(v.reshape(28,28))
+		plt.title(str(i))
+		
+
 	log.out("Plotting...")
 	map1=plt.matshow(tile(DBM.w1_np),cmap="gray")
 	plt.colorbar(map1)
