@@ -149,10 +149,18 @@ def init_pretrained(name_extension="0.0651765",w=None,bias_v=None,bias_h=None):
 	return m
 
 def sigmoid(x,T):
-	return 1./(1.+tf.exp(-1./T*x))
+	return 1./tf.add(1.,tf.exp(-tf.multiply(1./T,x)))
 
 def sigmoid_np(x,T):
     return 1./(1.+np.exp(-1./T*x))
+
+
+def clamp(x,x_min,x_max):
+    if x>x_max:
+        x=x_max
+    if x<x_min:
+        x=x_min
+    return x
 
 
 def shuffle(x,seed):
@@ -168,3 +176,50 @@ def shuffle(x,seed):
         y[i]=y[j]
         y[j]=_saved_i_
     return y
+
+def sort_receptive_field(m):
+    """ tries to order every receptive field to its maximum location"""
+    w       = np.copy(tile(m))
+    w_new   = np.zeros(w.shape)
+    pos_max = []
+    n       = 0
+    im_size=int(sqrt(m.shape[0]))
+    for i in range(0,w.shape[0],im_size):
+        for j in range(0,w.shape[1],im_size):
+            switch = 0
+            maxi   = abs(w[i:i+im_size,j:j+im_size]).max()
+            npw    = np.where(abs(w[i:i+im_size,j:j+im_size]) == maxi)
+            pos_max.append([i,j,[npw[0][0],npw[1][0]]])
+
+            # calc index where the images needs to be moved
+            move_to = [int((pos_max[-1][2][0]*40./im_size)-10)*im_size, 
+                        int((pos_max[-1][2][1]*40./im_size)-10)*im_size]
+            if maxi>w.max()*0.25:
+                move_to[0]=clamp(move_to[0],0,w.shape[0])
+                move_to[1]=clamp(move_to[1],0,w.shape[0])
+            else:
+                # if maimum not big enough just try to move to the mid field
+                move_to[0]=w.shape[0]/2
+                move_to[1]=w.shape[1]/2
+
+            # iterate many tries
+            for k in range(im_size):
+                for m in range(im_size):
+                    for vor1 in [1,-1]:
+                        for vor2 in [-1,1]:
+
+                            if switch==0:
+                                        
+                                x=move_to[0]+vor1*(k*im_size)
+                                y=move_to[1]+vor2*(m*im_size)                
+                                #check if place is already used
+                                
+                                if w_new[x:x+im_size,y:y+im_size].mean()==0:
+                                    # move image 
+                                    w_new[x:x+im_size,y:y+im_size]=w[i:i+im_size,j:j+im_size]
+                                    # switch for breaking the tries
+                                    switch=1
+            if switch==0:
+                n+=1
+    return w_new
+

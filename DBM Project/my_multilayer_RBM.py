@@ -299,13 +299,14 @@ class DBM_class(object):
 	def load_from_file(self,path):
 		os.chdir(path)
 		log.out("Loading data from:","...",path[-20:])
-		self.w1_np=np.loadtxt("w1.txt")
-		self.w2_np=np.loadtxt("w2.txt")
-		# self.w3_np=np.loadtxt("w3.txt")
-		self.bias1_np=np.loadtxt("bias1.txt")
-		self.bias2_np=np.loadtxt("bias2.txt")
-		self.bias3_np=np.loadtxt("bias3.txt")
-		# self.bias4_np=np.loadtxt("bias4.txt")
+		self.w1_np      = np.loadtxt("w1.txt")
+		self.w1_np_old  = self.w1_np #save weights for later comparison
+		self.w2_np      = np.loadtxt("w2.txt")
+		# self.w3_np    = np.loadtxt("w3.txt")
+		self.bias1_np   = np.loadtxt("bias1.txt")
+		self.bias2_np   = np.loadtxt("bias2.txt")
+		self.bias3_np   = np.loadtxt("bias3.txt")
+		# self.bias4_np = np.loadtxt("bias4.txt")
 		os.chdir(workdir)
 
 	
@@ -345,21 +346,25 @@ class DBM_class(object):
 		"""
 		log.out("Initializing graph")
 		
+
 		self.v  = tf.placeholder(tf.float32,[None,self.shape[0]],name="Visible-Layer") # has self.shape [number of images per batch,number of visible units]
 
-		self.batch_ph  = tf.placeholder(tf.float32,[self.batchsize,None],name="Batch_placeholder")
-		self.batch_label_ph  = tf.placeholder(tf.float32,[self.batchsize,None],name="Batchlabel_placeholder")
+		self.batch_ph       = tf.placeholder(tf.float32,[self.batchsize,None],name="Batch_placeholder")
+		self.batch_label_ph = tf.placeholder(tf.float32,[self.batchsize,None],name="Batchlabel_placeholder")
 
 		if graph_mode=="training":
+			# h2 and other stuff is plaveholder if training
 			self.m_tf      = tf.placeholder(tf.int32,[],name="running_array_index")
 			self.h2        = tf.placeholder(tf.float32,[None,self.shape[2]],name="placeholder_h2")
 			self.learnrate = tf.placeholder(tf.float32,[],name="Learnrate")
 
+			# arrays for saving progress
 			self.h1_activity_ = tf.Variable(tf.zeros([self.num_of_updates/self.num_of_skipped]))
 			self.h2_activity_ = tf.Variable(tf.zeros([self.num_of_updates/self.num_of_skipped]))
 			self.train_error_ = tf.Variable(tf.zeros([self.num_of_updates/self.num_of_skipped]))
 			self.w1_mean_     = tf.Variable(tf.zeros([self.num_of_updates/self.num_of_skipped]))
 
+			# gradients for update of Weights
 			self.pos_grad1 = tf.Variable(tf.zeros([self.shape[0],self.shape[1]]))
 			self.neg_grad1 = tf.Variable(tf.zeros([self.shape[0],self.shape[1]]))
 
@@ -367,28 +372,22 @@ class DBM_class(object):
 			self.neg_grad2 = tf.Variable(tf.zeros([self.shape[1],self.shape[2]]))
 
 
-			#self.CD1_mean_    = tf.Variable(tf.zeros([self.num_of_updates/self.num_of_skipped]))
-			#self.CD2_mean_    = tf.Variable(tf.zeros([self.num_of_updates/self.num_of_skipped]))		
-
-
-		# create vars for each layer that get assignt for sampling
+		#### create vars for each layer that get assigned for sampling
 		self.v_var   = tf.Variable(tf.random_uniform([self.batchsize,self.shape[0]],minval=-1e-3,maxval=1e-3),name="v_var")
 		self.h1_var  = tf.Variable(tf.random_uniform([self.batchsize,self.shape[1]],minval=-1e-3,maxval=1e-3),name="h1_var")
 		self.h2_var  = tf.Variable(tf.random_uniform([self.batchsize,self.shape[2]],minval=-1e-3,maxval=1e-3),name="h2_var")
+		# modification array size 10 that gehts multiplied to the label vector for context
 		self.modification_tf = tf.Variable(tf.ones([self.batchsize,self.shape[2]]),name="Modification")
-		
-			# self.v_rev = tf.Variable(tf.random_uniform([self.batchsize,self.shape[0]],minval=-1e-3,maxval=1e-3),name="v_rev_init")
-
-			# tf.variables_initializer([self.h2_var], name='init_train')
-
+		# init vars with batches
+		self.init_v  = self.v_var.assign(self.batch_ph)
+		self.init_h2 = self.h2_var.assign(self.batch_label_ph)
 
 			
-			
+		#### temperature
 		if graph_mode=="gibbs":
 			self.temp = tf.placeholder(tf.float32,[],name="Temperature")
 		else:
 			self.temp = temp
-
 
 
 		### Parameters 
@@ -399,61 +398,39 @@ class DBM_class(object):
 		self.bias_h1 = tf.Variable(tf.zeros([self.shape[1]]), name="Hidden-Bias")
 		self.bias_h2 = tf.Variable(tf.zeros([self.shape[2]]), name="Hidden-Bias")
 
-	
-		### Propagation
-		## Forward Feed
-		# h1 gets both inputs from h2 and v
-		self.h1_prob = sigmoid(tf.matmul(self.v,self.w1) + tf.matmul(self.h2_var,self.w2,transpose_b=True) + self.bias_h1,self.temp)
-		self.h1      = self.sample(self.h1_prob)
-		
-		# h2 only from h1
-		if graph_mode == "testing" or graph_mode == "gibbs":
-			self.h2_prob = sigmoid(tf.matmul(self.h1,self.w2) + self.bias_h2,self.temp)
-			self.h2      = self.sample(self.h2_prob)
 
-		## Backward Feed   
-		self.h1_recon_prob = sigmoid(tf.matmul(self.v_var,self.w1)+tf.matmul(self.h2_var,self.w2,transpose_b=True)+self.bias_h1, self.temp)
-		self.h1_recon      = self.sample(self.h1_recon_prob)
-		self.v_recon_prob  = sigmoid(tf.matmul(self.h1_recon,self.w1,transpose_b=True)+self.bias_v, self.temp)
-		self.v_recon       = self.sample(self.v_recon_prob)
-
-		## Gibbs step 
-		self.h1_gibbs_prob = sigmoid(tf.matmul(self.v_recon_prob,self.w1) + tf.matmul(self.h2,self.w2,transpose_b=True) + self.bias_h1,self.temp)
-		self.h1_gibbs      = self.sample(self.h1_gibbs_prob)
-		self.h2_gibbs_prob = sigmoid(tf.matmul(self.h1_recon_prob,self.w2), self.temp)
-		self.h2_gibbs      = self.sample(self.h2_gibbs_prob)
-
-		
-		## Backward Feed 2
-		self.h1_recon_prob2 = sigmoid(tf.matmul(self.v_recon,self.w1)+tf.matmul(self.h2_gibbs,self.w2,transpose_b=True)+self.bias_h1, self.temp)
-		self.h1_recon2      = self.sample(self.h1_recon_prob2)
-		self.v_recon_prob2  = sigmoid(tf.matmul(self.h1_recon2,self.w1,transpose_b=True)+self.bias_v, self.temp)
-		self.v_recon2       = self.sample(self.v_recon_prob2)
-
-		## Gibbs step 2
-		self.h1_gibbs_prob2 = sigmoid(tf.matmul(self.v_recon_prob2,self.w1) + tf.matmul(self.h2_gibbs,self.w2,transpose_b=True) + self.bias_h1,self.temp)
-		self.h1_gibbs2      = self.sample(self.h1_gibbs_prob2)
-		self.h2_gibbs_prob2 = sigmoid(tf.matmul(self.h1_recon_prob2,self.w2), self.temp)
-		self.h2_gibbs2      = self.sample(self.h2_gibbs_prob2)
-
-		
-		#Error and stuff
+		### Error and stuff
 		self.error  = tf.reduce_mean(tf.square(self.batch_ph-self.v_var))
 		self.h1_sum = tf.reduce_sum(self.h1_var)
 		self.h2_sum = tf.reduce_sum(self.h2_var)
 		self.free_energy = -tf.reduce_sum(tf.log(1+tf.exp(tf.matmul(self.v,self.w1)+self.bias_h1)))
 
+
+		#### updates for each layer 
+		self.update_h1_with_context = self.h1_var.assign(self.sample(sigmoid(tf.matmul(self.v_var,self.w1)  + tf.matmul(tf.multiply(self.h2_var,self.modification_tf),self.w2,transpose_b=True) + self.bias_h1,self.temp)))
+		self.update_h1_probs = self.h1_var.assign((sigmoid(tf.matmul(self.v_var,self.w1)  + tf.matmul(self.h2_var,self.w2,transpose_b=True) + self.bias_h1,self.temp)))			
+
+		self.update_h1 = tf.assign(self.h1_var,
+						self.sample(sigmoid(tf.matmul(self.v_var,self.w1)  + tf.matmul(self.h2_var,self.w2,transpose_b=True) + self.bias_h1,self.temp)),
+						validate_shape=False)		
+		self.update_h2 = tf.assign(self.h2_var,
+						(sigmoid(tf.matmul(self.h1_var,self.w2) + self.bias_h2,self.temp)),
+						validate_shape=False)
+		self.update_v  = tf.assign(self.v_var ,
+						self.sample(sigmoid(tf.matmul(self.h1_var, (self.w1),transpose_b=True)+self.bias_v,self.temp)),
+						validate_shape=False)
+
+
+		
+		### Training with contrastive Divergence
 		if graph_mode=="training":
-			### Training with contrastive Divergence
-			
 			#first weight matrix
 			self.update_pos_grad1 = self.pos_grad1.assign(tf.matmul(self.v_var, self.h1_var,transpose_a=True))
 			self.update_neg_grad1 = self.neg_grad1.assign(tf.matmul(self.v_var, self.h1_var,transpose_a=True))
 			self.numpoints1       = tf.cast(tf.shape(self.v_var)[0],tf.float32) #number of train inputs per batch (for averaging the CD matrix -> see practical paper by hinton)
 			# self.weight_decay1  = tf.reduce_sum(tf.abs(self.w1))*0.00001
 			self.CD1              = (self.pos_grad1 - self.neg_grad1)/self.numpoints1
-			# self.CD1_mean       = tf.reduce_mean(tf.squa1,tf.squa2re(self.CD1))
-			self.update_w1        = self.w1.assign(self.w1+self.learnrate*self.CD1)
+			self.update_w1        = self.w1.assign_add(self.learnrate*self.CD1)
 			self.mean_w1          = tf.reduce_mean(tf.square(self.w1))
 			
 			# second weight matrix
@@ -461,46 +438,52 @@ class DBM_class(object):
 			self.update_neg_grad2 = self.neg_grad2.assign(tf.matmul(self.h1_var, self.h2_var,transpose_a=True))
 			self.numpoints2       = tf.cast(tf.shape(self.h2_var)[0],tf.float32) #number of train inputs per batch (for averaging the CD matrix -> see practical paper by hinton)
 			self.CD2              = (self.pos_grad2 - self.neg_grad2)/self.numpoints2
-			# self.CD2_mean       = tf.reduce_mean(tf.square(self.CD2))
-			self.update_w2        = self.w2.assign(self.w2+self.learnrate*self.CD2)
+			self.update_w2        = self.w2.assign_add(self.learnrate*self.CD2)
 
-			# bias updates
-			self.update_bias_h1 = self.bias_h1.assign(self.bias_h1+self.learnrate*tf.reduce_mean(self.h1_var-self.h1_gibbs,0))
-			self.update_bias_h2 = self.bias_h2.assign(self.bias_h2+self.learnrate*tf.reduce_mean(self.h2_var-self.h2_gibbs,0))
-			self.update_bias_v  = self.bias_v.assign(self.bias_v+self.learnrate*tf.reduce_mean(self.v_var-self.v_recon,0))
-		
+			# bias updates (unused)
+			# self.update_bias_h1 = self.bias_h1.assign(tf.add(self.bias_h1,tf.multiply(self.learnrate,tf.reduce_mean(tf.subtract(self.h1_var,self.h1_gibbs),0))))
+			# self.update_bias_h2 = self.bias_h2.assign(tf.add(self.bias_h2,tf.multiply(self.learnrate,tf.reduce_mean(tf.subtract(self.h2_var,self.h2_gibbs),0))))
+			# self.update_bias_v  = self.bias_v.assign(tf.add(self.bias_v,tf.multiply(self.learnrate,tf.reduce_mean(tf.subtract(self.v_var,self.v_recon),0))))
 		
 		
 			self.assign_arrays =	[tf.scatter_update(self.train_error_,self.m_tf,self.error),
-							 #tf.scatter_update(self.CD1_mean_,self.m_tf,self.CD1_mean),
-							 #tf.scatter_update(self.CD2_mean_,self.m_tf,self.CD2_mean),
 							 tf.scatter_update(self.w1_mean_,self.m_tf,self.mean_w1),
 							 tf.scatter_update(self.h1_activity_,self.m_tf,self.h1_sum),
-							 # tf.scatter_update(self.h2_activity_,self.m_tf,self.h2_sum),
 							]
+		### Propagation (old)
+		## Forward Feed
+		# h1 gets both inputs from h2 and v
+		# self.h1_prob = sigmoid(tf.matmul(self.v,self.w1) + tf.matmul(self.h2_var,self.w2,transpose_b=True) + self.bias_h1,self.temp)
+		# self.h1      = self.sample(self.h1_prob)
+		
+		# # h2 only from h1
+		# if graph_mode == "testing" or graph_mode == "gibbs":
+		# 	self.h2_prob = sigmoid(tf.matmul(self.h1,self.w2) + self.bias_h2,self.temp)
+		# 	self.h2      = self.sample(self.h2_prob)
 
-		# updates for each layer (for computing everything "per hand")
-		self.update_h1_with_context = self.h1_var.assign(self.sample(sigmoid(tf.matmul(self.v_var,self.w1)  + tf.matmul(tf.multiply(self.h2_var,self.modification_tf),self.w2,transpose_b=True) + self.bias_h1,self.temp)))
-		self.update_h1_probs = self.h1_var.assign((sigmoid(tf.matmul(self.v_var,self.w1)  + tf.matmul(self.h2_var,self.w2,transpose_b=True) + self.bias_h1,self.temp)))			
+		# ## Backward Feed   
+		# self.h1_recon_prob = sigmoid(tf.matmul(self.v_var,self.w1)+tf.matmul(self.h2_var,self.w2,transpose_b=True)+self.bias_h1, self.temp)
+		# self.h1_recon      = self.sample(self.h1_recon_prob)
+		# self.v_recon_prob  = sigmoid(tf.matmul(self.h1_recon,self.w1,transpose_b=True)+self.bias_v, self.temp)
+		# self.v_recon       = self.sample(self.v_recon_prob)
 
-		self.update_h1 = self.h1_var.assign(self.sample(sigmoid(tf.matmul(self.v_var,self.w1)  + tf.matmul(self.h2_var,self.w2,transpose_b=True) + self.bias_h1,self.temp)))			
-		self.update_h2 = self.h2_var.assign((sigmoid(tf.matmul(self.h1_var,self.w2) + self.bias_h2,self.temp)))
-		self.update_v  =  self.v_var.assign(self.sample(sigmoid(tf.matmul(self.h1_var, (self.w1),transpose_b=True)+self.bias_v,self.temp)))
+		# ## Gibbs step 
+		# self.h1_gibbs_prob = sigmoid(tf.matmul(self.v_recon_prob,self.w1) + tf.matmul(self.h2,self.w2,transpose_b=True) + self.bias_h1,self.temp)
+		# self.h1_gibbs      = self.sample(self.h1_gibbs_prob)
+		# self.h2_gibbs_prob = sigmoid(tf.matmul(self.h1_recon_prob,self.w2), self.temp)
+		# self.h2_gibbs      = self.sample(self.h2_gibbs_prob)
 
-		self.init_v = self.v_var.assign(self.batch_ph)
-		self.init_h2 = self.h2_var.assign(self.batch_label_ph)
+		### reverse feed (old)
+		# self.h2_rev      = tf.placeholder(tf.float32,[None,10],name="reverse_h2")
+		# self.h1_rev_prob = sigmoid(tf.matmul(self.v, self.w1) + tf.matmul(self.h2_rev, (self.w2),transpose_b=True)+self.bias_h1,self.temp)
+		# self.h1_rev      = tf.nn.relu(tf.sign(self.h1_rev_prob - tf.random_uniform(tf.shape(self.h1_rev_prob)))) 
+		# self.v_rev_prob  = sigmoid(tf.matmul(self.h1_rev, (self.w1),transpose_b=True)+self.bias_v,self.temp)
+		# self.v_rev       = tf.nn.relu(tf.sign(self.v_rev_prob - tf.random_uniform(tf.shape(self.v_rev_prob)))) 
 
-		### reverse feed
-		self.h2_rev      = tf.placeholder(tf.float32,[None,10],name="reverse_h2")
-		self.h1_rev_prob = sigmoid(tf.matmul(self.v, self.w1) + tf.matmul(self.h2_rev, (self.w2),transpose_b=True)+self.bias_h1,self.temp)
-		self.h1_rev      = tf.nn.relu(tf.sign(self.h1_rev_prob - tf.random_uniform(tf.shape(self.h1_rev_prob)))) 
-		self.v_rev_prob  = sigmoid(tf.matmul(self.h1_rev, (self.w1),transpose_b=True)+self.bias_v,self.temp)
-		self.v_rev       = tf.nn.relu(tf.sign(self.v_rev_prob - tf.random_uniform(tf.shape(self.v_rev_prob)))) 
-
-		#test sample
-		self.h1_place  = tf.placeholder(tf.float32,[None,self.shape[1]],name="h1_placeholder")
-		self.h2_sample = sigmoid(tf.matmul(self.h1_place,self.w2) + self.bias_h2, self.temp)
-		self.v_sample  = sigmoid(tf.matmul(self.h1_place,self.w1,transpose_b=True) + self.bias_v, self.temp)
+		#test sample (old)
+		# self.h1_place  = tf.placeholder(tf.float32,[None,self.shape[1]],name="h1_placeholder")
+		# self.h2_sample = sigmoid(tf.matmul(self.h1_place,self.w2) + self.bias_h2, self.temp)
+		# self.v_sample  = sigmoid(tf.matmul(self.h1_place,self.w1,transpose_b=True) + self.bias_v, self.temp)
 
 		sess.run(tf.global_variables_initializer())
 		self.init_state=1
@@ -539,7 +522,7 @@ class DBM_class(object):
 		
 		return np.array(h2_),v_noise_recon
 
-	def train(self,train_data,train_label,epochs,num_batches,learnrate,cont):
+	def train(self,train_data,train_label,epochs,num_batches,learnrate,N,cont):
 		""" training the DBM with given h2 as labels """
 		# init all vars for training
 		self.batchsize      = int(55000/num_batches)
@@ -587,6 +570,7 @@ class DBM_class(object):
 
 			log.out("Running Batch")
 			log.info("Not updating bias!")
+			log.info("Freerunning for %i steps"%N)
 			for start, end in zip( range(0, len(train_data), self.batchsize), range(self.batchsize, len(train_data), self.batchsize)):
 				# define a batch
 				batch = train_data[start:end]
@@ -602,7 +586,7 @@ class DBM_class(object):
 				sess.run([self.update_pos_grad1,self.update_pos_grad2])
 
 				# update all layers N times (free running)
-				for n in range(10):
+				for n in range(N):
 					sess.run([self.update_v,self.update_h2,self.update_h1])
 
 				# calc he negatie gradients 
@@ -668,84 +652,59 @@ class DBM_class(object):
 		self.export()
 
 
-	def test(self,test_data):
+	def test(self,test_data,N,M):
 		""" testing runs without giving h2 , only v is given and h2 has to be infered 
-		by the DBM """
-		#init the vars and reset the weights and biases 
-		
+		by the DBM 
+		test_data :: images to test, get assigned to v layer
+		N :: Number of updates from hidden layers 
+		M :: Number of samples taken to reconstruct the image
+		"""
+		#init the vars and reset the weights and biases 		
 		self.batchsize=len(test_data)
 
-		# "verarsche" tf graph init weil h2 einfach nur fur die erste def gebraucht wird im graph und danach anders definiert
-		# self.h2   = tf.Variable(tf.random_uniform([len(test_data),self.shape[2]],minval=-1e-3,maxval=1e-3),name="h2")
-		# self.v_rev   = tf.Variable(tf.random_uniform([len(test_data),self.shape[0]],minval=-1e-3,maxval=1e-3),name="v_rev_init")
-		# tf.variables_initializer([self.h2,self.v_rev], name='init_train')
-
+		### init the graph 
 		if load_from_file and not training:
 			self.load_from_file(workdir+"/data/"+pathsuffix)
-
 		self.graph_init("testing") # "testing" because this graph creates the testing variables where only v is given, not h2
-
 		self.import_()
 
+
+		#### start test run
 		log.start("Testing DBM")
 		
-		# init the v layers
+		#### give input to v layer
 		sess.run([self.init_v],{self.batch_ph : test_data})
 
-		# update h and h2 N times
-		N = 30
+		#### update h and h2 N times
 		log.out("Sampling h1 and h2 %i times"%N)
 		for n in range(N):
 			self.h1_test, self.h2_test = sess.run([self.update_h1, self.update_h2])
 
-		# update v
-		self.probs = self.v_var.eval()
-		for i in range(20):
-			self.probs += sess.run(self.update_v)
-		self.probs *= 1/21.
+			### here a check for equilibrium could be added
 
+		#### update v
+		self.probs = self.v_var.eval()
+		for i in range(M):
+			self.probs += sess.run(self.update_v)
+		self.probs *= 1./(M+1)
+
+		#### calculate errors and activations
 		self.test_error  = self.error.eval({self.batch_ph : test_data})
+		self.test_error_.append(self.test_error) #append to errors if called multiple times
+		# error of classifivation labels
+		self.class_error=np.mean(np.abs(self.h2_test-test_label))		
+		#activations of hidden layers
 		self.h1_act_test = self.h1_sum.eval()
 		self.h2_act_test = self.h2_sum.eval()
-
-
-		# self.probs = self.v_recon_prob.eval({self.v:test_data})
-
-		# for i in range(5):
-		# 	self.probs =  self.v_recon_prob.eval({self.v:self.probs})
-
-		self.rec = self.v_recon.eval({self.v:self.probs})
-
-		# self.rec_h1  = self.h1_recon_prob.eval({self.v:test_data})
-		# self.h1_test = self.h1_prob.eval({self.v:test_data})
-		# self.h2_test = self.h2_prob.eval({self.v:self.probs})
-
-		
-
-		# N = 20
-		# self.save_means = np.zeros([N,2])
-		# log.info("sampling h2 with %i steps"%N)
-		# sess.run(self.v_var.assign(test_data))
-		# for i in range(N):
-		# 	# h1           = self.h1_rev.eval({self.v:self.probs,self.h2_rev:self.h2_test})
-		# 	# self.h2_test = self.h2_sample.eval({self.h1_place:h1})
-		# 	h1,self.h2_test = sess.run([self.update_h1,self.update_h2])
-			
-		# 	self.save_means[i,0] = np.mean(h1)
-		# 	self.save_means[i,1] = np.mean(self.h2_test)
-
-		# self.probs   = self.v_sample.eval({self.h1_place:h1})
-		log.end()
-
-
+		# norm the sum of the activities
 		self.h1_act_test*=1./(n_second_layer*len(test_data))
 		self.h2_act_test*=1./(n_third_layer*len(test_data))
 
-		self.test_error_.append(self.test_error)
-		# error of classifivation labels
-		self.class_error=np.mean(np.abs(self.h2_test-test_label))
-		
-		# #set the maximum = 1 and the rest 0 		
+		log.end()
+
+
+
+		#### count how many images got classified wrong 
 		log.out("Taking only the maximum")
 		n_wrongs=0
 		h2_copy=np.copy(self.h2_test)
@@ -794,18 +753,9 @@ class DBM_class(object):
 		self.num_of_updates=1000 #just needs to be defined because it will make a train graph with tf.arrays where this number is needed
 
 
-		# tf.variables_initializer([temp], name='init_train')
-
 		if liveplot:
 			log.info("Liveplotting gibbs sampling")
 			fig,ax=plt.subplots(1,4,figsize=(15,5))
-		
-		# set v as input 
-		# v_gibbs = self.v_var.eval() # rnd.random(v_input.shape)*0.01
-		
-		#calculate forward feed h2
-
-		# self.energy_[0]=-10
 
 
 
@@ -1044,25 +994,25 @@ dbm_epochs           = 10
 
 
 rbm_learnrate     = 0.001
-dbm_learnrate     = 0.001
+dbm_learnrate     = 0.05
 dbm_learnrate_end = 0.005
 
 temp = 0.05
 
 pre_training    = 0 	#if no pretrain then files are automatically loaded
 
-training        = 1
+training        = 0
 testing         = 1
-plotting        = 1
-gibbs_sampling  = 0
+plotting        = 0
+gibbs_sampling  = 1
 noise_stab_test = 0
 
-save_to_file          = 1 	# only save biases and weights for further training
+save_to_file          = 0 	# only save biases and weights for further training
 save_all_params       = 0	# also save all test data and reconstructed images (memory heavy)
 save_pretrained       = 0
 
 load_from_file        = 1
-pathsuffix            = "Wed Feb 28 14-25-46 2018"#"Sun Feb 11 20-20-39 2018"#"Thu Jan 18 20-04-17 2018 80 epochen"
+pathsuffix            = "Wed Feb 28 16-28-04 2018 20*20 bester"#"Sun Feb 11 20-20-39 2018"#"Thu Jan 18 20-04-17 2018 80 epochen"
 pathsuffix_pretrained = "Tue Feb 27 19-58-15 2018"
 
 
@@ -1104,6 +1054,7 @@ for i in range(1):
 					epochs      = dbm_epochs,
 					num_batches = dbm_batches,
 					learnrate   = dbm_learnrate,
+					N           = 10, #freerunning steps
 					cont        = i)
 
 			DBM.train_time=log.end()
@@ -1112,9 +1063,11 @@ for i in range(1):
 	if testing:
 		with tf.Session() as sess:
 			log.start("Test Session")
-			# new session for test images - v has 10.000 length 
-			#testing the network , this also inits the graph so do not comment it out
-			DBM.test(test_data)
+
+			DBM.test(	test_data,
+					N=10,
+					M=10 )
+
 			# DBM.test(test_data_noise) 
 
 
@@ -1132,13 +1085,14 @@ if gibbs_sampling:
 
 		index_for_number_gibbs=[]
 		# loop through images from test_data and find al images that are <5 
-		for i in range(18,19):			
+		for i in range(18,1900):			
 			## find the digit that was presented
 			digit=np.where(test_label[i])[0][0] 		
 			## set desired digit range
 			if digit<5:
 				index_for_number_gibbs.append(i)
 		log.info("Found %i Images"%len(index_for_number_gibbs))
+
 
 		# create graph 
 		DBM.batchsize=len(index_for_number_gibbs)
@@ -1148,11 +1102,11 @@ if gibbs_sampling:
 		DBM.graph_init("gibbs")
 		DBM.import_()
 
-		h2_no_context=DBM.gibbs_sampling([[1,0,0,0,0,0,0,0,0,0]], 1000, 0.05 , 0.05, 
-							mode         = "generate",
-							modification = [0,0,0,1,0,0,0,0,0,0],
-							p            = p,
-							liveplot     = 1)
+		# h2_no_context=DBM.gibbs_sampling([[0,0,0,2,0,0,0,0,0,0]], 1000, 0.05 , 0.05, 
+		# 					mode         = "generate",
+		# 					modification = [0,0,0,1,0,0,0,0,0,0],
+		# 					p            = p,
+		# 					liveplot     = 1)
 		
 		# calculte h2 firerates over all gibbs_steps 
 		log.start("Sampling data")
@@ -1160,12 +1114,12 @@ if gibbs_sampling:
 							mode         = "context",
 							modification = [1,1,1,1,1,1,1,1,1,1],
 							p            = p,
-							liveplot     = 1)
+							liveplot     = 0)
 			
 		# with context
 		h2_context=DBM.gibbs_sampling(test_data[index_for_number_gibbs[:]], 200, 0.05 , 0.05, 
 							mode         = "context",
-							modification = [2,2,2,2,2,0,0,0,0,0],
+							modification = [1,1,1,1,1,0,0,0,0,0],
 							p            = p,
 							liveplot     = 0)
 		log.end()
@@ -1272,20 +1226,22 @@ if training and save_to_file:
 #### Plot
 # Plot the Weights, Errors and other informations
 if plotting:
+	log.out("Plotting...")
+
 	# plot "receptive fields"
-	for i in range(10):
+	for i in range(5):
 		h2=[0,0,0,0,0,0,0,0,0,0]
 		h2[i]=1
 		for n in range(10):
 			h1_=sigmoid_np(np.dot(h2, DBM.w2_np.T),temp)
-			h1_[np.where(h1_<0.7)] = 0
+			h1_[np.where(h1_<0.75)] = 0
 		
 		v = (np.dot(DBM.w1_np,h1_.T))
 		plt.matshow(v.reshape(28,28))
 		plt.title(str(i))
 		
 
-	log.out("Plotting...")
+	
 	map1=plt.matshow(tile(DBM.w1_np),cmap="gray")
 	plt.colorbar(map1)
 	plt.title("W 1")
@@ -1294,6 +1250,14 @@ if plotting:
 	map2=plt.matshow(tile_raster_images(X=DBM.w2_np.T, img_shape=(int(sqrt(DBM.shape[1])),int(sqrt(DBM.shape[1]))), tile_shape=(12, 12), tile_spacing=(0,0)))
 	# plt.title("W 2")
 	# plt.colorbar(map2)	
+
+	try:
+		# plot change in w1 
+		plt.matshow(tile(DBM.w1_np-DBM.w1_np_old))
+		plt.colorbar()
+		plt.title("Change in W1")
+	except:
+		pass
 
 	if training:
 		x=np.linspace(0,dbm_epochs,len(DBM.w1_mean_np))
@@ -1319,7 +1283,7 @@ if plotting:
 
 
 	#plot some samples from the testdata 
-	fig3,ax3 = plt.subplots(4,13,figsize=(16,4),sharey="row")
+	fig3,ax3 = plt.subplots(3,13,figsize=(16,4),sharey="row")
 	for i in range(13):
 		# plot the input
 		ax3[0][i].matshow(test_data[i:i+1].reshape(28,28))
@@ -1329,14 +1293,9 @@ if plotting:
 		ax3[1][i].matshow(DBM.probs[i:i+1].reshape(28,28))
 		ax3[1][i].set_yticks([])
 		ax3[1][i].set_xticks([])
-		# plot the recunstructed image
-		ax3[2][i].matshow(DBM.rec[i:i+1].reshape(28,28))
-		ax3[2][i].set_yticks([])
-		ax3[2][i].set_xticks([])
-		# plot the hidden layer h2 and h1
 		# ax3[3][i].matshow(DBM.h1_test[i:i+1].reshape(int(sqrt(DBM.shape[1])),int(sqrt(DBM.shape[1]))))
-		ax3[3][i].bar(range(10),DBM.h2_test[i])
-		ax3[3][i].set_xticks(range(10))
+		ax3[2][i].bar(range(10),DBM.h2_test[i])
+		ax3[2][i].set_xticks(range(10))
 
 		#plot the reconstructed layer h1
 		# ax3[5][i].matshow(DBM.rec_h1[i:i+1].reshape(int(sqrt(DBM.shape[1])),int(sqrt(DBM.shape[1]))))
@@ -1345,7 +1304,7 @@ if plotting:
 
 
 	#plot only one digit
-	fig4,ax4 = plt.subplots(4,10,figsize=(16,4),sharey="row")
+	fig4,ax4 = plt.subplots(3,10,figsize=(16,4),sharey="row")
 	m=0
 	for i in index_for_number_test[0:10]:
 		# plot the input
@@ -1356,14 +1315,10 @@ if plotting:
 		ax4[1][m].matshow(DBM.probs[i:i+1].reshape(28,28))
 		ax4[1][m].set_yticks([])
 		ax4[1][m].set_xticks([])
-		# plot the recunstructed image
-		ax4[2][m].matshow(DBM.rec[i:i+1].reshape(28,28))
-		ax4[2][m].set_yticks([])
-		ax4[2][m].set_xticks([])
 		# plot the hidden layer h2 and h1
 		# ax4[3][m].matshow(DBM.h1_test[i:i+1].reshape(int(sqrt(DBM.shape[1])),int(sqrt(DBM.shape[1]))))
-		ax4[3][m].bar(range(10),DBM.h2_test[i])
-		ax4[3][m].set_xticks(range(10))
+		ax4[2][m].bar(range(10),DBM.h2_test[i])
+		ax4[2][m].set_xticks(range(10))
 		#plot the reconstructed layer h1
 		# ax4[5][m].matshow(DBM.rec_h1[i:i+1].reshape(int(sqrt(DBM.shape[1])),int(sqrt(DBM.shape[1]))))
 		# plt.matshow(random_recon.reshape(28,28))
