@@ -172,13 +172,13 @@ class RBM(object):
 
 	def train(self,sess,RBM_i,RBMs,batch):
 		self.my_input_data = batch
-		if RBM_i == 1:
-			self.my_input_data = RBMs[RBM_i-1].h.eval({RBMs[RBM_i-1].v : batch})
-		elif RBM_i > 1:
-			self.my_input_data = RBMs[RBM_i-1].h.eval({RBMs[RBM_i-1].v : RBMs[RBM_i-1].my_input_data})
-		
+		# iterate which RBM level this is and calculate the proper input 
+		for j in range(1,len(RBMs)):
+			if RBM_i >= j:
+				self.my_input_data = RBMs[j-1].h.eval({RBMs[j-1].v : self.my_input_data})
+
 		#### update the weights and biases
-		self.w_i,self.error_i = sess.run([self.update_w,self.error],feed_dict={self.v:self.my_input_data})
+		self.w_i, self.error_i = sess.run([self.update_w,self.error],feed_dict={self.v:self.my_input_data})
 		# sess.run([self.update_bias_h,self.update_bias_v],feed_dict={self.v:self.my_input_data})
 
 		return self.w_i,self.error_i
@@ -224,8 +224,8 @@ class DBM_class(object):
 				   ]
 
 		self.RBMs    = [0]*(len(self.shape)-1)
-		self.RBMs[0] = RBM(self.shape[0],self.shape[1], 2, 1, learnrate = rbm_learnrate, liveplot=0)
-		self.RBMs[1] = RBM(self.shape[1],self.shape[2], 1, 2, learnrate = rbm_learnrate, liveplot=0)
+		self.RBMs[0] = RBM(self.shape[0],self.shape[1], forw_mult= 2, back_mult = 1, learnrate = rbm_learnrate, liveplot=1)
+		self.RBMs[1] = RBM(self.shape[1],self.shape[2], forw_mult= 1, back_mult = 2, learnrate = rbm_learnrate, liveplot=0)
 		# self.RBMs[2] = RBM(self.shape[2],self.shape[3], 1, 2, learnrate=rbm_learnrate, liveplot=0)
 
 	def pretrain(self):
@@ -1024,22 +1024,22 @@ class DBM_class(object):
 
 num_batches_pretrain = 100
 dbm_batches          = 100
-pretrain_epochs      = 1
-dbm_epochs           = 5
+pretrain_epochs      = 10
+dbm_epochs           = 1
 
 
 rbm_learnrate     = 0.01
 dbm_learnrate     = 0.01
-dbm_learnrate_end = 0.01
+dbm_learnrate_end = 0.001
 
 
 temp = 0.05
 
 
-pre_training    = 0 	#if no pretrain then files are automatically loaded
+pre_training    = 1 	#if no pretrain then files are automatically loaded
 
 
-training        = 0
+training        = 1
 
 testing         = 1
 plotting        = 1
@@ -1053,7 +1053,7 @@ save_all_params       = 0	# also save all test data and reconstructed images (me
 save_pretrained       = 0
 
 
-load_from_file        = 1
+load_from_file        = 0
 pathsuffix            = "Tue Mar  6 14-58-49 2018" #"Wed Feb 28 16-28-04 2018 20*20 bester"#"Sun Feb 11 20-20-39 2018"#"Thu Jan 18 20-04-17 2018 80 epochen"
 pathsuffix_pretrained = "Mon Mar  5 11-13-22 2018"
 
@@ -1062,7 +1062,7 @@ number_of_layers = 3
 
 
 n_first_layer    = 784
-n_second_layer   = 20*20
+n_second_layer   = 12*12
 n_third_layer    = 10
 
 saveto_path=data_dir+"/"+time_now
@@ -1110,8 +1110,8 @@ for i in range(1):
 			log.start("Test Session")
 
 			wrong_classified_id = DBM.test(	test_data,
-									N=2,  # sample h1 and h2. 1->1 sample, aber achtung_> 1. sample ist aus random werten, also mindestens 2 sample machen 
-									M=0   # average v. 0->1 sample
+									N=20,  # sample h1 and h2. 1->1 sample, aber achtung_> 1. sample ist aus random werten, also mindestens 2 sample machen 
+									M=10  # average v. 0->1 sample
 								)
 
 			# DBM.test(test_data_noise) 
@@ -1275,6 +1275,7 @@ if training and save_to_file:
 ####################################################################################################################################
 #### Plot
 # Plot the Weights, Errors and other informations
+h1_shape = int(sqrt(n_second_layer))
 if plotting:
 	log.out("Plotting...")
 
@@ -1296,16 +1297,16 @@ if plotting:
 
 
 		# h1_aus_h2[np.where(h1_aus_h2<0.6)] = 0
-		plt.matshow(h1_aus_h2_sig.reshape(20,20))
+		plt.matshow(h1_aus_h2_sig.reshape(h1_shape,h1_shape))
 		plt.colorbar()
 		plt.title("aus h2")
-		plt.matshow(h1_aus_v_sig.reshape(20,20))
+		plt.matshow(h1_aus_v_sig.reshape(h1_shape,h1_shape))
 		plt.colorbar()
 		plt.title("aus v")
 
-		v_aus_h1_aus_h2 = sample_np(np.dot(DBM.w1_np,h1_aus_h2.T))
-		v_aus_h1_aus_v = sample_np(np.dot(DBM.w1_np,h1_aus_v.T))
-		v_aus_h1_aus_beide = sample_np(np.dot(DBM.w1_np,h1_beide.T))
+		v_aus_h1_aus_h2 = (np.dot(DBM.w1_np,h1_aus_h2.T))
+		v_aus_h1_aus_v = (np.dot(DBM.w1_np,h1_aus_v.T))
+		v_aus_h1_aus_beide = (np.dot(DBM.w1_np,h1_beide.T))
 		plt.matshow(v_aus_h1_aus_h2.reshape(28,28))
 		plt.title("aus h2")
 		plt.matshow(v_aus_h1_aus_v.reshape(28,28))
