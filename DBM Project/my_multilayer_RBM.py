@@ -56,6 +56,8 @@ if True:
 
 from tensorflow.examples.tutorials.mnist import input_data
 time_now = time.asctime()
+time_now = time_now.replace(":", "-")
+time_now = time_now.replace(" ", "_")
 
 #### Load MNIST Data 
 if "train_data" not in globals():
@@ -120,7 +122,7 @@ class RBM(object):
 
 		# get the probabilities of the hidden units in 
 		self.h_prob  = sigmoid(tf.matmul(self.v,self.forw_mult*self.w) + self.bias_h,temp)
-		#h has shape [number of images per batch, number of hidden units]
+		# h has shape [number of images per batch, number of hidden units]
 		# get the actual activations for h {0,1}
 		self.h       = tf.nn.relu(
 			            tf.sign(
@@ -156,27 +158,28 @@ class RBM(object):
 		#update w
 		self.update_w = self.w.assign(self.w+self.learnrate*self.CD)
 		self.mean_w   = tf.reduce_mean(self.w)
+
 		#update bias
 		""" Since vectors v and h are actualy matrices with number of batch_size images in them, reduce mean will make them to a vector again """
-		self.update_bias_v = self.bias_v.assign(self.bias_v+self.learnrate*tf.reduce_mean(self.v-self.v_recon,0))
-		self.update_bias_h = self.bias_h.assign(self.bias_h+self.learnrate*tf.reduce_mean(self.h-self.h_gibbs,0))
+		# self.update_bias_v = self.bias_v.assign(self.bias_v+self.learnrate*tf.reduce_mean(self.v-self.v_recon,0))
+		# self.update_bias_h = self.bias_h.assign(self.bias_h+self.learnrate*tf.reduce_mean(self.h-self.h_gibbs,0))
 
 
 		# reverse feed
-		self.h_rev       = tf.placeholder(tf.float32,[None,self.hidden_units],name="Reverse-hidden")
-		self.v_prob_rev  = sigmoid(tf.matmul(self.h_rev,(self.w),transpose_b=True) + self.bias_v,temp)
-		self.v_recon_rev = tf.nn.relu(tf.sign(self.v_prob_rev - tf.random_uniform(tf.shape(self.v_prob_rev))))
+		# self.h_rev       = tf.placeholder(tf.float32,[None,self.hidden_units],name="Reverse-hidden")
+		# self.v_prob_rev  = sigmoid(tf.matmul(self.h_rev,(self.w),transpose_b=True) + self.bias_v,temp)
+		# self.v_recon_rev = tf.nn.relu(tf.sign(self.v_prob_rev - tf.random_uniform(tf.shape(self.v_prob_rev))))
 
 	def train(self,sess,RBM_i,RBMs,batch):
 		self.my_input_data = batch
-		if RBM_i==1:
-			self.my_input_data=RBMs[RBM_i-1].h.eval({RBMs[RBM_i-1].v:batch})
-		elif RBM_i==2:
-			self.my_input_data=RBMs[RBM_i-1].h.eval({RBMs[RBM_i-1].v:RBMs[RBM_i-1].my_input_data})
-
+		if RBM_i == 1:
+			self.my_input_data = RBMs[RBM_i-1].h.eval({RBMs[RBM_i-1].v : batch})
+		elif RBM_i > 1:
+			self.my_input_data = RBMs[RBM_i-1].h.eval({RBMs[RBM_i-1].v : RBMs[RBM_i-1].my_input_data})
+		
 		#### update the weights and biases
-		self.w_i,self.error_i=sess.run([self.update_w,self.error],feed_dict={self.v:self.my_input_data})
-		sess.run([self.update_bias_h,self.update_bias_v],feed_dict={self.v:self.my_input_data})
+		self.w_i,self.error_i = sess.run([self.update_w,self.error],feed_dict={self.v:self.my_input_data})
+		# sess.run([self.update_bias_h,self.update_bias_v],feed_dict={self.v:self.my_input_data})
 
 		return self.w_i,self.error_i
 
@@ -222,7 +225,7 @@ class DBM_class(object):
 
 		self.RBMs    = [0]*(len(self.shape)-1)
 		self.RBMs[0] = RBM(self.shape[0],self.shape[1], 2, 1, learnrate = rbm_learnrate, liveplot=0)
-		self.RBMs[1] = RBM(self.shape[1],self.shape[2], 2, 2, learnrate = rbm_learnrate, liveplot=0)
+		self.RBMs[1] = RBM(self.shape[1],self.shape[2], 1, 2, learnrate = rbm_learnrate, liveplot=0)
 		# self.RBMs[2] = RBM(self.shape[2],self.shape[3], 1, 2, learnrate=rbm_learnrate, liveplot=0)
 
 	def pretrain(self):
@@ -247,22 +250,24 @@ class DBM_class(object):
 			#iterate through the RBMs , each iteration is a RBM
 			if pre_training:	
 				sess.run(tf.global_variables_initializer())
+
 				for RBM_i,RBM in enumerate(self.RBMs):
 					log.start("Pretraining ",str(RBM_i+1)+".", "RBM")
 
 					for epoch in range(pretrain_epochs):
+
 						log.start("Epoch:",epoch+1,"/",pretrain_epochs)
 						
 						for start, end in zip( range(0, len(train_data), batchsize_pretrain), range(batchsize_pretrain, len(train_data), batchsize_pretrain)):
 							#### define a batch
 							batch = train_data[start:end]
-							# train the rbm 
+							# train the rbm  
 							w_i,error_i = RBM.train(sess,RBM_i,self.RBMs,batch)
 							#### liveplot
 							if RBM.liveplot and plt.fignum_exists(fig.number) and start%40==0:
 								ax.cla()
-								rbm_shape=int(sqrt(RBM.visible_units))
-								matrix_new=tile_raster_images(X=w_i.T, img_shape=(rbm_shape, rbm_shape), tile_shape=(10, 10), tile_spacing=(0,0))
+								rbm_shape  = int(sqrt(RBM.visible_units))
+								matrix_new = tile_raster_images(X=w_i.T, img_shape=(rbm_shape, rbm_shape), tile_shape=(10, 10), tile_spacing=(0,0))
 								ax.matshow(matrix_new)
 								plt.pause(0.00001)
 
@@ -277,7 +282,7 @@ class DBM_class(object):
 				
 
 				# define the weights
-				self.weights=[]
+				self.weights  =  []
 				for i in range(len(self.RBMs)):
 					self.weights.append(self.RBMs[i].w.eval())
 
@@ -418,24 +423,23 @@ class DBM_class(object):
 		self.update_v  = self.v_var.assign(self.sample(sigmoid(tf.matmul(self.h1_var, self.w1,transpose_b=True)+self.bias_v,self.temp)))
 
 
-		
+		self.numpoints       = tf.cast(tf.shape(self.v_var)[0],tf.float32) #number of train inputs per batch (for averaging the CD matrix -> see practical paper by hinton)
+
 		### Training with contrastive Divergence
 		if graph_mode=="training":
 			#first weight matrix
 			self.update_pos_grad1 = self.pos_grad1.assign(tf.matmul(self.v_var, self.h1_var,transpose_a=True))
 			self.update_neg_grad1 = self.neg_grad1.assign(tf.matmul(self.v_var, self.h1_var,transpose_a=True))
-			self.numpoints1       = tf.cast(tf.shape(self.v_var)[0],tf.float32) #number of train inputs per batch (for averaging the CD matrix -> see practical paper by hinton)
 			self.weight_decay1    = tf.reduce_sum(tf.square(self.w1))*0.0004
-			self.CD1              = ((self.pos_grad1 - self.neg_grad1))/self.numpoints1
+			self.CD1              = ((self.pos_grad1 - self.neg_grad1))/self.numpoints
 			self.update_w1        = self.w1.assign_add(tf.multiply(self.learnrate,self.CD1))
 			self.mean_w1          = tf.reduce_mean(tf.square(self.w1))
 			
 			# second weight matrix
 			self.update_pos_grad2 = self.pos_grad2.assign(tf.matmul(self.h1_var, self.h2_var,transpose_a=True))
 			self.update_neg_grad2 = self.neg_grad2.assign(tf.matmul(self.h1_var, self.h2_var,transpose_a=True))
-			self.numpoints2       = tf.cast(tf.shape(self.h2_var)[0],tf.float32) #number of train inputs per batch (for averaging the CD matrix -> see practical paper by hinton)
 			self.weight_decay2    = tf.reduce_sum(tf.square(self.w2))*0.0003
-			self.CD2              = ((self.pos_grad2 - self.neg_grad2))/self.numpoints2
+			self.CD2              = ((self.pos_grad2 - self.neg_grad2))/self.numpoints
 			self.update_w2        = self.w2.assign_add(tf.multiply(self.learnrate,self.CD2))
 
 			# bias updates (unused)
@@ -563,7 +567,6 @@ class DBM_class(object):
 			log.info("Freerunning for %i steps"%N)
 				
 			for start, end in zip( range(0, len(train_data), self.batchsize), range(self.batchsize, len(train_data), self.batchsize)):
-				log.info( start,end)
 				# define a batch
 				batch = train_data[start:end]
 				batch_label = train_label[start:end]
@@ -681,21 +684,22 @@ class DBM_class(object):
 		log.out("Sampling h1 and h2 %i times"%N)
 		for n in range(N):
 			h1[n], h2[n]  = sess.run([self.update_h1, self.update_h2])
-
 			### calculate diffs vs the N steps 
 			if n>0:
 				self.h2_diff[n-1] = np.abs(h2[n]-h2[n-1])
 
+
 		# plot the diffst for 100 pictures
-		diffs_h2_plt=[]
-		save = np.zeros(N)
-		for pic in range(100):
-			for i in range(N):
-				save[i]=np.mean(DBM.h2_diff[i,pic,:])
-			diffs_h2_plt.append(smooth(save,10))
-			plt.plot(diffs_h2_plt[pic])
-		plt.xlabel("N")
-		plt.title("differenzen der h2 layer im mittel aller bilder")
+		if plotting:
+			diffs_h2_plt=[]
+			save = np.zeros(N)
+			for pic in range(100):
+				for i in range(N):
+					save[i]=np.mean(DBM.h2_diff[i,pic,:])
+				diffs_h2_plt.append(smooth(save,10))
+				plt.plot(diffs_h2_plt[pic])
+			plt.xlabel("N")
+			plt.title("differenzen der h2 layer für 100 bilder")
 
 		
 		self.h1_test = h1[-1]
@@ -706,6 +710,8 @@ class DBM_class(object):
 		for i in range(M):
 			self.probs += sess.run(self.update_v)
 		self.probs *= 1./(M+1)
+
+
 
 		#### calculate errors and activations
 		self.test_error  = self.error.eval({self.batch_ph : test_data})
@@ -718,10 +724,6 @@ class DBM_class(object):
 		# norm the sum of the activities
 		self.h1_act_test*=1./(n_second_layer*len(test_data))
 		self.h2_act_test*=1./(n_third_layer*len(test_data))
-
-		log.end()
-
-
 
 		#### count how many images got classified wrong 
 		log.out("Taking only the maximum")
@@ -738,6 +740,7 @@ class DBM_class(object):
 				wrong_classified_ind.append(i)
 
 
+		log.end()
 		log.reset()
 		log.info("Reconstr. error: ",np.round(DBM.test_error,5), "learnrate: ",np.round(dbm_learnrate,5))
 		log.info("Class error: ",np.round(self.class_error,5))
@@ -1019,15 +1022,15 @@ class DBM_class(object):
 ####################################################################################################################################
 #### User Settings ###
 
-num_batches_pretrain = 1000
-dbm_batches          = 10
+num_batches_pretrain = 100
+dbm_batches          = 100
 pretrain_epochs      = 1
-dbm_epochs           = 10
+dbm_epochs           = 5
 
 
-rbm_learnrate     = 0.002
-dbm_learnrate     = 0.05
-dbm_learnrate_end = 0.05
+rbm_learnrate     = 0.01
+dbm_learnrate     = 0.01
+dbm_learnrate_end = 0.01
 
 
 temp = 0.05
@@ -1036,7 +1039,7 @@ temp = 0.05
 pre_training    = 0 	#if no pretrain then files are automatically loaded
 
 
-training        = 1
+training        = 0
 
 testing         = 1
 plotting        = 1
@@ -1050,8 +1053,8 @@ save_all_params       = 0	# also save all test data and reconstructed images (me
 save_pretrained       = 0
 
 
-load_from_file        = 0
-pathsuffix            = "Tue Mar  6 14-58-49 2018"#"Wed Feb 28 16-28-04 2018 20*20 bester"#"Sun Feb 11 20-20-39 2018"#"Thu Jan 18 20-04-17 2018 80 epochen"
+load_from_file        = 1
+pathsuffix            = "Tue Mar  6 14-58-49 2018" #"Wed Feb 28 16-28-04 2018 20*20 bester"#"Sun Feb 11 20-20-39 2018"#"Thu Jan 18 20-04-17 2018 80 epochen"
 pathsuffix_pretrained = "Mon Mar  5 11-13-22 2018"
 
 
@@ -1107,8 +1110,8 @@ for i in range(1):
 			log.start("Test Session")
 
 			wrong_classified_id = DBM.test(	test_data,
-									N=30, # sample h1 and h2
-									M=10   # average v
+									N=2,  # sample h1 and h2. 1->1 sample, aber achtung_> 1. sample ist aus random werten, also mindestens 2 sample machen 
+									M=0   # average v. 0->1 sample
 								)
 
 			# DBM.test(test_data_noise) 
@@ -1276,20 +1279,53 @@ if plotting:
 	log.out("Plotting...")
 
 	# plot "receptive fields"
-	for i in range(5):
-		h2=[0,0,0,0,0,0,0,0,0,0]
-		h2[i]=1
-		for n in range(10):
-			h1_=sigmoid_np(np.dot(h2, DBM.w2_np.T),temp)
-			h1_[np.where(h1_<0.6)] = 0
+	fig,ax=plt.subplots(3,1)
+	fig2,ax2=plt.subplots(1,1)
+	for i in range(1):
+		h2 = test_label[i:i+1]
+		digit = np.where(h2 == 1)[1]
 
-		v = (np.dot(DBM.w1_np,h1_.T))
-		plt.matshow(v.reshape(28,28))
+		v_data = test_data[i:i+1]
+
+		h1_aus_h2 = (np.dot(h2*3, DBM.w2_np.T))
+		h1_aus_v  = (np.dot(v_data, DBM.w1_np))
+		h1_aus_h2_sig = sigmoid_np(np.dot(h2*3, DBM.w2_np.T),temp)
+		h1_aus_v_sig  = sigmoid_np(np.dot(v_data, DBM.w1_np),temp)
+		h1_beide  = sigmoid_np(np.dot(v_data, DBM.w1_np)+np.dot(h2, DBM.w2_np.T),temp)
+		h2_aus_h1 = sigmoid_np(np.dot(h1_aus_v,DBM.w2_np), temp)
+
+
+		# h1_aus_h2[np.where(h1_aus_h2<0.6)] = 0
+		plt.matshow(h1_aus_h2_sig.reshape(20,20))
 		plt.colorbar()
-		plt.title(str(i))
-		
+		plt.title("aus h2")
+		plt.matshow(h1_aus_v_sig.reshape(20,20))
+		plt.colorbar()
+		plt.title("aus v")
 
-	
+		v_aus_h1_aus_h2 = sample_np(np.dot(DBM.w1_np,h1_aus_h2.T))
+		v_aus_h1_aus_v = sample_np(np.dot(DBM.w1_np,h1_aus_v.T))
+		v_aus_h1_aus_beide = sample_np(np.dot(DBM.w1_np,h1_beide.T))
+		plt.matshow(v_aus_h1_aus_h2.reshape(28,28))
+		plt.title("aus h2")
+		plt.matshow(v_aus_h1_aus_v.reshape(28,28))
+		plt.title("aus v")
+		plt.matshow(v_aus_h1_aus_beide.reshape(28,28))
+		# plt.matshow(v.reshape(28,28))
+		ax[0].hist(h1_aus_v[0],bins=20,label="h1 aus v")
+		ax[0].legend()
+		ax[1].hist(h1_aus_h2[0],bins=20,label="h1 aus h2")
+		ax[1].legend()
+		ax[2].hist(h1_beide[0],bins=20,label="h1 aus v+h2")
+		ax[2].legend()
+		
+		ax2.plot(h1_beide [0],label="beide")
+		ax2.plot(h1_aus_h2[0],label="h2")
+		ax2.plot(h1_aus_v [0],label="v")
+		ax2.legend()
+
+
+		
 	map1=plt.matshow(tile(DBM.w1_np),cmap="gray")
 	plt.colorbar(map1)
 	plt.title("W 1")

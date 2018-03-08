@@ -1,5 +1,6 @@
 import tensorflow as tf 
 import numpy as np
+import numpy.random as rnd
 import os
 from math import sqrt
 def scale_to_unit_interval(ndar, eps=1e-8):
@@ -154,6 +155,11 @@ def sigmoid(x,T):
 def sigmoid_np(x,T):
     return 1./(1.+np.exp(-1./T*x))
 
+def sample_np(x):
+    x=np.array(x)
+    rng = rnd.random(x.shape)
+    x=(x-rng)>=0
+    return x
 
 def clamp(x,x_min,x_max):
     if x>x_max:
