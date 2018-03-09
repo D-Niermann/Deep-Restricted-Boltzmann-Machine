@@ -224,10 +224,10 @@ class DBM_class(object):
 				   ]
 
 		self.RBMs    = [0]*(len(self.shape)-1)
-		self.RBMs[0] = RBM(self.shape[0],self.shape[1], forw_mult= 2, back_mult = 1, learnrate = rbm_learnrate, liveplot=1)
-		self.RBMs[1] = RBM(self.shape[1],self.shape[2], forw_mult= 1, back_mult = 2, learnrate = rbm_learnrate, liveplot=0)
+		self.RBMs[0] = RBM(self.shape[0],self.shape[1], forw_mult= 1, back_mult = 1, learnrate = rbm_learnrate, liveplot=0)
+		self.RBMs[1] = RBM(self.shape[1],self.shape[2], forw_mult= 1, back_mult = 1, learnrate = rbm_learnrate, liveplot=0)
 		# self.RBMs[2] = RBM(self.shape[2],self.shape[3], 1, 2, learnrate=rbm_learnrate, liveplot=0)
-
+		log.out("not using forw and backw multiplicators")
 	def pretrain(self):
 		""" this function will pretrain the RBMs and define a self.weights list where every
 		weight will be stored in. This weights list can then be used to save to file and/or 
@@ -509,8 +509,16 @@ class DBM_class(object):
 
 
 
-	def train(self,train_data,train_label,epochs,num_batches,learnrate,N,cont):
-		""" training the DBM with given h2 as labels and v as input images"""
+	def train(self,train_data,train_label,epochs,num_batches,learnrate,N,M,cont):
+		""" training the DBM with given h2 as labels and v as input images
+		train_data :: images
+		train_label :: corresponding label
+		epochs :: how many epochs to train
+		num_batches :: how many batches
+		learnrate :: learnrate
+		N :: Number of gibbs steps
+		M :: Number of particles (how many times to gibbs sample)
+		"""
 		######## init all vars for training
 		self.batchsize      = int(55000/num_batches)
 		num_of_updates      = epochs*num_batches
@@ -522,9 +530,9 @@ class DBM_class(object):
 		self.m              = 0
 
 		### sample arrays for freerun
-		v_  = np.zeros([N, self.batchsize, self.shape[0]])
-		h1_ = np.zeros([N, self.batchsize, self.shape[1]])
-		h2_ = np.zeros([N, self.batchsize, self.shape[2]])
+		v_  = np.zeros([M, self.batchsize, self.shape[0]])
+		h1_ = np.zeros([M, self.batchsize, self.shape[1]])
+		h2_ = np.zeros([M, self.batchsize, self.shape[2]])
 
 		### free energy
 		# self.F=[]
@@ -565,6 +573,7 @@ class DBM_class(object):
 			log.out("Running Batch")
 			# log.info("++ Using Weight Decay! Not updating bias! ++")
 			log.info("Freerunning for %i steps"%N)
+			log.info("Averaging for %i steps"%M)
 				
 			for start, end in zip( range(0, len(train_data), self.batchsize), range(self.batchsize, len(train_data), self.batchsize)):
 				# define a batch
@@ -572,8 +581,8 @@ class DBM_class(object):
 				batch_label = train_label[start:end]
 
 				# assign v and h2 to the batch data
-				sess.run([self.assign_v,self.assign_h2],{self.batch_ph : batch, 
-										 self.batch_label_ph : batch_label})
+				sess.run([self.assign_v,self.assign_h2],{ self.batch_ph : batch, 
+										 	self.batch_label_ph : batch_label})
 
 				# calc h1 probabilities
 				sess.run([self.update_h1_probs])
@@ -581,13 +590,14 @@ class DBM_class(object):
 				# update the positive gradients
 				sess.run([self.update_pos_grad1,self.update_pos_grad2])
 
-				# update all layers N times (free running) (should be averaged over N)
-				for n in range(N):
-					v_[n], h1_[n], h2_[n] = sess.run([self.update_v,self.update_h1,self.update_h2])
+				# update all layers N times (free running) 
+				for m in range(M):
+					for n in range(N):
+						 v_[m], h1_[m], h2_[m] = sess.run([self.update_v,self.update_h1,self.update_h2])
 				
 				### average these updates and assign them to the layers, so that the calculation
 				### of the gradients take this averages 
-				sess.run([self.assign_v, self.assign_h1, self.assign_h2],{ 	self.batch_ph : np.mean(v_, axis=0), 
+				sess.run([self.assign_v, self.assign_h1, self.assign_h2],{	self.batch_ph : np.mean(v_, axis=0), 
 														self.h1_ph : np.mean(h1_, axis=0),
 														self.batch_label_ph : np.mean(h2_, axis=0)
 														})
@@ -839,9 +849,16 @@ class DBM_class(object):
 
 			sess.run(self.modification_tf.assign(self.batchsize*[modification]))
 			
+			log.info("Generating with image as starting value for v")
+			input_image = test_data[3:4]
+			## make noisy ?
+			sess.run(self.assign_v,{self.batch_ph : input_image})
+
 			for i in range(gibbs_steps):
 				# calculate the backward and forward pass 
-				v_gibbs, h1 = sess.run([self.update_v,self.update_h1],{self.temp: temp})
+				h1 = sess.run(self.update_h1,{self.temp: temp})
+				v_gibbs = sess.run(self.update_v,{self.temp: temp})
+
 
 				h2_[i] = h2
 
@@ -1024,19 +1041,19 @@ class DBM_class(object):
 
 num_batches_pretrain = 100
 dbm_batches          = 100
-pretrain_epochs      = 10
-dbm_epochs           = 1
+pretrain_epochs      = 5
+dbm_epochs           = 10
 
 
 rbm_learnrate     = 0.01
-dbm_learnrate     = 0.01
-dbm_learnrate_end = 0.001
+dbm_learnrate     = 0.05
+dbm_learnrate_end = 0.005
 
 
 temp = 0.05
 
 
-pre_training    = 1 	#if no pretrain then files are automatically loaded
+pre_training    = 0 	#if no pretrain then files are automatically loaded
 
 
 training        = 1
@@ -1054,7 +1071,7 @@ save_pretrained       = 0
 
 
 load_from_file        = 0
-pathsuffix            = "Tue Mar  6 14-58-49 2018" #"Wed Feb 28 16-28-04 2018 20*20 bester"#"Sun Feb 11 20-20-39 2018"#"Thu Jan 18 20-04-17 2018 80 epochen"
+pathsuffix            = "Wed Feb 28 16-28-04 2018 20*20 bester"#"Sun Feb 11 20-20-39 2018"#"Thu Jan 18 20-04-17 2018 80 epochen"
 pathsuffix_pretrained = "Mon Mar  5 11-13-22 2018"
 
 
@@ -1062,7 +1079,7 @@ number_of_layers = 3
 
 
 n_first_layer    = 784
-n_second_layer   = 12*12
+n_second_layer   = 20*20
 n_third_layer    = 10
 
 saveto_path=data_dir+"/"+time_now
@@ -1099,7 +1116,8 @@ for i in range(1):
 					epochs      = dbm_epochs,
 					num_batches = dbm_batches,
 					learnrate   = dbm_learnrate,
-					N           = 20, #freerunning steps
+					N           = 3, #freerunning steps
+					M 		= 50, # taking the average over this many gibbs steps
 					cont        = i)
 
 			DBM.train_time=log.end()
@@ -1131,7 +1149,7 @@ if gibbs_sampling:
 
 		index_for_number_gibbs=[]
 		# loop through images from all wrong classified images and find al images that are <5 
-		for i in range(10000): #wrong_classified_ind:			
+		for i in range(2): #wrong_classified_ind:			
 			## find the digit that was presented
 			digit=np.where(test_label[i])[0][0] 		
 			## set desired digit range
@@ -1149,10 +1167,10 @@ if gibbs_sampling:
 		DBM.import_()
 
 		#### generation of an image using a label
-		# h2_no_context=DBM.gibbs_sampling([[1,0,0,0,0,0,0,0,0,0]], 500, 0.1 , 0.001, 
-		# 					mode         = "generate",
-		# 					modification = [0,0,0,1,0,0,0,0,0,0],
-		# 					liveplot     = 1)
+		h2_no_context=DBM.gibbs_sampling([[1,0,0,0,0,0,0,0,0,0]], 500, 0.04 , 0.001, 
+							mode         = "generate",
+							modification = [0,0,0,1,0,0,0,0,0,0],
+							liveplot     = 1)
 
 		# calculte h2 firerates over all gibbs_steps 
 		log.start("Sampling data")
@@ -1288,9 +1306,9 @@ if plotting:
 
 		v_data = test_data[i:i+1]
 
-		h1_aus_h2 = (np.dot(h2*3, DBM.w2_np.T))
+		h1_aus_h2 = (np.dot(h2, DBM.w2_np.T))
 		h1_aus_v  = (np.dot(v_data, DBM.w1_np))
-		h1_aus_h2_sig = sigmoid_np(np.dot(h2*3, DBM.w2_np.T),temp)
+		h1_aus_h2_sig = sigmoid_np(np.dot(h2, DBM.w2_np.T),temp)
 		h1_aus_v_sig  = sigmoid_np(np.dot(v_data, DBM.w1_np),temp)
 		h1_beide  = sigmoid_np(np.dot(v_data, DBM.w1_np)+np.dot(h2, DBM.w2_np.T),temp)
 		h2_aus_h1 = sigmoid_np(np.dot(h1_aus_v,DBM.w2_np), temp)
@@ -1317,9 +1335,9 @@ if plotting:
 		ax[0].legend()
 		ax[1].hist(h1_aus_h2[0],bins=20,label="h1 aus h2")
 		ax[1].legend()
-		ax[2].hist(h1_beide[0],bins=20,label="h1 aus v+h2")
+		ax[2].hist(h1_beide[0],bins=20,label="h1 aus v und h2")
 		ax[2].legend()
-		
+
 		ax2.plot(h1_beide [0],label="beide")
 		ax2.plot(h1_aus_h2[0],label="h2")
 		ax2.plot(h1_aus_v [0],label="v")
