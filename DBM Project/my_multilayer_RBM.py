@@ -413,14 +413,21 @@ class DBM_class(object):
 		self.h2_sum = tf.reduce_sum(self.h2_var)
 		self.free_energy = -tf.reduce_sum(tf.log(1+tf.exp(tf.matmul(self.v_var,self.w1)+self.bias_h1)))
 
+		## calculations for layers
+		self.v = self.sample(sigmoid(tf.matmul(self.h1_var, self.w1,transpose_b=True)+self.bias_v,self.temp))
+		self.h1_prob = sigmoid(tf.matmul(self.v_var,self.w1)  + tf.matmul(self.h2_var,self.w2,transpose_b=True) + self.bias_h1, self.temp)
+		self.h1 = self.sample(self.h1_prob)
+		self.h2 = sigmoid(tf.matmul(self.h1_var,self.w2) + self.bias_h2,self.temp)
 
 		#### updates for each layer 
-		self.update_h1_with_context = self.h1_var.assign(self.sample(sigmoid(tf.matmul(self.v_var,self.w1)  + tf.matmul(tf.multiply(self.h2_var,self.modification_tf),self.w2,transpose_b=True) + self.bias_h1,self.temp)))
-		self.update_h1_probs = self.h1_var.assign((sigmoid(tf.matmul(self.v_var,self.w1)  + tf.matmul(self.h2_var,self.w2,transpose_b=True) + self.bias_h1,self.temp)))			
 
-		self.update_h1 =  self.h1_var.assign(self.sample(sigmoid(tf.matmul(self.v_var,self.w1)  + tf.matmul(self.h2_var,self.w2,transpose_b=True) + self.bias_h1,self.temp)))		
-		self.update_h2 = self.h2_var.assign((sigmoid(tf.matmul(self.h1_var,self.w2) + self.bias_h2,self.temp)))
-		self.update_v  = self.v_var.assign(self.sample(sigmoid(tf.matmul(self.h1_var, self.w1,transpose_b=True)+self.bias_v,self.temp)))
+		self.update_h1_with_context = self.h1_var.assign(self.sample(sigmoid(tf.matmul(self.v_var,self.w1)  + tf.matmul(tf.multiply(self.h2_var,self.modification_tf),self.w2,transpose_b=True) + self.bias_h1,self.temp)))
+		self.update_h1_probs = self.h1_var.assign(self.h1_prob)			
+
+		self.update_v  = self.v_var.assign(self.v)
+		self.update_h1 = self.h1_var.assign(self.h1)		
+		self.update_h2 = self.h2_var.assign(self.h2)
+		
 
 
 		self.numpoints       = tf.cast(tf.shape(self.v_var)[0],tf.float32) #number of train inputs per batch (for averaging the CD matrix -> see practical paper by hinton)
@@ -443,9 +450,9 @@ class DBM_class(object):
 			self.update_w2        = self.w2.assign_add(tf.multiply(self.learnrate,self.CD2))
 
 			# bias updates (unused)
-			# self.update_bias_h1 = self.bias_h1.assign(tf.add(self.bias_h1,tf.multiply(self.learnrate,tf.reduce_mean(tf.subtract(self.h1_var,self.h1_gibbs),0))))
-			# self.update_bias_h2 = self.bias_h2.assign(tf.add(self.bias_h2,tf.multiply(self.learnrate,tf.reduce_mean(tf.subtract(self.h2_var,self.h2_gibbs),0))))
-			# self.update_bias_v  = self.bias_v.assign(tf.add(self.bias_v,tf.multiply(self.learnrate,tf.reduce_mean(tf.subtract(self.v_var,self.v_recon),0))))
+			# self.update_bias_h1 = self.bias_h1.assign_add(tf.multiply(self.learnrate,tf.reduce_mean(tf.subtract(self.h1_var,self.h1_gibbs),0)))
+			# self.update_bias_h2 = self.bias_h2.assign_add(tf.multiply(self.learnrate,tf.reduce_mean(tf.subtract(self.h2_var,self.h2_gibbs),0)))
+			# self.update_bias_v  = self.bias_v.assign_add(tf.multiply(self.learnrate,tf.reduce_mean(tf.subtract(self.v_old,self.v_var),0)))
 		
 		
 			self.assign_arrays =	[tf.scatter_update(self.train_error_,self.m_tf,self.error),
@@ -590,17 +597,35 @@ class DBM_class(object):
 				# update the positive gradients
 				sess.run([self.update_pos_grad1,self.update_pos_grad2])
 
-				# update all layers N times (free running) 
+				# for averaging many gibbs samples go through m times
 				for m in range(M):
-					for n in range(N):
-						 v_[m], h1_[m], h2_[m] = sess.run([self.update_v,self.update_h1,self.update_h2])
-				
-				### average these updates and assign them to the layers, so that the calculation
-				### of the gradients take this averages 
-				sess.run([self.assign_v, self.assign_h1, self.assign_h2],{	self.batch_ph : np.mean(v_, axis=0), 
-														self.h1_ph : np.mean(h1_, axis=0),
-														self.batch_label_ph : np.mean(h2_, axis=0)
-														})
+					# update all layers N times (free running, gibbs sampling) 
+					if N == 1:
+						# since only one step is made the layers can be calculated directly without updating the vars 
+						v_[m], h1_[m], h2_[m] = sess.run([self.v,self.h1,self.h2])
+					else:
+						# more steps of gibbs sampling require the vars to be assigned
+						for n in range(N):
+							 sess.run([self.update_v,self.update_h1,self.update_h2])
+						
+						if M>1:
+							## reverse the old state before the gibbs sampling
+							# assign the arrays after N steps (so the array saves N+1)
+							v_[m], h1_[m], h2_[m] = sess.run([self.update_v,self.update_h1,self.update_h2])
+							
+							# assign v and h2 to the batch data
+							sess.run([self.assign_v,self.assign_h2],{ self.batch_ph : batch, 
+													 	self.batch_label_ph : batch_label})
+							# calc h1 probabilities
+							sess.run([self.update_h1_probs])			
+
+				if M>1:
+					### average these updates and assign them to the layers, so that the calculation
+					### of the gradients take this averages 
+					sess.run([self.assign_v, self.assign_h1, self.assign_h2],{	self.batch_ph : np.mean(v_, axis=0), 
+															self.h1_ph : np.mean(h1_, axis=0),
+															self.batch_label_ph : np.mean(h2_, axis=0)
+															})
 
 
 				# calc he negatie gradients
@@ -709,7 +734,7 @@ class DBM_class(object):
 				diffs_h2_plt.append(smooth(save,10))
 				plt.plot(diffs_h2_plt[pic])
 			plt.xlabel("N")
-			plt.title("differenzen der h2 layer für 100 bilder")
+			plt.title("differenzen der h2 layer fur 100 bilder")
 
 		
 		self.h1_test = h1[-1]
@@ -1042,12 +1067,12 @@ class DBM_class(object):
 num_batches_pretrain = 100
 dbm_batches          = 100
 pretrain_epochs      = 5
-dbm_epochs           = 10
+dbm_epochs           = 1
 
 
 rbm_learnrate     = 0.01
 dbm_learnrate     = 0.05
-dbm_learnrate_end = 0.005
+dbm_learnrate_end = 0.05
 
 
 temp = 0.05
@@ -1116,8 +1141,8 @@ for i in range(1):
 					epochs      = dbm_epochs,
 					num_batches = dbm_batches,
 					learnrate   = dbm_learnrate,
-					N           = 3, #freerunning steps
-					M 		= 50, # taking the average over this many gibbs steps
+					N           = 1, # freerunning steps
+					M 		= 10, # taking the average over this many gibbs steps
 					cont        = i)
 
 			DBM.train_time=log.end()
@@ -1297,7 +1322,7 @@ h1_shape = int(sqrt(n_second_layer))
 if plotting:
 	log.out("Plotting...")
 
-	# plot "receptive fields"
+	##### plot "receptive fields"
 	fig,ax=plt.subplots(3,1)
 	fig2,ax2=plt.subplots(1,1)
 	for i in range(1):
@@ -1388,7 +1413,7 @@ if plotting:
 
 
 	#plot some samples from the testdata 
-	fig3,ax3 = plt.subplots(3,13,figsize=(16,4),sharey="row")
+	fig3,ax3 = plt.subplots(4,13,figsize=(16,4),sharey="row")
 	for i in range(13):
 		# plot the input
 		ax3[0][i].matshow(test_data[i:i+1].reshape(28,28))
@@ -1398,9 +1423,13 @@ if plotting:
 		ax3[1][i].matshow(DBM.probs[i:i+1].reshape(28,28))
 		ax3[1][i].set_yticks([])
 		ax3[1][i].set_xticks([])
-		# ax3[3][i].matshow(DBM.h1_test[i:i+1].reshape(int(sqrt(DBM.shape[1])),int(sqrt(DBM.shape[1]))))
-		ax3[2][i].bar(range(10),DBM.h2_test[i])
-		ax3[2][i].set_xticks(range(10))
+		
+		ax3[2][i].matshow(DBM.h1_test[i:i+1].reshape(int(sqrt(DBM.shape[1])),int(sqrt(DBM.shape[1]))))
+		ax3[2][i].set_yticks([])
+		ax3[2][i].set_xticks([])
+		
+		ax3[3][i].bar(range(10),DBM.h2_test[i])
+		ax3[3][i].set_xticks(range(10))
 
 		#plot the reconstructed layer h1
 		# ax3[5][i].matshow(DBM.rec_h1[i:i+1].reshape(int(sqrt(DBM.shape[1])),int(sqrt(DBM.shape[1]))))
@@ -1409,7 +1438,7 @@ if plotting:
 
 
 	#plot only one digit
-	fig4,ax4 = plt.subplots(3,10,figsize=(16,4),sharey="row")
+	fig4,ax4 = plt.subplots(4,10,figsize=(16,4),sharey="row")
 	m=0
 	for i in index_for_number_test[0:10]:
 		# plot the input
@@ -1421,9 +1450,12 @@ if plotting:
 		ax4[1][m].set_yticks([])
 		ax4[1][m].set_xticks([])
 		# plot the hidden layer h2 and h1
-		# ax4[3][m].matshow(DBM.h1_test[i:i+1].reshape(int(sqrt(DBM.shape[1])),int(sqrt(DBM.shape[1]))))
-		ax4[2][m].bar(range(10),DBM.h2_test[i])
-		ax4[2][m].set_xticks(range(10))
+		ax4[2][m].matshow(DBM.h1_test[i:i+1].reshape(int(sqrt(DBM.shape[1])),int(sqrt(DBM.shape[1]))))
+		ax4[1][m].set_yticks([])
+		ax4[1][m].set_xticks([])
+
+		ax4[3][m].bar(range(10),DBM.h2_test[i])
+		ax4[3][m].set_xticks(range(10))
 		#plot the reconstructed layer h1
 		# ax4[5][m].matshow(DBM.rec_h1[i:i+1].reshape(int(sqrt(DBM.shape[1])),int(sqrt(DBM.shape[1]))))
 		# plt.matshow(random_recon.reshape(28,28))
