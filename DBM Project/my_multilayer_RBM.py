@@ -381,8 +381,11 @@ class DBM_class(object):
 		self.v_var   = tf.Variable(tf.random_uniform([self.batchsize,self.shape[0]],minval=-1e-3,maxval=1e-3),name="v_var")
 		self.h1_var  = tf.Variable(tf.random_uniform([self.batchsize,self.shape[1]],minval=-1e-3,maxval=1e-3),name="h1_var")
 		self.h2_var  = tf.Variable(tf.random_uniform([self.batchsize,self.shape[2]],minval=-1e-3,maxval=1e-3),name="h2_var")
+		self.h1_var_old = tf.Variable(tf.random_uniform([self.batchsize,self.shape[1]],minval=-1e-3,maxval=1e-3),name="h1_var_old")
+
 		# modification array size 10 that gehts multiplied to the label vector for context
 		self.modification_tf = tf.Variable(tf.ones([self.batchsize,self.shape[2]]),name="Modification")
+
 		# init vars with batches
 		self.assign_v  = self.v_var.assign(self.sample(self.batch_ph))
 		self.assign_h1 = self.h1_var.assign(self.h1_ph)
@@ -402,7 +405,7 @@ class DBM_class(object):
 
 		self.bias_v  = tf.Variable(tf.zeros([self.shape[0]]),name="Visible-Bias")
 		self.bias_h1 = tf.Variable(tf.zeros([self.shape[1]]), name="Hidden-Bias")
-		self.bias_h2 = tf.Variable(tf.zeros([self.shape[2]]), name="Hidden-Bias")
+		self.bias_h2 = tf.Variable(tf.zeros([self.shape[2]]), name="Hidden2-Bias")
 
 
 		### Error and stuff
@@ -450,9 +453,10 @@ class DBM_class(object):
 			self.update_w2        = self.w2.assign_add(tf.multiply(self.learnrate,self.CD2))
 
 			# bias updates (unused)
-			# self.update_bias_h1 = self.bias_h1.assign_add(tf.multiply(self.learnrate,tf.reduce_mean(tf.subtract(self.h1_var,self.h1_gibbs),0)))
-			# self.update_bias_h2 = self.bias_h2.assign_add(tf.multiply(self.learnrate,tf.reduce_mean(tf.subtract(self.h2_var,self.h2_gibbs),0)))
-			# self.update_bias_v  = self.bias_v.assign_add(tf.multiply(self.learnrate,tf.reduce_mean(tf.subtract(self.v_old,self.v_var),0)))
+			self.update_h1_old = self.h1_var_old.assign(self.h1_var)
+			self.update_bias_h1 = self.bias_h1.assign_add(tf.multiply(self.learnrate,tf.reduce_mean(tf.subtract(self.h1_var_old,self.h1_var),0)))
+			self.update_bias_h2 = self.bias_h2.assign_add(tf.multiply(self.learnrate,tf.reduce_mean(tf.subtract(self.batch_label_ph,self.h2_var),0)))
+			self.update_bias_v  = self.bias_v.assign_add(tf.multiply(self.learnrate,tf.reduce_mean(tf.subtract(self.batch_ph,self.v_var),0)))
 		
 		
 			self.assign_arrays =	[tf.scatter_update(self.train_error_,self.m_tf,self.error),
@@ -593,6 +597,8 @@ class DBM_class(object):
 
 				# calc h1 probabilities
 				sess.run([self.update_h1_probs])
+				# save this h1 for bias update
+				sess.run(self.update_h1_old)
 
 				# update the positive gradients
 				sess.run([self.update_pos_grad1,self.update_pos_grad2])
@@ -606,7 +612,12 @@ class DBM_class(object):
 					else:
 						# more steps of gibbs sampling require the vars to be assigned
 						for n in range(N):
-							 sess.run([self.update_v,self.update_h1,self.update_h2])
+							#f first update h1
+							sess.run(self.update_h1)
+							# than update v and h2 
+							sess.run([self.update_v,self.update_h2])
+						# las step to reduce some sampling noise update h1 but only calc probs
+						sess.run(self.update_h1_probs)
 						
 						if M>1:
 							## reverse the old state before the gibbs sampling
@@ -635,8 +646,13 @@ class DBM_class(object):
 				# run all parameter updates 
 				sess.run([	self.update_w1,
 						self.update_w2,
+						self.update_bias_v,
+						self.update_bias_h1,
+						self.update_bias_h2
 						],
-						feed_dict={self.learnrate : learnrate}
+						feed_dict={	self.batch_ph : batch,
+								self.batch_label_ph : batch_label,
+								self.learnrate : learnrate}
 					)
 
 
@@ -1067,7 +1083,7 @@ class DBM_class(object):
 num_batches_pretrain = 100
 dbm_batches          = 100
 pretrain_epochs      = 5
-dbm_epochs           = 1
+dbm_epochs           = 4
 
 
 rbm_learnrate     = 0.01
@@ -1095,8 +1111,8 @@ save_all_params       = 0	# also save all test data and reconstructed images (me
 save_pretrained       = 0
 
 
-load_from_file        = 0
-pathsuffix            = "Wed Feb 28 16-28-04 2018 20*20 bester"#"Sun Feb 11 20-20-39 2018"#"Thu Jan 18 20-04-17 2018 80 epochen"
+load_from_file        = 1
+pathsuffix            = "Sun_Mar_11_16-32-33_2018"#"Sun Feb 11 20-20-39 2018"#"Thu Jan 18 20-04-17 2018 80 epochen"
 pathsuffix_pretrained = "Mon Mar  5 11-13-22 2018"
 
 
@@ -1141,8 +1157,8 @@ for i in range(1):
 					epochs      = dbm_epochs,
 					num_batches = dbm_batches,
 					learnrate   = dbm_learnrate,
-					N           = 1, # freerunning steps
-					M 		= 10, # taking the average over this many gibbs steps
+					N           = 5, # freerunning steps
+					M 		= 1, # taking the average over this many gibbs steps, 1> no averaging
 					cont        = i)
 
 			DBM.train_time=log.end()
@@ -1325,27 +1341,27 @@ if plotting:
 	##### plot "receptive fields"
 	fig,ax=plt.subplots(3,1)
 	fig2,ax2=plt.subplots(1,1)
-	for i in range(1):
+	for i in range(5):
 		h2 = test_label[i:i+1]
 		digit = np.where(h2 == 1)[1]
 
 		v_data = test_data[i:i+1]
 
-		h1_aus_h2 = (np.dot(h2, DBM.w2_np.T))
-		h1_aus_v  = (np.dot(v_data, DBM.w1_np))
-		h1_aus_h2_sig = sigmoid_np(np.dot(h2, DBM.w2_np.T),temp)
-		h1_aus_v_sig  = sigmoid_np(np.dot(v_data, DBM.w1_np),temp)
-		h1_beide  = sigmoid_np(np.dot(v_data, DBM.w1_np)+np.dot(h2, DBM.w2_np.T),temp)
+		h1_aus_h2 = (np.dot(h2, DBM.w2_np.T)+DBM.bias2_np)
+		h1_aus_v  = (np.dot(v_data, DBM.w1_np)+DBM.bias2_np)
+		h1_aus_h2_sig = sigmoid_np(np.dot(h2, DBM.w2_np.T)+DBM.bias2_np,temp)
+		h1_aus_v_sig  = sigmoid_np(np.dot(v_data, DBM.w1_np)+DBM.bias2_np,temp)
+		h1_beide  = sigmoid_np(np.dot(v_data, DBM.w1_np)+np.dot(h2, DBM.w2_np.T)+DBM.bias2_np,temp)
 		h2_aus_h1 = sigmoid_np(np.dot(h1_aus_v,DBM.w2_np), temp)
 
 
 		# h1_aus_h2[np.where(h1_aus_h2<0.6)] = 0
-		plt.matshow(h1_aus_h2_sig.reshape(h1_shape,h1_shape))
-		plt.colorbar()
-		plt.title("aus h2")
-		plt.matshow(h1_aus_v_sig.reshape(h1_shape,h1_shape))
-		plt.colorbar()
-		plt.title("aus v")
+		# plt.matshow(h1_aus_h2_sig.reshape(h1_shape,h1_shape))
+		# plt.colorbar()
+		# plt.title("aus h2")
+		# plt.matshow(h1_aus_v_sig.reshape(h1_shape,h1_shape))
+		# plt.colorbar()
+		# plt.title("aus v")
 
 		v_aus_h1_aus_h2 = (np.dot(DBM.w1_np,h1_aus_h2.T))
 		v_aus_h1_aus_v = (np.dot(DBM.w1_np,h1_aus_v.T))
@@ -1355,18 +1371,18 @@ if plotting:
 		plt.matshow(v_aus_h1_aus_v.reshape(28,28))
 		plt.title("aus v")
 		plt.matshow(v_aus_h1_aus_beide.reshape(28,28))
-		# plt.matshow(v.reshape(28,28))
-		ax[0].hist(h1_aus_v[0],bins=20,label="h1 aus v")
-		ax[0].legend()
-		ax[1].hist(h1_aus_h2[0],bins=20,label="h1 aus h2")
-		ax[1].legend()
-		ax[2].hist(h1_beide[0],bins=20,label="h1 aus v und h2")
-		ax[2].legend()
+	# # plt.matshow(v.reshape(28,28))
+	# ax[0].hist(h1_aus_v[0],bins=20,label="h1 aus v")
+	# ax[0].legend()
+	# ax[1].hist(h1_aus_h2[0],bins=20,label="h1 aus h2")
+	# ax[1].legend()
+	# ax[2].hist(h1_beide[0],bins=20,label="h1 aus v und h2")
+	# ax[2].legend()
 
-		ax2.plot(h1_beide [0],label="beide")
-		ax2.plot(h1_aus_h2[0],label="h2")
-		ax2.plot(h1_aus_v [0],label="v")
-		ax2.legend()
+	# ax2.plot(h1_beide [0],label="beide")
+	# ax2.plot(h1_aus_h2[0],label="h2")
+	# ax2.plot(h1_aus_v [0],label="v")
+	# ax2.legend()
 
 
 		
