@@ -233,6 +233,7 @@ class DBM_class(object):
 		weight will be stored in. This weights list can then be used to save to file and/or 
 		to be loaded into the DBM for further training. 
 		"""
+
 		if pre_training:
 			for rbm in self.RBMs:
 				if rbm.liveplot:
@@ -251,12 +252,13 @@ class DBM_class(object):
 			if pre_training:	
 				sess.run(tf.global_variables_initializer())
 
-				for RBM_i,RBM in enumerate(self.RBMs):
+				for RBM_i, RBM in enumerate(self.RBMs):
 					log.start("Pretraining ",str(RBM_i+1)+".", "RBM")
+					
 
-					for epoch in range(pretrain_epochs):
+					for epoch in range(pretrain_epochs[RBM_i]):
 
-						log.start("Epoch:",epoch+1,"/",pretrain_epochs)
+						log.start("Epoch:",epoch+1,"/",pretrain_epochs[RBM_i])
 						
 						for start, end in zip( range(0, len(train_data), batchsize_pretrain), range(batchsize_pretrain, len(train_data), batchsize_pretrain)):
 							#### define a batch
@@ -393,7 +395,7 @@ class DBM_class(object):
 
 			
 		#### temperature
-		if graph_mode=="gibbs":
+		if graph_mode=="gibbs" or graph_mode=="testing":
 			self.temp = tf.placeholder(tf.float32,[],name="Temperature")
 		else:
 			self.temp = temp
@@ -729,12 +731,12 @@ class DBM_class(object):
 		log.start("Testing DBM")
 		
 		#### give input to v layer
-		sess.run(self.assign_v, {self.batch_ph : test_data})
+		sess.run(self.assign_v, {self.batch_ph : test_data, self.temp : temp})
 
 		#### update h and h2 N times
 		log.out("Sampling h1 and h2 %i times"%N)
 		for n in range(N):
-			h1[n], h2[n]  = sess.run([self.update_h1, self.update_h2])
+			h1[n], h2[n]  = sess.run([self.update_h1, self.update_h2], {self.temp : temp})
 			### calculate diffs vs the N steps 
 			if n>0:
 				self.h2_diff[n-1] = np.abs(h2[n]-h2[n-1])
@@ -759,7 +761,7 @@ class DBM_class(object):
 		#### update v M times
 		self.probs = self.v_var.eval()
 		for i in range(M):
-			self.probs += sess.run(self.update_v)
+			self.probs += sess.run(self.update_v,{self.temp : temp})
 		self.probs *= 1./(M+1)
 
 
@@ -779,23 +781,31 @@ class DBM_class(object):
 		#### count how many images got classified wrong 
 		log.out("Taking only the maximum")
 		n_wrongs=0
-		h2_copy=np.copy(self.h2_test)
+		# h2_copy=np.copy(self.h2_test)
 		wrong_classified_ind=[]
+		wrong_maxis=[]
 		for i in range(len(self.h2_test)):
-			h2_copy[i]=self.h2_test[i]==self.h2_test[i].max()
-			# if this sum == 1 its a wrong classification
-			sum_=np.sum(h2_copy[i]!=test_label[i])/2
-			n_wrongs+=sum_
-			## search which numbers got not classified correctly
-			if sum_==1:
+			digit = np.where(test_label[i]==1)[0][0]
+			maxi    = self.h2_test[i].max()
+			max_pos = np.where(self.h2_test[i] == maxi)[0][0]
+			if max_pos != digit:
 				wrong_classified_ind.append(i)
+				wrong_maxis.append(maxi)
+		n_wrongs=len(wrong_maxis)
+			# h2_copy[i]=self.h2_test[i]==self.h2_test[i].max()
+			# if this sum == 1 its a wrong classification
+			# sum_=np.sum(h2_copy[i]!=test_label[i])/2
+			# n_wrongs+=sum_
+			## search which numbers got not classified correctly
+			# if sum_==1:
+			# 	wrong_classified_ind.append(i)
 
 
 		log.end()
 		log.reset()
 		log.info("Reconstr. error: ",np.round(DBM.test_error,5), "learnrate: ",np.round(dbm_learnrate,5))
 		log.info("Class error: ",np.round(self.class_error,5))
-		log.info("Wrong Digits: ",n_wrongs)
+		log.info("Wrong Digits: ",n_wrongs," with aveage: ",round(np.mean(wrong_maxis),3))
 		log.info("Activations of Neurons: ", np.round(self.h1_act_test,4) , np.round(self.h2_act_test,4))
 		return wrong_classified_ind
 
@@ -848,7 +858,7 @@ class DBM_class(object):
 			
 			for i in range(gibbs_steps):
 				# calculate the backward and forward pass 
-				h1, h2 = sess.run([self.update_h1_with_context,self.update_h2],{self.temp: temp})
+				h1, h2 = sess.run([self.update_h1_with_context, self.update_h2], {self.temp: temp})
 
 				h2_[i] = h2
 
@@ -883,22 +893,22 @@ class DBM_class(object):
 
 		if mode=="generate":
 			sess.run(self.h2_var.assign(v_input))
-			# sess.run(self.h2_var.assign(np.reshape(modification,[1,10])))
+			sess.run(self.assign_v,{self.batch_ph : rnd.random([1,DBM.shape[0]])*0.001})
+			sess.run(self.assign_h1,{self.h1_ph   : rnd.random([1,DBM.shape[1]])*0.001})
 			h2 = self.h2_var.eval()
 			h1 = self.h1_var.eval()
 			v_gibbs = self.v_var.eval()
 
 			sess.run(self.modification_tf.assign(self.batchsize*[modification]))
 			
-			log.info("Generating with image as starting value for v")
-			input_image = test_data[3:4]
+			# log.info("Generating with image as starting value for v")
+			# input_image = test_data[3:4]
 			## make noisy ?
-			sess.run(self.assign_v,{self.batch_ph : input_image})
 
 			for i in range(gibbs_steps):
 				# calculate the backward and forward pass 
-				h1 = sess.run(self.update_h1,{self.temp: temp})
-				v_gibbs = sess.run(self.update_v,{self.temp: temp})
+				v_gibbs, h1 = sess.run([self.update_v, self.update_h1],{self.temp: temp})
+
 
 
 				h2_[i] = h2
@@ -1081,14 +1091,14 @@ class DBM_class(object):
 #### User Settings ###
 
 num_batches_pretrain = 100
-dbm_batches          = 100
-pretrain_epochs      = 5
-dbm_epochs           = 4
+dbm_batches          = 100 
+pretrain_epochs      = [5,20]
+dbm_epochs           = 1
 
 
-rbm_learnrate     = 0.01
-dbm_learnrate     = 0.05
-dbm_learnrate_end = 0.05
+rbm_learnrate     = 0.005
+dbm_learnrate     = 0.01
+dbm_learnrate_end = 0.01
 
 
 temp = 0.05
@@ -1097,7 +1107,7 @@ temp = 0.05
 pre_training    = 0 	#if no pretrain then files are automatically loaded
 
 
-training        = 1
+training        = 0
 
 testing         = 1
 plotting        = 1
@@ -1108,11 +1118,11 @@ noise_stab_test = 0
 
 save_to_file          = 0 	# only save biases and weights for further training
 save_all_params       = 0	# also save all test data and reconstructed images (memory heavy)
-save_pretrained       = 0
+save_pretrained       = 1
 
 
 load_from_file        = 1
-pathsuffix            = "Sun_Mar_11_16-32-33_2018"#"Sun Feb 11 20-20-39 2018"#"Thu Jan 18 20-04-17 2018 80 epochen"
+pathsuffix            = "Tue_Mar_13_09-20-37_2018"#"Sun Feb 11 20-20-39 2018"#"Thu Jan 18 20-04-17 2018 80 epochen"
 pathsuffix_pretrained = "Mon Mar  5 11-13-22 2018"
 
 
@@ -1169,7 +1179,7 @@ for i in range(1):
 			log.start("Test Session")
 
 			wrong_classified_id = DBM.test(	test_data,
-									N=20,  # sample h1 and h2. 1->1 sample, aber achtung_> 1. sample ist aus random werten, also mindestens 2 sample machen 
+									N=100,  # sample h1 and h2. 1->1 sample, aber achtung_> 1. sample ist aus random werten, also mindestens 2 sample machen 
 									M=10  # average v. 0->1 sample
 								)
 
@@ -1190,7 +1200,7 @@ if gibbs_sampling:
 
 		index_for_number_gibbs=[]
 		# loop through images from all wrong classified images and find al images that are <5 
-		for i in range(2): #wrong_classified_ind:			
+		for i in range(10000): #wrong_classified_id:			
 			## find the digit that was presented
 			digit=np.where(test_label[i])[0][0] 		
 			## set desired digit range
@@ -1208,20 +1218,20 @@ if gibbs_sampling:
 		DBM.import_()
 
 		#### generation of an image using a label
-		h2_no_context=DBM.gibbs_sampling([[1,0,0,0,0,0,0,0,0,0]], 500, 0.04 , 0.001, 
-							mode         = "generate",
-							modification = [0,0,0,1,0,0,0,0,0,0],
-							liveplot     = 1)
+		# h2_no_context=DBM.gibbs_sampling([[0,0,1,0,0,0,0,0,0,0]], 500, 0.05 , 0.05, 
+		# 					mode         = "generate",
+		# 					modification = [0,0,0,1,0,0,0,0,0,0],
+		# 					liveplot     = 1)
 
 		# calculte h2 firerates over all gibbs_steps 
 		log.start("Sampling data")
-		h2_no_context=DBM.gibbs_sampling(test_data[index_for_number_gibbs[:]], 200, 0.05 , 0.02, 
+		h2_no_context=DBM.gibbs_sampling(test_data[index_for_number_gibbs[:]], 40, 0.05 , 0.05, 
 							mode         = "context",
 							modification = [1,1,1,1,1,1,1,1,1,1],
 							liveplot     = 0)
 			
 		# with context
-		h2_context=DBM.gibbs_sampling(test_data[index_for_number_gibbs[:]], 200, 0.05 , 0.02, 
+		h2_context=DBM.gibbs_sampling(test_data[index_for_number_gibbs[:]], 40, 0.05 , 0.05, 
 							mode         = "context",
 							modification = [0,0,0,0,0,1,1,1,1,1],
 									  #[0,1,2,3,4,5,6,7,8,9]
@@ -1241,9 +1251,9 @@ if gibbs_sampling:
 		
 
 		for i,d in enumerate(index_for_number_gibbs):
-			digit = np.where(test_label[d])[0][0]
+			digit = np.where(test_label[d]==1)[0][0]
 
-			### count how many got right (with context)
+			### count how many got right (with context) but only check in the subspace of choosen digits
 			maxi_c    = h2_context[i].max()
 			max_pos_c = np.where(h2_context[i] == maxi_c)[0][0]
 			if max_pos_c == digit:
@@ -1251,7 +1261,7 @@ if gibbs_sampling:
 			else:
 				incorrect_maxis_c.append(maxi_c)
 
-			### count how many got right (no context)
+			### count how many got right (no context) but only check in the subspace of choosen digits
 			maxi_nc    = h2_no_context[i].max()
 			max_pos_nc = np.where(h2_no_context[i] == maxi_nc)[0][0]			
 			if max_pos_nc == digit:
@@ -1379,10 +1389,10 @@ if plotting:
 	# ax[2].hist(h1_beide[0],bins=20,label="h1 aus v und h2")
 	# ax[2].legend()
 
-	# ax2.plot(h1_beide [0],label="beide")
-	# ax2.plot(h1_aus_h2[0],label="h2")
-	# ax2.plot(h1_aus_v [0],label="v")
-	# ax2.legend()
+	ax2.plot(h1_beide [0],label="beide")
+	ax2.plot(h1_aus_h2[0],label="h2")
+	ax2.plot(h1_aus_v [0],label="v")
+	ax2.legend()
 
 
 		
