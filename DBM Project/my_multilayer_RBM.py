@@ -111,13 +111,13 @@ class RBM(object):
 		################################################################################################################################################
 		#### Graph
 		################################################################################################################################################
-		""" shape definitions are wired here-normally one would define [rows,columns] but here it is reversed with [columns,rows]? """
+		#shape definitions are wired here-normally one would define [rows,columns] but here it is reversed with [columns,rows]? """
 
 		self.v       = tf.placeholder(tf.float32,[None,self.visible_units],name="Visible-Layer") # has shape [number of images per batch,number of visible units]
 
 		self.w       = tf.Variable(tf.random_uniform([self.visible_units,self.hidden_units],minval=-1e-3,maxval=1e-3),name="Weights")# init with small random values to break symmetriy
 		self.bias_v  = tf.Variable(tf.zeros([self.visible_units]),name="Visible-Bias")
-		self.bias_h  = tf.Variable(tf.zeros([self.hidden_units]),name="Hidden-Bias")
+		self.bias_h  = tf.Variable(tf.zeros([self.hidden_units]), name="Hidden-Bias")
 
 
 		# get the probabilities of the hidden units in 
@@ -419,7 +419,8 @@ class DBM_class(object):
 		self.free_energy = -tf.reduce_sum(tf.log(1+tf.exp(tf.matmul(self.v_var,self.w1)+self.bias_h1)))
 
 		## calculations for layers
-		self.v = self.sample(sigmoid(tf.matmul(self.h1_var, self.w1,transpose_b=True)+self.bias_v,self.temp))
+		self.v_prob = sigmoid(tf.matmul(self.h1_var, self.w1,transpose_b=True)+self.bias_v,self.temp)
+		self.v = self.sample(self.v_prob)
 		self.h1_prob = sigmoid(tf.matmul(self.v_var,self.w1)  + tf.matmul(self.h2_var,self.w2,transpose_b=True) + self.bias_h1, self.temp)
 		self.h1 = self.sample(self.h1_prob)
 		self.h2 = sigmoid(tf.matmul(self.h1_var,self.w2) + self.bias_h2,self.temp)
@@ -428,6 +429,8 @@ class DBM_class(object):
 
 		self.update_h1_with_context = self.h1_var.assign(self.sample(sigmoid(tf.matmul(self.v_var,self.w1)  + tf.matmul(tf.multiply(self.h2_var,self.modification_tf),self.w2,transpose_b=True) + self.bias_h1,self.temp)))
 		self.update_h1_probs = self.h1_var.assign(self.h1_prob)			
+		
+		self.update_v_probs = self.v_var.assign(self.v_prob)			
 
 		self.update_v  = self.v_var.assign(self.v)
 		self.update_h1 = self.h1_var.assign(self.h1)		
@@ -569,7 +572,7 @@ class DBM_class(object):
 		if self.liveplot:
 			log.info("Liveplot is on!")
 			fig,ax = plt.subplots(1,1,figsize=(15,10))
-			data   = ax.matshow(tile(self.w1.eval()),vmin=-0.01,vmax=0.01)
+			data   = ax.matshow(tile(self.w1.eval()), vmin=-0.01, vmax=0.01)
 			plt.colorbar(data)
 
 
@@ -755,8 +758,8 @@ class DBM_class(object):
 			plt.title("differenzen der h2 layer fur 100 bilder")
 
 		
-		self.h1_test = h1[-1]
-		self.h2_test = h2[-1]
+		self.h1_test = np.mean(h1[-20:],axis=0)
+		self.h2_test = np.mean(h2[-20:],axis=0)
 
 		#### update v M times
 		self.probs = self.v_var.eval()
@@ -854,7 +857,8 @@ class DBM_class(object):
 			h1 = self.h1_var.eval()
 			v_gibbs = self.v_var.eval()
 
-			sess.run(self.modification_tf.assign(self.batchsize*[modification]))
+			modification = np.concatenate((modification,)*self.batchsize).reshape(self.batchsize,10)
+			sess.run(self.modification_tf.assign(modification))
 			
 			for i in range(gibbs_steps):
 				# calculate the backward and forward pass 
@@ -893,25 +897,24 @@ class DBM_class(object):
 
 		if mode=="generate":
 			sess.run(self.h2_var.assign(v_input))
-			sess.run(self.assign_v,{self.batch_ph : rnd.random([1,DBM.shape[0]])*0.001})
-			sess.run(self.assign_h1,{self.h1_ph   : rnd.random([1,DBM.shape[1]])*0.001})
+			sess.run(self.assign_v,{self.batch_ph : rnd.random([1,DBM.shape[0]])*0.1})
+			sess.run(self.update_h1, {self.temp : temp})
 			h2 = self.h2_var.eval()
 			h1 = self.h1_var.eval()
 			v_gibbs = self.v_var.eval()
 
-			sess.run(self.modification_tf.assign(self.batchsize*[modification]))
+			# sess.run(self.modification_tf.assign(self.batchsize*[modification]))
 			
 			# log.info("Generating with image as starting value for v")
 			# input_image = test_data[3:4]
 			## make noisy ?
 
 			for i in range(gibbs_steps):
+				
 				# calculate the backward and forward pass 
-				v_gibbs, h1 = sess.run([self.update_v, self.update_h1],{self.temp: temp})
+				v_gibbs, h1 = sess.run([self.update_v, self.update_h1], {self.temp : temp})
 
-
-
-				h2_[i] = h2
+				h2_[i] = h2 # sess.run(self.update_h2, {self.temp : temp})
 
 
 				if liveplot:
@@ -1091,14 +1094,14 @@ class DBM_class(object):
 #### User Settings ###
 
 num_batches_pretrain = 100
-dbm_batches          = 100 
+dbm_batches          = 20 
 pretrain_epochs      = [5,20]
-dbm_epochs           = 1
+dbm_epochs           = 10
 
 
 rbm_learnrate     = 0.005
-dbm_learnrate     = 0.01
-dbm_learnrate_end = 0.01
+dbm_learnrate     = 0.03
+dbm_learnrate_end = 0.03
 
 
 temp = 0.05
@@ -1109,20 +1112,20 @@ pre_training    = 0 	#if no pretrain then files are automatically loaded
 
 training        = 0
 
-testing         = 1
-plotting        = 1
+testing         = 0
+plotting        = 0
 
-gibbs_sampling  = 0
+gibbs_sampling  = 1
 noise_stab_test = 0
 
 
 save_to_file          = 0 	# only save biases and weights for further training
 save_all_params       = 0	# also save all test data and reconstructed images (memory heavy)
-save_pretrained       = 1
+save_pretrained       = 0
 
 
 load_from_file        = 1
-pathsuffix            = "Tue_Mar_13_09-20-37_2018"#"Sun Feb 11 20-20-39 2018"#"Thu Jan 18 20-04-17 2018 80 epochen"
+pathsuffix            = "Tue_Mar_13_14-17-13_2018"#"Sun Feb 11 20-20-39 2018"#"Thu Jan 18 20-04-17 2018 80 epochen"
 pathsuffix_pretrained = "Mon Mar  5 11-13-22 2018"
 
 
@@ -1179,7 +1182,7 @@ for i in range(1):
 			log.start("Test Session")
 
 			wrong_classified_id = DBM.test(	test_data,
-									N=100,  # sample h1 and h2. 1->1 sample, aber achtung_> 1. sample ist aus random werten, also mindestens 2 sample machen 
+									N=50,  # sample h1 and h2. 1->1 sample, aber achtung_> 1. sample ist aus random werten, also mindestens 2 sample machen 
 									M=10  # average v. 0->1 sample
 								)
 
@@ -1196,15 +1199,20 @@ if gibbs_sampling:
 		if load_from_file and not training:
 			DBM.load_from_file(workdir+"/data/"+pathsuffix)
 
-		# p = 1 # (unused) multiplication for modification context array 
+		subspace = [5,6,7,8,9]
 
+		context_mod = np.zeros(10)
+		for i in range(10):
+			if i in subspace:
+				context_mod[i] = 1
+
+		# loop through images from all wrong classsified images and find al images that are <5 
 		index_for_number_gibbs=[]
-		# loop through images from all wrong classified images and find al images that are <5 
-		for i in range(10000): #wrong_classified_id:			
+		for i in wrong_classified_id: #wrong_classified_id:			
 			## find the digit that was presented
 			digit=np.where(test_label[i])[0][0] 		
 			## set desired digit range
-			if digit>=5:
+			if digit in subspace:
 				index_for_number_gibbs.append(i)
 		log.info("Found %i Images"%len(index_for_number_gibbs))
 
@@ -1217,10 +1225,10 @@ if gibbs_sampling:
 		DBM.graph_init("gibbs")
 		DBM.import_()
 
-		#### generation of an image using a label
+		# #### generation of an image using a label
 		# h2_no_context=DBM.gibbs_sampling([[0,0,1,0,0,0,0,0,0,0]], 500, 0.05 , 0.05, 
 		# 					mode         = "generate",
-		# 					modification = [0,0,0,1,0,0,0,0,0,0],
+		# 					modification = [1,1,1,1,1,1,1,1,1,1],
 		# 					liveplot     = 1)
 
 		# calculte h2 firerates over all gibbs_steps 
@@ -1233,8 +1241,7 @@ if gibbs_sampling:
 		# with context
 		h2_context=DBM.gibbs_sampling(test_data[index_for_number_gibbs[:]], 40, 0.05 , 0.05, 
 							mode         = "context",
-							modification = [0,0,0,0,0,1,1,1,1,1],
-									  #[0,1,2,3,4,5,6,7,8,9]
+							modification = context_mod,
 							liveplot     = 0)
 		log.end()
 
@@ -1248,25 +1255,31 @@ if gibbs_sampling:
 		correct_maxis_nc   = []
 		incorrect_maxis_c  = []
 		incorrect_maxis_nc = []
-		
+
+		wrongs_outside_subspace_c = 0
+		wrongs_outside_subspace_nc = 0
 
 		for i,d in enumerate(index_for_number_gibbs):
 			digit = np.where(test_label[d]==1)[0][0]
 
-			### count how many got right (with context) but only check in the subspace of choosen digits
+			### count how many got right (with context) 
 			maxi_c    = h2_context[i].max()
 			max_pos_c = np.where(h2_context[i] == maxi_c)[0][0]
 			if max_pos_c == digit:
 				correct_maxis_c.append(maxi_c)
 			else:
+				if max_pos_c  not  in  subspace:
+					wrongs_outside_subspace_c += 1
 				incorrect_maxis_c.append(maxi_c)
 
-			### count how many got right (no context) but only check in the subspace of choosen digits
+			### count how many got right (no context) 
 			maxi_nc    = h2_no_context[i].max()
 			max_pos_nc = np.where(h2_no_context[i] == maxi_nc)[0][0]			
 			if max_pos_nc == digit:
 				correct_maxis_nc.append(maxi_nc)
 			else:
+				if max_pos_c  not in  subspace:
+					wrongs_outside_subspace_nc += 1
 				incorrect_maxis_nc.append(maxi_nc)
 
 			desired_digits_c.append(h2_context[i,digit])
@@ -1278,6 +1291,7 @@ if gibbs_sampling:
 		log.info("Inorrect Context:" , len(incorrect_maxis_c),"/",round(100*len(incorrect_maxis_c)/float(len(index_for_number_gibbs)),2),"%")
 		log.info("Inorrect No Context:" , len(incorrect_maxis_nc),"/",round(100*len(incorrect_maxis_nc)/float(len(index_for_number_gibbs)),2),"%")
 		log.info("Diff:     ",abs(len(incorrect_maxis_c)-len(incorrect_maxis_nc)))
+		log.info("Outside subspace (c/nc):",wrongs_outside_subspace_c,",", wrongs_outside_subspace_nc)
 		log.out("Means: Correct // Wrong (c/nc): \n \t \t ", round(np.mean(correct_maxis_c),4),
 									round(np.mean(correct_maxis_nc),4), "//",
 									round(np.mean(incorrect_maxis_c),4),
@@ -1296,7 +1310,7 @@ if gibbs_sampling:
 
 		# 	log.end()
 
-		# ### plot
+		# # ### plot
 		# fig_gs,ax_gs = plt.subplots(2,1,sharex="all")
 		# for i in range(len(desired_digits_c)):
 		# 	ax_gs[0].plot((desired_digits_c[i]))
@@ -1351,7 +1365,7 @@ if plotting:
 	##### plot "receptive fields"
 	fig,ax=plt.subplots(3,1)
 	fig2,ax2=plt.subplots(1,1)
-	for i in range(5):
+	for i in range(1):
 		h2 = test_label[i:i+1]
 		digit = np.where(h2 == 1)[1]
 
@@ -1398,6 +1412,7 @@ if plotting:
 		
 	map1=plt.matshow(tile(DBM.w1_np),cmap="gray")
 	plt.colorbar(map1)
+	plt.grid(False)
 	plt.title("W 1")
 
 	# plt.matshow(tile(DBM.CD1_np))
