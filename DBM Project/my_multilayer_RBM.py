@@ -875,7 +875,7 @@ class DBM_class(object):
 			for i in range(gibbs_steps):
 				# calculate the backward and forward pass 
 				h1, h2 = sess.run([self.update_h1_with_context, self.update_h2], {self.temp: temp})
-				v_gibbs = sess.run(self.update_v, {self.temp : temp})
+				# v_gibbs = sess.run(self.update_v, {self.temp : temp})
 				h2_[i] = h2
 
 
@@ -1078,12 +1078,12 @@ temp = 0.05
 pre_training    = 0 	#if no pretrain then files are automatically loaded
 
 
-training        = 1
+training        = 0
 
-testing         = 1
-plotting        = 1
+testing         = 0
+plotting        = 0
 
-gibbs_sampling  = 0
+gibbs_sampling  = 1
 noise_stab_test = 0
 
 
@@ -1093,7 +1093,7 @@ save_pretrained       = 0
 
 
 load_from_file        = 1
-pathsuffix            = "Thu_Mar_15_11-43-13_2018"#"Sun Feb 11 20-20-39 2018"#"Thu Jan 18 20-04-17 2018 80 epochen"
+pathsuffix            = r"Tue_Mar_13_09-20-37_2018 - 5% fehler"#"Sun Feb 11 20-20-39 2018"#"Thu Jan 18 20-04-17 2018 80 epochen"
 pathsuffix_pretrained = "Mon Mar  5 11-13-22 2018"
 
 
@@ -1173,14 +1173,16 @@ if gibbs_sampling:
 
 		subspace = [5,6,7,8,9]
 
+		p = 2
+		log.info("Multiplicator p = ",p)
 		context_mod = np.zeros(10)
 		for i in range(10):
 			if i in subspace:
-				context_mod[i] = 1
+				context_mod[i] = 1*p
 
 		# loop through images from all wrong classsified images and find al images that are <5 
 		index_for_number_gibbs=[]
-		for i in range(45,46): #wrong_classified_id:			
+		for i in range(10000): #wrong_classified_id:			
 			## find the digit that was presented
 			digit=np.where(test_label[i])[0][0] 		
 			## set desired digit range
@@ -1198,10 +1200,10 @@ if gibbs_sampling:
 		DBM.import_()
 
 		# #### generation of an image using a label
-		h2_no_context=DBM.gibbs_sampling([[0,0,1,0,0,0,0,0,0,0]], 500, 0.05 , 0.05, 
-							mode         = "generate",
-							modification = [1,1,1,1,1,1,1,1,1,1],
-							liveplot     = 1)
+		# h2_no_context=DBM.gibbs_sampling([[0,0,1,0,0,0,0,0,0,0]], 500, 0.05 , 0.05, 
+		# 					mode         = "generate",
+		# 					modification = [1,1,1,1,1,1,1,1,1,1],
+		# 					liveplot     = 1)
 
 		# calculte h2 firerates over all gibbs_steps 
 		log.start("Sampling data")
@@ -1231,8 +1233,14 @@ if gibbs_sampling:
 		wrongs_outside_subspace_c = 0
 		wrongs_outside_subspace_nc = 0
 
+		hist_data    = np.zeros([10,1]).tolist()
+		hist_data_nc = np.zeros([10,1]).tolist()
+
 		for i,d in enumerate(index_for_number_gibbs):
-			digit = np.where(test_label[d]==1)[0][0]
+			digit = np.where( test_label[d] == 1 )[0][0]
+			
+			hist_data[digit].append( h2_context[i].tolist() )
+			hist_data_nc[digit].append( h2_no_context[i].tolist() )
 
 			### count how many got right (with context) 
 			maxi_c    = h2_context[i].max()
@@ -1289,6 +1297,21 @@ if gibbs_sampling:
 		plt.xlabel("Threshold")
 		plt.ylabel("Number of Digits")
 		plt.legend(loc="best")
+
+
+		### plt histograms for each used digit
+		fig,ax = plt.subplots(1,len(subspace))
+		for i,digit in enumerate(subspace):
+			ax[i].bar(range(10),np.mean(hist_data[digit][1:],axis=0))
+			ax[i].set_title(str(digit))
+			ax[i].set_xticks(range(10))
+
+		### plt histograms for each used digit
+		fig,ax = plt.subplots(1,len(subspace))
+		for i,digit in enumerate(subspace):
+			ax[i].bar(range(10),np.mean(hist_data_nc[digit][1:],axis=0))
+			ax[i].set_title(str(digit))
+			ax[i].set_xticks(range(10))
 
 		log.end()
 
