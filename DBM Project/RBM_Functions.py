@@ -15,10 +15,10 @@ def smooth(x,f):
 
 
 def tile(w):
-    a=np.zeros([int(sqrt(w.shape[0]*w.shape[1])),int(sqrt(w.shape[0]*w.shape[1]))])
-    j,k=0,0
-    pic_size=int(sqrt(w.T.shape[1]))
-    r=w.T.shape[0]
+    a        = np.zeros([int(sqrt(w.shape[0]*w.shape[1])),int(sqrt(w.shape[0]*w.shape[1]))])
+    j,k      = 0,0
+    pic_size = int(sqrt(w.T.shape[1]))
+    r        = w.T.shape[0]
     for i in range(r):
         try:
             a[k:k+pic_size,j:j+pic_size]=w.T[i,:].reshape(pic_size,pic_size)
@@ -30,6 +30,26 @@ def tile(w):
             pass
         # j+=28
     return a
+
+def untile(w,shape):
+    """ reverse tile() function 
+    w     :: matrix to be untiled
+    shape :: desired shape 
+    """
+    a        = np.zeros([shape[0],shape[1]])
+    j,k      = 0, 0
+    pic_size = int(sqrt(shape[0]))
+    r        = shape[1]
+
+    for i in range(r):
+            a[:,i] = w[k:k+pic_size,j:j+pic_size].reshape(shape[0])
+            k += pic_size
+            if k+pic_size>w.shape[0]:
+                k = 0
+                j += pic_size
+
+    return a
+
 
 def tile_raster_images(X, img_shape, tile_shape, tile_spacing=(0, 0),scale_rows_to_unit_interval=True,output_pixel_vals=True):
     
@@ -184,16 +204,29 @@ def shuffle(x,seed):
     return y
 
 def sort_receptive_field(m):
-    """ tries to order every receptive field to its maximum location"""
+    """ tries to order every receptive field to its maximum location
+    input:
+        w :: weights matrix of the first layer 
+    returns:
+        w_new :: new tiled matrix
+        line_change :: index of each line (which is an image here, because the tiled matrix is used)
+                         of each image that got moved and where it got moved 
+    """
     w       = np.copy(tile(m))
     w_new   = np.zeros(w.shape)
     pos_max = []
     n       = 0
     im_size=int(sqrt(m.shape[0]))
+    line_change = []
+    m_shape0 = m.shape[0]
+    m_shape1 = m.shape[1]
     for i in range(0,w.shape[0],im_size):
         for j in range(0,w.shape[1],im_size):
+            true_x = (i + (j * w.shape[0]) ) % m_shape0
+            true_y = (j + (i * w.shape[1]) ) % m_shape1
+            line = i/28+(j/28 * w.shape[0]/28)
             switch = 0
-            maxi   = abs(w[i:i+im_size,j:j+im_size]).max()
+            maxi   = abs(w[i:i + im_size,j:j + im_size]).max()
             npw    = np.where(abs(w[i:i+im_size,j:j+im_size]) == maxi)
             pos_max.append([i,j,[npw[0][0],npw[1][0]]])
 
@@ -216,16 +249,36 @@ def sort_receptive_field(m):
 
                             if switch==0:
                                         
-                                x=move_to[0]+vor1*(k*im_size)
-                                y=move_to[1]+vor2*(m*im_size)                
+                                x_to=move_to[0]+vor1*(k*im_size)
+                                y_to=move_to[1]+vor2*(m*im_size)
                                 #check if place is already used
                                 
-                                if w_new[x:x+im_size,y:y+im_size].mean()==0:
+                                if w_new[x_to:x_to+im_size,y_to:y_to+im_size].mean()==0:
                                     # move image 
-                                    w_new[x:x+im_size,y:y+im_size]=w[i:i+im_size,j:j+im_size]
+                                    w_new[x_to:x_to+im_size,y_to:y_to+im_size]=w[i:i+im_size,j:j+im_size]
                                     # switch for breaking the tries
-                                    switch=1
+                                    switch = 1
+                                    # save which image got moveed where
+                                    line_to = x_to/28+(y_to/28 * w.shape[0]/28)
+                                    line_change.append([line,line_to])
+
             if switch==0:
                 n+=1
+    return w_new, np.array(line_change)
+
+def sort_by_index(w,line_change):
+    """ sort w by index list given from sort_receptive_field() """
+    w_new = np.zeros(w.shape)
+
+    for i in line_change:
+        move_to=i[1]
+        move_from=i[0]
+        w_new[move_to] = w[move_from]
     return w_new
 
+
+if __name__ == "__main__":
+    w1_new, pos_change = sort_receptive_field(DBM.w1_np)
+    w1_unt = untile(w1_new, [784,400])
+    w1_test = untile(tile(w1_unt), [784,400]) #works 
+    w2_new = sort_by_index(DBM.w2_np, pos_change)
