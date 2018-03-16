@@ -296,7 +296,7 @@ class DBM_class(object):
 				if save_pretrained:
 					for i in range(len(self.weights)):
 						np.savetxt("Pretrained-"+" %i "%i+str(time_now)+".txt", self.weights[i])
-						log.out("Saved Pretrained")
+					log.out("Saved Pretrained under "+str(time_now))
 			else:
 				self.weights=[]
 				log.out("Loading Pretrained from file")
@@ -1064,10 +1064,10 @@ class DBM_class(object):
 num_batches_pretrain = 100
 dbm_batches          = 1000 
 pretrain_epochs      = [5,20]
-dbm_epochs           = 5
+dbm_epochs           = 15
 
 
-rbm_learnrate     = 0.005
+rbm_learnrate     = 0.05
 dbm_learnrate     = 0.05
 dbm_learnrate_end = 0.05
 
@@ -1078,7 +1078,7 @@ temp = 0.05
 pre_training    = 0 	#if no pretrain then files are automatically loaded
 
 
-training        = 0
+training        = 1
 
 testing         = 0
 plotting        = 0
@@ -1089,12 +1089,12 @@ noise_stab_test = 0
 
 save_to_file          = 0 	# only save biases and weights for further training
 save_all_params       = 0	# also save all test data and reconstructed images (memory heavy)
-save_pretrained       = 0
+save_pretrained       = 1
 
 
-load_from_file        = 1
-pathsuffix            = r"Tue_Mar_13_09-20-37_2018 - 5% fehler"#"Sun Feb 11 20-20-39 2018"#"Thu Jan 18 20-04-17 2018 80 epochen"
-pathsuffix_pretrained = "Mon Mar  5 11-13-22 2018"
+load_from_file        = 0
+pathsuffix            = r"Fri_Mar_16_09-35-20_2018"#"Sun Feb 11 20-20-39 2018"#"Thu Jan 18 20-04-17 2018 80 epochen"
+pathsuffix_pretrained = "Fri_Mar_16_09-35-20_2018"
 
 
 number_of_layers = 3
@@ -1173,7 +1173,7 @@ if gibbs_sampling:
 
 		subspace = [5,6,7,8,9]
 
-		p = 2
+		p = 1
 		log.info("Multiplicator p = ",p)
 		context_mod = np.zeros(10)
 		for i in range(10):
@@ -1207,13 +1207,13 @@ if gibbs_sampling:
 
 		# calculte h2 firerates over all gibbs_steps 
 		log.start("Sampling data")
-		h2_no_context=DBM.gibbs_sampling(test_data[index_for_number_gibbs[:]], 300, 0.05 , 0.05, 
+		h2_no_context=DBM.gibbs_sampling(test_data[index_for_number_gibbs[:]], 100, 0.05 , 0.05, 
 							mode         = "context",
 							modification = [1,1,1,1,1,1,1,1,1,1],
 							liveplot     = 0)
 			
 		# with context
-		h2_context=DBM.gibbs_sampling(test_data[index_for_number_gibbs[:]], 300, 0.05 , 0.05, 
+		h2_context=DBM.gibbs_sampling(test_data[index_for_number_gibbs[:]], 100, 0.05 , 0.05, 
 							mode         = "context",
 							modification = context_mod,
 							liveplot     = 0)
@@ -1300,16 +1300,20 @@ if gibbs_sampling:
 
 
 		### plt histograms for each used digit
-		fig,ax = plt.subplots(1,len(subspace))
+		fig,ax = plt.subplots(1,len(subspace),figsize=(12,7),sharey="row")
+		plt.suptitle("With context")
 		for i,digit in enumerate(subspace):
 			ax[i].bar(range(10),np.mean(hist_data[digit][1:],axis=0))
+			ax[i].set_ylim([0,0.3])
 			ax[i].set_title(str(digit))
 			ax[i].set_xticks(range(10))
 
 		### plt histograms for each used digit
-		fig,ax = plt.subplots(1,len(subspace))
+		fig,ax = plt.subplots(1,len(subspace),figsize=(12,7),sharey="row")
+		plt.suptitle("Without context")
 		for i,digit in enumerate(subspace):
 			ax[i].bar(range(10),np.mean(hist_data_nc[digit][1:],axis=0))
+			ax[i].set_ylim([0,0.3])
 			ax[i].set_title(str(digit))
 			ax[i].set_xticks(range(10))
 
