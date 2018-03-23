@@ -320,14 +320,17 @@ class DBM_class(object):
 	def load_from_file(self,path):
 		os.chdir(path)
 		log.out("Loading data from:","...",path[-20:])
-		self.w1_np     = np.loadtxt("w1.txt")
-		self.w1_np_old = self.w1_np #save weights for later comparison
-		self.w2_np     = np.loadtxt("w2.txt")
-		self.w3_np     = np.loadtxt("w3.txt")
-		self.bias1_np  = np.loadtxt("bias1.txt")
-		self.bias2_np  = np.loadtxt("bias2.txt")
-		self.bias3_np  = np.loadtxt("bias3.txt")
-		self.bias_label_np  = np.loadtxt("bias_label.txt")
+
+		self.w_np=[]
+		for i in range(len(self.shape)-1):
+			self.w_np.append(np.loadtxt("w%i.txt"%(i)))
+			if i==0:
+				self.w1_np_old = self.w_np[0] #save weights for later comparison
+
+		self.bias_np=[]
+		for i in range(len(self.shape)):
+			self.bias_np.append(np.loadtxt("bias%i.txt"%(i)))
+
 		os.chdir(workdir)
 
 	
@@ -335,13 +338,10 @@ class DBM_class(object):
 		""" setting up the graph and setting the weights and biases tf variables to the 
 		saved numpy arrays """
 		log.out("loading numpy vars into graph")
-		sess.run(self.w[0].assign(self.w1_np))
-		sess.run(self.w[1].assign(self.w2_np))
-		sess.run(self.w[2].assign(self.w3_np))
-		sess.run(self.bias[0].assign(self.bias1_np))
-		sess.run(self.bias[1].assign(self.bias2_np))
-		sess.run(self.bias[2].assign(self.bias3_np))
-		sess.run(self.bias[3].assign(self.bias_label_np))
+		for i in range(len(self.shape)-1):
+			sess.run(self.w[i].assign(self.w_np[i]))
+		for i in range(len(self.shape)):
+			sess.run(self.bias[i].assign(self.bias_np[i]))
 
 	def layer_input(self, layer_i, temp):
 		""" calculate input of layer layer_i
@@ -541,22 +541,6 @@ class DBM_class(object):
 			h2_.append(h2[0])
 		
 		return np.array(h2_),v_noise_recon
-
-	# def freerun(self,v_input,N):
-	# 	self.batchsize = len(v_input)
-	# 	v = np.zeros([N,self.batchsize,self.shape[0]])
-	# 	h1 = np.zeros([N,self.batchsize,self.shape[1]])
-	# 	h2 = np.zeros([N,self.batchsize,self.shape[2]])
-
-	# 	self.v_var.assign(v_input.reshape(1,28))
-
-	# 	for n in range(N):
-	# 		v[n], h1[n], h2[n] = sess.run([self.update_v,self.update_h1,self.update_h2])
-
-	# 	fig,ax = plt.subplots(1,10)
-	# 	for i in range(10):
-	# 		ax[i].matshow(v[i].reshape(28,28))
-
 
 
 	def train(self,train_data,train_label,epochs,num_batches,learnrate,N,cont):
@@ -999,13 +983,12 @@ class DBM_class(object):
 
 	def export(self):
 		# convert weights and biases to numpy arrays
-		self.w1_np    = self.w[0].eval() 
-		self.w2_np    = self.w[1].eval()
-		self.w3_np    = self.w[2].eval()
-		self.bias1_np = self.bias[0].eval()
-		self.bias2_np = self.bias[1].eval()
-		self.bias3_np = self.bias[2].eval()
-		self.bias_label_np = self.bias[3].eval()
+		self.w_np=[]
+		for i in range(len(self.shape)-1):
+			self.w_np.append(self.w[i].eval())
+		self.bias_np = []
+		for i in range(len(self.shape)):	
+			self.bias_np.append(self.bias[i].eval())
 
 		# convert tf.arrays to numpy arrays 
 		if training:
@@ -1028,13 +1011,10 @@ class DBM_class(object):
 		new_path = saveto_path
 		os.makedirs(new_path)
 		os.chdir(new_path)
-		np.savetxt("w1.txt", self.w1_np)
-		np.savetxt("w2.txt", self.w2_np)
-		np.savetxt("w3.txt", self.w3_np)
-		np.savetxt("bias1.txt", self.bias1_np)
-		np.savetxt("bias2.txt", self.bias2_np)
-		np.savetxt("bias3.txt", self.bias3_np)
-		np.savetxt("bias_label.txt", self.bias_label_np)
+		for i in range(len(self.shape)-1):
+			np.savetxt("w%i.txt"%i, self.w_np[i])
+		for i in range(len(self.shape)):
+			np.savetxt("bias%i.txt"%i, self.bias_np[i])
 		
 		self.log_list.append(["train_time",self.train_time])
 
@@ -1043,7 +1023,6 @@ class DBM_class(object):
 					log_file.write(self.log_list[i][0]+","+str(self.log_list[i][1])+"\n")
 		
 		log.info("Saved data and log to:",new_path)
-
 
 		if save_all_params:
 			if training:
@@ -1087,24 +1066,24 @@ dbm_learnrate_end = 0.05
 temp = 0.05
 
 
-pre_training    = 0 	#if no pretrain then files are automatically loaded
+pre_training    = 1 	#if no pretrain then files are automatically loaded
 
 
-training        = 0
+training        = 1
 
-testing         = 0
-plotting        = 0
+testing         = 1
+plotting        = 1
 
-gibbs_sampling  = 1
+gibbs_sampling  = 0
 noise_stab_test = 0
 
 
-save_to_file          = 0 	# only save biases and weights for further training
+save_to_file          = 1 	# only save biases and weights for further training
 save_all_params       = 0	# also save all test data and reconstructed images (memory heavy)
-save_pretrained       = 0
+save_pretrained       = 1
 
 
-load_from_file        = 1
+load_from_file        = 0
 pathsuffix            = r"Fri_Mar_23_08-23-13_2018_[784, 225, 49, 10]"#"Sun Feb 11 20-20-39 2018"#"Thu Jan 18 20-04-17 2018 80 epochen"
 pathsuffix_pretrained = r"Thu_Mar_22_15-43-28_2018"
 
@@ -1352,23 +1331,23 @@ if plotting:
 	log.out("Plotting...")
 
 		
-	map1=plt.matshow(tile(DBM.w1_np),cmap="gray")
+	map1=plt.matshow(tile(DBM.w_np[0]),cmap="gray")
 	plt.colorbar(map1)
 	plt.grid(False)
 	plt.title("W 1")
 
 	# plt.matshow(tile(DBM.CD1_np))
-	map2=plt.matshow(tile(DBM.w2_np))
+	map2=plt.matshow(tile(DBM.w_np[1]))
 	plt.title("W 2")
 	plt.colorbar(map2)	
 
-	# map3=plt.matshow(tile(DBM.w3_np))
-	# plt.title("W 3")
-	# plt.colorbar(map3)	
+	map3=plt.matshow((DBM.w_np[2]).T)
+	plt.title("W 3")
+	plt.colorbar(map3)
 
 	try:
 		# plot change in w1 
-		plt.matshow(tile(DBM.w1_np-DBM.w1_np_old))
+		plt.matshow(tile(DBM.w_np[0]-DBM.w1_np_old))
 		plt.colorbar()
 		plt.title("Change in W1")
 	except:
