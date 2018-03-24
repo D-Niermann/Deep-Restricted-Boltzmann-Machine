@@ -343,23 +343,22 @@ class DBM_class(object):
 		for i in range(len(self.shape)):
 			sess.run(self.bias[i].assign(self.bias_np[i]))
 
-	def layer_input(self, layer_i, temp):
+	def layer_input(self, layer_i):
 		""" calculate input of layer layer_i
 		layer_i :: for which layer
-		temp :: temperature for sigmoid function
 		returns :: input for the layer - which are the probabilites
 		"""
 		if layer_i == 0:
-			_input_ = sigmoid(tf.matmul(self.layer[layer_i+1], self.w[layer_i],transpose_b=True) + self.bias[layer_i], temp)			
+			_input_ = sigmoid(tf.matmul(self.layer[layer_i+1], self.w[layer_i],transpose_b=True) + self.bias[layer_i], self.temp)			
 
 		elif layer_i == self.n_layers-1:
-			_input_ = sigmoid(tf.matmul(self.layer[layer_i-1],self.w[layer_i-1]) + self.bias[layer_i], temp)
+			_input_ = sigmoid(tf.matmul(self.layer[layer_i-1],self.w[layer_i-1]) + self.bias[layer_i], self.temp)
 		
 		else:
 			_input_ = sigmoid(tf.matmul(self.layer[layer_i-1],self.w[layer_i-1]) 
 					+ tf.matmul(self.layer[layer_i+1],self.w[layer_i],transpose_b=True) 
 					+ self.bias[layer_i], 
-					temp)
+					self.temp)
 		return _input_
 
 	def sample(self,x):
@@ -400,7 +399,11 @@ class DBM_class(object):
 			self.train_error_ = tf.Variable(tf.zeros([self.num_of_updates/self.num_of_skipped]))
 			self.train_class_error_ = tf.Variable(tf.zeros([self.num_of_updates/self.num_of_skipped]))
 			
-			
+		#### temperature
+		if graph_mode=="gibbs" or graph_mode=="testing":
+			self.temp = tf.placeholder(tf.float32,[],name="Temperature")
+		else:
+			self.temp = temp
 
 
 
@@ -430,6 +433,7 @@ class DBM_class(object):
 		self.update_l_s = [None]*self.n_layers # assign op. for calculated samples
 		self.update_l_p = [None]*self.n_layers # assign op. for calculated probs
 		self.layer_activities = [None]*self.n_layers # calc for layer activieties (mean over batch)
+		self.layer_energy = [None]*(self.n_layers-1)
 
 		### layer vars 
 		for i in range(len(self.layer)):
@@ -456,25 +460,20 @@ class DBM_class(object):
 				self.update_bias[i] = self.bias[i].assign_add(self.learnrate*tf.reduce_mean(tf.subtract(self.layer_save[i],self.layer[i]),0))
 
 		### layer calculations and assignments
-		for i in range(len(self.layer)):			
+		for i in range(len(self.layer)):
 			self.save_layer[i] = self.layer_save[i].assign(self.layer[i])
 			self.assign_l[i]   = self.layer[i].assign(self.layer_ph[i])
-			self.layer_prob[i] = self.layer_input(i,temp)
+			self.layer_prob[i] = self.layer_input(i)
 			self.layer_samp[i] = self.sample(self.layer_prob[i])
-			self.update_l_s[i] = self.layer[i].assign(self.layer_samp[i])
 			self.update_l_p[i] = self.layer[i].assign(self.layer_prob[i])
 			self.layer_activities[i] = tf.reduce_mean(tf.reduce_sum(self.layer[i],1)/self.shape[i])
-
+		for i in range(len(self.layer)-1):
+			self.layer_energy[i] = tf.matmul(self.layer[i], tf.matmul(self.w[i],self.layer[i+1],transpose_b=True))
+			self.update_l_s[i]   = self.layer[i].assign(self.layer_samp[i])
+		self.update_l_s[-1] = self.layer[-1].assign(self.layer_prob[-1])
 
 		# modification array size 10 that gehts multiplied to the label vector for context
 		self.modification_tf = tf.Variable(tf.ones([self.batchsize,self.shape[-1]]),name="Modification")
-
-		
-		#### temperature
-		if graph_mode=="gibbs" or graph_mode=="testing":
-			self.temp = tf.placeholder(tf.float32,[],name="Temperature")
-		else:
-			self.temp = temp
 
 
 
@@ -488,7 +487,7 @@ class DBM_class(object):
 
 		self.free_energy = -tf.reduce_sum(tf.log(1+tf.exp(tf.matmul(self.layer[0],self.w[0])+self.bias[1])))
 
-		
+		self.energy = -tf.reduce_sum([self.layer_energy[i] for i in range(len(self.layer_energy))])
 
 		#### updates for each layer 
 		self.update_h2_with_context = self.layer[-2].assign(self.sample(sigmoid(tf.matmul(self.layer[-3],self.w[-2])  
@@ -735,9 +734,13 @@ class DBM_class(object):
 		#### update hidden and label N times
 		log.out("Sampling hidden %i times "%N)
 		self.layer_act = np.zeros([N,self.n_layers])
+		self.save_h1 = []
+		
 		for n in range(N):
 			self.hidden_save = sess.run([self.update_l_s[i] for i in range(1,len(self.shape))], {self.temp : temp})
 			self.layer_act[n,:] = sess.run(self.layer_activities,{self.temp : temp})
+			self.save_h1.append(self.layer[1].eval()[0])
+		
 
 		# plot the layer_act for 100 pictures
 		plt.figure("Layer_activiations_test_run")
@@ -751,8 +754,10 @@ class DBM_class(object):
 
 		#### update v M times
 		self.probs = self.layer[0].eval()
+		self.image_timeline = []
 		for i in range(M):
 			self.probs += sess.run(self.update_l_s[0],{self.temp : temp})
+			self.image_timeline.append(self.layer[0].eval()[0])
 		self.probs *= 1./(M+1)
 
 
@@ -762,12 +767,6 @@ class DBM_class(object):
 		self.test_error_.append(self.test_error) #append to errors if called multiple times
 		# error of classifivation labels
 		self.class_error=np.mean(np.abs(self.label_test-test_label))		
-		#activations of hidden layers
-		# self.h1_act_test = self.h1_sum.eval()
-		# self.label_act_test = self.label_sum.eval()
-		# norm the sum of the activities
-		# self.h1_act_test*=1./(self.shape[1]*len(test_data))
-		# self.label_act_test*=1./(self.shape[-1]*len(test_data))
 
 		#### count how many images got classified wrong 
 		log.out("Taking only the maximum")
@@ -808,17 +807,10 @@ class DBM_class(object):
 		p :: multiplication of the h2 array to increase the importance of the layer
 		"""
 
-		# self.v_rev = tf.Variable(tf.random_uniform([1,self.shape[0]],minval=-1e-3,maxval=1e-3),name="v_rev_init")
-		# self.h2    = tf.Variable(tf.random_uniform([1,self.shape[2]],minval=-1e-3,maxval=1e-3),name="h2")
-		
-		# tf.variables_initializer([self.h2,self.v_rev], name='init_train')
-		self.layer_save=[]
+		self.layer_save = []
 		for i in range(len(self.shape)):
 			self.layer_save.append(np.zeros([gibbs_steps,self.batchsize,self.shape[i]]))
 
-		# h2_            = np.zeros([gibbs_steps,self.batchsize,self.shape[3]])
-		# h1_            = np.zeros([gibbs_steps,self.batchsize,self.shape[1]])
-		# v_g_           = np.zeros([gibbs_steps,self.batchsize,self.shape[0]])
 		temp_          = np.zeros([gibbs_steps])
 		self.energy_   = []
 		self.mean_h1   = []
@@ -888,42 +880,24 @@ class DBM_class(object):
 
 		if mode=="generate":
 			sess.run(self.layer[-1].assign(v_input))
-			# sess.run(self.assign_v,  {self.batch_ph : rnd.random([1,DBM.shape[0]])*0.1})
-			# sess.run(self.update_h1, {self.temp     : temp})
 
-
-
-			# self.layer_save[-1] = self.layer[-1].eval()
-			# h1 = self.h1_var.eval()
-			# v_gibbs = self.v_var.eval()
-
-			# sess.run(self.modification_tf.assign(self.batchsize*[modification]))
-			
-			# log.info("Generating with image as starting value for v")
-			# input_image = test_data[3:4]
-			## make noisy ?
-
-			for i in range(gibbs_steps):
+			for step in range(gibbs_steps):
 				
-				# calculate the backward and forward pass 
+				# update all layer except the last one 
 				layer = sess.run(self.update_l_s[:-1], {self.temp : temp})
 
-				# h2_[i] = h2[0] # sess.run(self.update_h2, {self.temp : temp})
-				for j in range(len(self.shape)-1):
-					self.layer_save[j][i] = layer[j]
-				self.layer_save[-1][i] = self.layer[-1].eval()
+				# h2_[step] = h2[0] # sess.run(self.update_h2, {self.temp : temp})
+				for layer_i in range(len(self.shape)-1):
+					self.layer_save[layer_i][step] = layer[layer_i]
+				self.layer_save[-1][step] = self.layer[-1].eval()
 
 
 				if liveplot:
 					# calc the energy
-					energy1=np.dot(layer[0], np.dot(self.w1_np,layer[1].T))[0]
-					energy2=np.dot(layer[1], np.dot(self.w2_np,layer[2].T))[0]
-					self.energy_.append(-(energy1+energy2))
+					self.energy_.append(sess.run(self.energy))
+
 					# save values to array
-					
-					# self.layer_save[i]   = layer[1]
-					# v_g_[i]  = layer[0]
-					temp_[i] = temp
+					temp_[step] = temp
 				
 
 				# assign new temp
@@ -937,11 +911,13 @@ class DBM_class(object):
 	
 		if liveplot and plt.fignum_exists(fig.number) and self.batchsize==1:
 			data = [None]*(len(self.shape)+1)
-			for i in range(len(self.shape)-1):
-				data[i]  = ax[i].matshow(self.layer_save[i][0].reshape(int(sqrt(self.shape[i])),int(sqrt(self.shape[i]))))
-				ax[i].set_yticks([])
-				ax[i].set_xticks([])
-				ax[i].grid(False)
+			for layer_i in range(len(self.shape)-1):
+				s = int(sqrt(self.shape[layer_i]))
+				data[layer_i]  = ax[layer_i].matshow(self.layer_save[layer_i][0].reshape(s,s))
+				ax[layer_i].set_yticks([])
+				ax[layer_i].set_xticks([])
+				ax[layer_i].grid(False)
+			
 			data[-2], = ax[-2].plot([],[])
 			data[-1], = ax[-1].plot([],[])
 
@@ -955,17 +931,18 @@ class DBM_class(object):
 			ax[-2].set_xlim(0,10)
 			ax[-2].set_title("Classification")
 			
-			for i in range(1,gibbs_steps-1,2):
+			for step in range(1,gibbs_steps-1,2):
 				if plt.fignum_exists(fig.number):
-					ax[1].set_title("Temp.: %s, Steps: %s"%(str(round(temp_[i],3)),str(i)))
+					ax[1].set_title("Temp.: %s, Steps: %s"%(str(round(temp_[step],3)),str(step)))
 					
-					# a0.set_data(self.layer_save[0][i].reshape(28,28))
+					# a0.set_data(self.layer_save[0][step].reshape(28,28))
 					# a1.set_data(range(10),self.layer_save[-1][0])
 
-					for k in range(len(self.shape)-1):
-						data[k].set_data(self.layer_save[k][i].reshape(int(sqrt(self.shape[k])),int(sqrt(self.shape[k]))))
-					data[-2].set_data(range(10),self.layer_save[-1][i])
-					data[-1].set_data(range(i),self.energy_[:i])
+					for layer_i in range(len(self.shape)-1):
+						s = int(sqrt(self.shape[layer_i]))
+						data[layer_i].set_data(self.layer_save[layer_i][step].reshape(s,s))
+					data[-2].set_data(range(10),self.layer_save[-1][step])
+					data[-1].set_data(range(step),self.energy_[:step])
 					# a3.set_data(range(i),self.energy_[:i])
 					plt.pause(1/50.)
 		
@@ -1044,45 +1021,40 @@ class DBM_class(object):
 #### User Settings ###
 
 num_batches_pretrain = 100
-dbm_batches          = 100
+dbm_batches          = 500
 pretrain_epochs      = [2,2,2,2,2]
-dbm_epochs           = 1
+dbm_epochs           = 3
 
 
 rbm_learnrate     = 0.05
-dbm_learnrate     = 0.05
-dbm_learnrate_end = 0.05
-
+dbm_learnrate     = 0.01
+dbm_learnrate_end = 0.01
 
 temp = 0.05
 
+pre_training    = 0	# if no pretrain then files are automatically loaded
+training        = 0	# if trianing the whole DBM
+testing         = 0	# if testing the DBM with test data
+plotting        = 0
 
-pre_training    = 0 	#if no pretrain then files are automatically loaded
-
-
-training        = 0
-
-testing         = 1
-plotting        = 1
-
-gibbs_sampling  = 0
+gibbs_sampling  = 0	
 noise_stab_test = 0
 
-
-save_to_file          = 0 	# only save biases and weights for further training
-save_all_params       = 0	# also save all test data and reconstructed images (memory heavy)
-save_pretrained       = 0
+save_to_file    = 0 	# only save biases and weights for further training
+save_all_params = 0	# also save all test data and reconstructed images (memory heavy)
+save_pretrained = 0	
 
 
 load_from_file        = 1
-pathsuffix            = r"Tue_Mar_13_09-20-37_2018 - 5% fehler"#"Sun Feb 11 20-20-39 2018"#"Thu Jan 18 20-04-17 2018 80 epochen"
+pathsuffix            = r"Sat_Mar_24_00-56-26_2018_[784, 100, 225, 10]"#"Thu Jan 18 20-04-17 2018 80 epochen"
 pathsuffix_pretrained = r"Fri_Mar_23_10-22-57_2018"
-
+####################################################################################################################################################
 
 
 DBM_shape = [
 			28*28,
-			20*20,
+			10*10,
+			15*15,
 			10
 		 ]
 
@@ -1118,7 +1090,7 @@ for i in range(1):
 					epochs      = dbm_epochs,
 					num_batches = dbm_batches,
 					learnrate   = dbm_learnrate,
-					N           = 3, # freerunning steps
+					N           = 20, # freerunning steps
 					cont        = i)
 
 			DBM.train_time=log.end()
@@ -1178,24 +1150,25 @@ if gibbs_sampling:
 		DBM.graph_init("gibbs")
 		DBM.import_()
 
+
 		# #### generation of an image using a label
-		h2_no_context=DBM.gibbs_sampling([[0,0,1,0,0,0,0,0,0,0]], 500, 0.05 , 0.05, 
+		h2_no_context=DBM.gibbs_sampling([[0,1,0,0,0,0,0,0,0,0]], 500, 0.055 , 0.03, 
 							mode         = "generate",
 							modification = [1,1,1,1,1,1,1,1,1,1],
 							liveplot     = 1)
 
 		# calculte h2 firerates over all gibbs_steps 
 		log.start("Sampling data")
-		h2_no_context=DBM.gibbs_sampling(test_data[index_for_number_gibbs[:]], 100, 0.05 , 0.05, 
-							mode         = "context",
-							modification = [1,1,1,1,1,1,1,1,1,1],
-							liveplot     = 0)
+		# h2_no_context=DBM.gibbs_sampling(test_data[index_for_number_gibbs[:]], 100, 0.05 , 0.05, 
+		# 					mode         = "context",
+		# 					modification = [1,1,1,1,1,1,1,1,1,1],
+		# 					liveplot     = 0)
 			
-		# with context
-		h2_context=DBM.gibbs_sampling(test_data[index_for_number_gibbs[:]], 100, 0.05 , 0.05, 
-							mode         = "context",
-							modification = context_mod,
-							liveplot     = 0)
+		# # with context
+		# h2_context=DBM.gibbs_sampling(test_data[index_for_number_gibbs[:]], 100, 0.05 , 0.05, 
+		# 					mode         = "context",
+		# 					modification = context_mod,
+		# 					liveplot     = 0)
 		log.end()
 
 		# append h2 activity to array, but only the unit that corresponst to the given digit picture
@@ -1339,6 +1312,20 @@ if plotting:
 		plt.title("Change in W1")
 	except:
 		pass
+
+	# timeline
+	fig,ax=plt.subplots(2,len(DBM.image_timeline),figsize=(17,6))
+	for i in range(len(DBM.image_timeline)):
+		ax[0][i].matshow((DBM.image_timeline[i]).reshape(28,28))
+		ax[1][i].matshow((DBM.save_h1[i*2]).reshape(int(sqrt(DBM.shape[1])),int(sqrt(DBM.shape[1]))))
+		ax[0][i].set_title(str(i))
+		ax[0][i].set_xticks([])
+		ax[0][i].set_yticks([])
+		ax[1][i].set_xticks([])
+		ax[1][i].set_yticks([])
+		ax[0][i].grid(False)
+	plt.tight_layout()
+
 
 	if training:
 		x=np.linspace(0,dbm_epochs,len(DBM.w_mean_np[0]))
