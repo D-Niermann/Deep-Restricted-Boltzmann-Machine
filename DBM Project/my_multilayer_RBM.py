@@ -321,13 +321,13 @@ class DBM_class(object):
 		os.chdir(path)
 		log.out("Loading data from:","...",path[-20:])
 
-		self.w_np=[]
+		self.w_np     = []
+		self.w_np_old = []
 		for i in range(len(self.shape)-1):
 			self.w_np.append(np.loadtxt("w%i.txt"%(i)))
-			if i==0:
-				self.w1_np_old = self.w_np[0] #save weights for later comparison
+			self.w_np_old.append(self.w_np[i])  #save weights for later comparison
 
-		self.bias_np=[]
+		self.bias_np = []
 		for i in range(len(self.shape)):
 			self.bias_np.append(np.loadtxt("bias%i.txt"%(i)))
 
@@ -1015,7 +1015,7 @@ class DBM_class(object):
 num_batches_pretrain = 100
 dbm_batches          = 500
 pretrain_epochs      = [2,10,10,10,10]
-dbm_epochs           = 5
+dbm_epochs           = 1
 
 
 rbm_learnrate     = 0.05
@@ -1024,7 +1024,7 @@ dbm_learnrate_end = 0.005
 
 temp = 0.05
 
-pre_training    = 1	# if no pretrain then files are automatically loaded
+pre_training    = 0	# if no pretrain then files are automatically loaded
 training        = 1	# if trianing the whole DBM
 testing         = 1	# if testing the DBM with test data
 plotting        = 1
@@ -1038,7 +1038,7 @@ save_pretrained = 0
 
 
 load_from_file        = 1
-pathsuffix            = r"Sat_Mar_24_10-07-32_2018_[784, 100, 225, 10]"#"Thu Jan 18 20-04-17 2018 80 epochen"
+pathsuffix            = r"Mon_Mar_26_09-24-59_2018_[784, 400, 100, 10]"#"Thu Jan 18 20-04-17 2018 80 epochen"
 pathsuffix_pretrained = r"Fri_Mar_23_10-22-57_2018"
 ####################################################################################################################################################
 
@@ -1082,7 +1082,7 @@ for i in range(1):
 					epochs      = dbm_epochs,
 					num_batches = dbm_batches,
 					learnrate   = dbm_learnrate,
-					N           = 50, # freerunning steps
+					N           = 2, # freerunning steps
 					cont        = i)
 
 			DBM.train_time=log.end()
@@ -1284,13 +1284,21 @@ if training and save_to_file:
 h1_shape = int(sqrt(DBM.shape[1]))
 if plotting:
 	log.out("Plotting...")
-
 	
-	for i in range(len(DBM.shape)-2):
-		map1=plt.matshow(tile(DBM.w_np[i]),cmap="gray")
-		plt.colorbar(map1)
-		plt.grid(False)
-		plt.title("W %i"%i)
+	# plot w1 as image	
+	map1=plt.matshow(tile(DBM.w_np[i]),cmap="gray")
+	plt.colorbar(map1)
+	plt.grid(False)
+	plt.title("W %i"%i)
+
+	# plot all other weights as hists
+	fig,ax = plt.subplots(DBM.n_layers-1,1,figsize=(8,10))
+	for i in range(DBM.n_layers-1):
+		ax[i].hist((DBM.w_np[i]).flatten(),bins=60,alpha=0.5,label="Before Training")
+		ax[i].hist((DBM.w_np_old[i]).flatten(),color="r",bins=60,alpha=0.5,label="After Training")
+		ax[i].set_title("W %i"%i)
+		ax[i].legend()
+	plt.tight_layout()
 
 
 	map3=plt.matshow((DBM.w_np[-1]).T)
@@ -1299,7 +1307,7 @@ if plotting:
 
 	try:
 		# plot change in w1 
-		plt.matshow(tile(DBM.w_np[0]-DBM.w1_np_old))
+		plt.matshow(tile(DBM.w_np[0]-DBM.w_np_old[0]))
 		plt.colorbar()
 		plt.title("Change in W1")
 	except:
@@ -1307,6 +1315,7 @@ if plotting:
 
 	# timeline
 	fig,ax=plt.subplots(2,len(DBM.image_timeline),figsize=(17,6))
+	plt.tight_layout()
 	for i in range(len(DBM.image_timeline)):
 		ax[0][i].matshow((DBM.image_timeline[i]).reshape(28,28))
 		ax[1][i].matshow((DBM.save_h1[i*2]).reshape(int(sqrt(DBM.shape[1])),int(sqrt(DBM.shape[1]))))
@@ -1316,7 +1325,7 @@ if plotting:
 		ax[1][i].set_xticks([])
 		ax[1][i].set_yticks([])
 		ax[0][i].grid(False)
-	plt.tight_layout()
+	
 
 
 	if training:
@@ -1342,11 +1351,12 @@ if plotting:
 		plt.legend(loc="best")
 		ax_fr3.set_title("Train Error")
 		
-		plt.tight_layout()
+	plt.tight_layout()
 
 
 	#plot some samples from the testdata 
 	fig3,ax3 = plt.subplots(len(DBM.shape)+1,13,figsize=(16,6),sharey="row")
+	plt.tight_layout(pad=0.0)
 	for i in range(13):
 		# plot the input
 		ax3[0][i].matshow(test_data[i:i+1].reshape(int(sqrt(DBM.shape[0])),int(sqrt(DBM.shape[0]))))
@@ -1371,7 +1381,7 @@ if plotting:
 		#plot the reconstructed layer h1
 		# ax3[5][i].matshow(DBM.rec_h1[i:i+1].reshape(int(sqrt(DBM.shape[1])),int(sqrt(DBM.shape[1]))))
 		# plt.matshow(random_recon.reshape(28,28))
-	plt.tight_layout(pad=0.0)
+	
 
 
 	#plot only one digit
