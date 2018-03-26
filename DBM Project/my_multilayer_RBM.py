@@ -298,7 +298,7 @@ class DBM_class(object):
 
 				if save_pretrained:
 					for i in range(len(self.weights)):
-						np.savetxt("Pretrained-"+" %i "%i+str(time_now)+".txt", self.weights[i])
+						np.savetxt(workdir+"/pretrain_data/"+"Pretrained-"+" %i "%i+str(time_now)+".txt", self.weights[i])
 					log.out("Saved Pretrained under "+str(time_now))
 			else:
 				if not load_from_file:
@@ -306,7 +306,7 @@ class DBM_class(object):
 					self.weights=[]
 					log.out("Loading Pretrained from file")
 					for i in range(len(self.shape)-1):
-						self.weights.append(np.loadtxt("Pretrained-"+" %i "%i+pathsuffix_pretrained+".txt").astype(np.float32))
+						self.weights.append(np.loadtxt(workdir+"/pretrain_data/"+"Pretrained-"+" %i "%i+pathsuffix_pretrained+".txt").astype(np.float32))
 				else:
 					### if loading from file is active the pretrained weights would get 
 					### reloaded anyway so directly load them here
@@ -742,12 +742,6 @@ class DBM_class(object):
 			self.save_h1.append(self.layer[1].eval()[0])
 		
 
-		# plot the layer_act for 100 pictures
-		plt.figure("Layer_activiations_test_run")
-		for i in range(self.n_layers):
-			plt.plot(self.layer_act[:,i],label="Layer %i"%i)
-		plt.legend()
-
 		
 		self.h1_test = self.hidden_save[0]
 		self.label_test = self.hidden_save[-1]
@@ -1037,9 +1031,9 @@ save_all_params = 0	# also save all test data and reconstructed images (memory h
 save_pretrained = 0	
 
 
-load_from_file        = 1
-pathsuffix            = r"Mon_Mar_26_09-24-59_2018_[784, 400, 100, 10]"#"Thu Jan 18 20-04-17 2018 80 epochen"
-pathsuffix_pretrained = r"Fri_Mar_23_10-22-57_2018"
+load_from_file        = 0
+pathsuffix            = "Mon_Mar_26_09-24-59_2018_[784, 400, 100, 10]"#"Thu Jan 18 20-04-17 2018 80 epochen"
+pathsuffix_pretrained = "Fri_Mar_23_10-22-57_2018"
 ####################################################################################################################################################
 
 
@@ -1312,6 +1306,13 @@ if plotting:
 		plt.title("Change in W1")
 	except:
 		pass
+
+	# plot the layer_act for 100 pictures
+	plt.figure("Layer_activiations_test_run")
+	for i in range(self.n_layers):
+		plt.plot(self.layer_act[:,i],label="Layer %i"%i)
+	plt.legend()
+
 
 	# timeline
 	fig,ax=plt.subplots(2,len(DBM.image_timeline),figsize=(17,6))
