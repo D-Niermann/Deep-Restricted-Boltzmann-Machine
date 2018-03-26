@@ -737,7 +737,7 @@ class DBM_class(object):
 		self.save_h1 = []
 		
 		for n in range(N):
-			self.hidden_save = sess.run([self.update_l_s[i] for i in range(1,len(self.shape))], {self.temp : temp})
+			self.hidden_save = sess.run([self.update_l_p[i] for i in range(1,len(self.shape))], {self.temp : temp})
 			self.layer_act[n,:] = sess.run(self.layer_activities,{self.temp : temp})
 			self.save_h1.append(self.layer[1].eval()[0])
 		
@@ -828,65 +828,61 @@ class DBM_class(object):
 
 
 		if mode=="context":
-			# init all layer
-			## assign v layer to v_input
 			sess.run(self.assign_l[0],{self.layer_ph[0] : v_input})
-			## assign all other as random 
 			for i in range(1,len(self.shape)):
-				sess.run( self.assign_l[i], {self.layer_ph[i] : 0.1*rnd.random([self.batchsize, self.shape[i]])} )
-				
+				sess.run( self.assign_l[i], {self.layer_ph[i] : 0.01*rnd.random([self.batchsize, self.shape[i]])} )
 			
-			label   = self.layer[-1].eval()
-			h1      = self.layer[1].eval()
-			v_gibbs = self.layer[0].eval()
-
 			modification = np.concatenate((modification,)*self.batchsize).reshape(self.batchsize,10)
 			sess.run(self.modification_tf.assign(modification))
-			
-			for i in range(gibbs_steps):
-				# calculate the backward and forward pass 
-				h1,fuckedup, h2 = sess.run([self.update_l_s[1],self.update_h2_with_context,self.update_layer[-1]], {self.temp: temp})
-				# v_gibbs = sess.run(self.update_v, {self.temp : temp})
-				h2_[i] = h2
+
+			for step in range(gibbs_steps):
+				# update all layer except the last one 
+				layer_1 = sess.run(self.update_l_s[1:-2], {self.temp : temp})
+				layer_2 = sess.run(self.update_h2_with_context,{self.temp : temp})
+				layer_3 = sess.run(self.update_l_s[-1], {self.temp : temp})
+
+				# save layers 
+				if liveplot:
+					self.layer_save[0][step] = self.layer[0].eval()
+					for layer_i in range(1,len(self.shape)-2):
+						self.layer_save[layer_i][step] = layer_1[layer_i-1]
+					self.layer_save[-2][step] = layer_2
+
+				self.layer_save[-1][step] = layer_3
 
 
-				if liveplot and self.batchsize==1:
+				if liveplot:
 					# calc the energy
-					energy1 = np.dot(v_gibbs, np.dot(self.w1_np,h1.T))[0]
-					energy2 = np.dot(h1, np.dot(self.w2_np,h2.T))[0]
-					self.energy_.append(-(energy1+energy2))
+					self.energy_.append(sess.run(self.energy))
 					# save values to array
-					
-					h1_[i]   = h1
-					v_g_[i]  = v_gibbs
-					temp_[i] = temp
+					temp_[step] = temp
 				
 
 				# assign new temp
 				temp += temp_delta 
 
-				#### calc the probabiliy for every point in h 
-				# self.p_h = sigmoid_np(np.dot(h2,self.w2_np.T)+np.dot(v_gibbs,self.w1_np), temp)
-				# # calc the standart deviation for every point
-				# self.std_dev_h = np.sqrt(self.p_h*(1-self.p_h))
 
-				#### for checking of the thermal equilibrium
-				# step=10
-				# if i%step==0 and i>0:
-				# 	self.mean_h1.append( np.mean(h1_[i-(step-1):i], axis = (0,1) ))
-				# 	if len(self.mean_h1)>1:
-				# 		log.out(np.mean(abs(self.std_dev_h-(abs(self.mean_h1[-2]-self.mean_h1[-1])))))
+			#### calc the probabiliy for every point in h 
+			# self.p_h = sigmoid_np(np.dot(h2,self.w2_np.T)+np.dot(v_gibbs,self.w1_np), temp)
+			# # calc the standart deviation for every point
+			# self.std_dev_h = np.sqrt(self.p_h*(1-self.p_h))
+
+			#### for checking of the thermal equilibrium
+			# step=10
+			# if i%step==0 and i>0:
+			# 	self.mean_h1.append( np.mean(h1_[i-(step-1):i], axis = (0,1) ))
+			# 	if len(self.mean_h1)>1:
+			# 		log.out(np.mean(abs(self.std_dev_h-(abs(self.mean_h1[-2]-self.mean_h1[-1])))))
 	
 
 		if mode=="generate":
 			sess.run(self.layer[-1].assign(v_input))
 
 			for step in range(gibbs_steps):
-				
 				# update all layer except the last one 
 				layer = sess.run(self.update_l_s[:-1], {self.temp : temp})
 
-				# h2_[step] = h2[0] # sess.run(self.update_h2, {self.temp : temp})
+				# save layers 
 				for layer_i in range(len(self.shape)-1):
 					self.layer_save[layer_i][step] = layer[layer_i]
 				self.layer_save[-1][step] = self.layer[-1].eval()
@@ -895,7 +891,6 @@ class DBM_class(object):
 				if liveplot:
 					# calc the energy
 					self.energy_.append(sess.run(self.energy))
-
 					# save values to array
 					temp_[step] = temp
 				
@@ -934,16 +929,13 @@ class DBM_class(object):
 			for step in range(1,gibbs_steps-1,2):
 				if plt.fignum_exists(fig.number):
 					ax[1].set_title("Temp.: %s, Steps: %s"%(str(round(temp_[step],3)),str(step)))
-					
-					# a0.set_data(self.layer_save[0][step].reshape(28,28))
-					# a1.set_data(range(10),self.layer_save[-1][0])
 
 					for layer_i in range(len(self.shape)-1):
 						s = int(sqrt(self.shape[layer_i]))
 						data[layer_i].set_data(self.layer_save[layer_i][step].reshape(s,s))
 					data[-2].set_data(range(10),self.layer_save[-1][step])
 					data[-1].set_data(range(step),self.energy_[:step])
-					# a3.set_data(range(i),self.energy_[:i])
+					
 					plt.pause(1/50.)
 		
 			plt.close(fig)
@@ -1022,39 +1014,39 @@ class DBM_class(object):
 
 num_batches_pretrain = 100
 dbm_batches          = 500
-pretrain_epochs      = [2,2,2,2,2]
-dbm_epochs           = 3
+pretrain_epochs      = [2,10,10,10,10]
+dbm_epochs           = 5
 
 
 rbm_learnrate     = 0.05
-dbm_learnrate     = 0.01
-dbm_learnrate_end = 0.01
+dbm_learnrate     = 0.005
+dbm_learnrate_end = 0.005
 
 temp = 0.05
 
-pre_training    = 0	# if no pretrain then files are automatically loaded
-training        = 0	# if trianing the whole DBM
-testing         = 0	# if testing the DBM with test data
-plotting        = 0
+pre_training    = 1	# if no pretrain then files are automatically loaded
+training        = 1	# if trianing the whole DBM
+testing         = 1	# if testing the DBM with test data
+plotting        = 1
 
-gibbs_sampling  = 0	
+gibbs_sampling  = 0
 noise_stab_test = 0
 
-save_to_file    = 0 	# only save biases and weights for further training
+save_to_file    = 1 	# only save biases and weights for further training
 save_all_params = 0	# also save all test data and reconstructed images (memory heavy)
 save_pretrained = 0	
 
 
 load_from_file        = 1
-pathsuffix            = r"Sat_Mar_24_00-56-26_2018_[784, 100, 225, 10]"#"Thu Jan 18 20-04-17 2018 80 epochen"
+pathsuffix            = r"Sat_Mar_24_10-07-32_2018_[784, 100, 225, 10]"#"Thu Jan 18 20-04-17 2018 80 epochen"
 pathsuffix_pretrained = r"Fri_Mar_23_10-22-57_2018"
 ####################################################################################################################################################
 
 
 DBM_shape = [
 			28*28,
+			20*20,
 			10*10,
-			15*15,
 			10
 		 ]
 
@@ -1090,7 +1082,7 @@ for i in range(1):
 					epochs      = dbm_epochs,
 					num_batches = dbm_batches,
 					learnrate   = dbm_learnrate,
-					N           = 20, # freerunning steps
+					N           = 50, # freerunning steps
 					cont        = i)
 
 			DBM.train_time=log.end()
@@ -1133,7 +1125,7 @@ if gibbs_sampling:
 
 		# loop through images from all wrong classsified images and find al images that are <5 
 		index_for_number_gibbs=[]
-		for i in range(2): #wrong_classified_id:			
+		for i in range(1000): #wrong_classified_id:			
 			## find the digit that was presented
 			digit=np.where(test_label[i])[0][0] 		
 			## set desired digit range
@@ -1152,23 +1144,23 @@ if gibbs_sampling:
 
 
 		# #### generation of an image using a label
-		h2_no_context=DBM.gibbs_sampling([[0,1,0,0,0,0,0,0,0,0]], 500, 0.055 , 0.03, 
-							mode         = "generate",
-							modification = [1,1,1,1,1,1,1,1,1,1],
-							liveplot     = 1)
+		# h2_no_context=DBM.gibbs_sampling([[1,0,0,0,0,0,0,0,0,0]], 500, 0.055 , 0.03, 
+		# 					mode         = "generate",
+		# 					modification = [1,1,1,1,1,1,1,1,1,1],
+		# 					liveplot     = 1)
 
 		# calculte h2 firerates over all gibbs_steps 
 		log.start("Sampling data")
-		# h2_no_context=DBM.gibbs_sampling(test_data[index_for_number_gibbs[:]], 100, 0.05 , 0.05, 
-		# 					mode         = "context",
-		# 					modification = [1,1,1,1,1,1,1,1,1,1],
-		# 					liveplot     = 0)
+		h2_no_context=DBM.gibbs_sampling(test_data[index_for_number_gibbs[:]], 100, 0.05 , 0.05, 
+							mode         = "context",
+							modification = [1,1,1,1,1,1,1,1,1,1],
+							liveplot     = 0)
 			
 		# # with context
-		# h2_context=DBM.gibbs_sampling(test_data[index_for_number_gibbs[:]], 100, 0.05 , 0.05, 
-		# 					mode         = "context",
-		# 					modification = context_mod,
-		# 					liveplot     = 0)
+		h2_context=DBM.gibbs_sampling(test_data[index_for_number_gibbs[:]], 100, 0.05 , 0.05, 
+							mode         = "context",
+							modification = context_mod,
+							liveplot     = 0)
 		log.end()
 
 		# append h2 activity to array, but only the unit that corresponst to the given digit picture
