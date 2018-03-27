@@ -555,7 +555,7 @@ class DBM_class(object):
 		######## init all vars for training
 		self.batchsize = int(55000/num_batches)
 		num_of_updates = epochs*num_batches
-		M              = 20
+		M              = 10
 
 		log.info("Batchsize:",self.batchsize,"NBatches",num_of_updates)
 
@@ -594,6 +594,10 @@ class DBM_class(object):
 			plt.colorbar(data)
 
 
+		# rng1 = rnd.random([self.batchsize,self.shape[1]])*0.01
+		# rng2 = rnd.random([self.batchsize,self.shape[2]])*0.01
+		# rng3 = rnd.random([self.batchsize,self.shape[3]])*0.01
+
 		# starting the training
 		for epoch in range(epochs):
 			log.start("Deep BM Epoch:",epoch+1,"/",epochs)
@@ -608,7 +612,7 @@ class DBM_class(object):
 			# log.info("++ Using Weight Decay! Not updating bias! ++")
 			log.info("Freerunning for %i steps"%N)
 
-				
+
 			for start, end in zip( range(0, len(train_data), self.batchsize), range(self.batchsize, len(train_data), self.batchsize)):
 				# define a batch
 				batch = train_data[start:end]
@@ -616,7 +620,9 @@ class DBM_class(object):
 
 				# assign v and h2 to the batch data
 				sess.run([self.assign_l[0],self.assign_l[-1]],{ self.layer_ph[0]  : batch, 
-										 	      self.layer_ph[-1] : batch_label})
+										 	      self.layer_ph[-1] : batch_label })
+				# sess.run(self.assign_l[1:-1], {self.layer_ph[1]: rng1,
+				# 					 self.layer_ph[2]: rng2 })
 
 				# calc hidden layer probabilities (not the visible & label layer)
 				for hidden in range(M):
@@ -646,8 +652,8 @@ class DBM_class(object):
 				# run all parameter updates 
 				sess.run([self.update_w, self.update_bias],
 						feed_dict={	self.layer_ph[0] : batch,
-								self.layer_ph[-1] : batch_label,
-								self.learnrate : learnrate}
+								self.layer_ph[-1]: batch_label,
+								self.learnrate:    learnrate}
 					)
 
 
@@ -664,9 +670,9 @@ class DBM_class(object):
 				if self.m%self.num_of_skipped==0:
 					try:
 						sess.run([self.assign_arrays],
-								feed_dict={	self.layer_ph[0] :      batch,
+								feed_dict={	self.layer_ph[0]:  batch,
 										self.layer_ph[-1]: batch_label,
-										self.m_tf:           self.m / self.num_of_skipped }
+										self.m_tf:         self.m / self.num_of_skipped }
 							)
 					except:
 						log.info("Error for m="+str(self.m))
@@ -700,15 +706,15 @@ class DBM_class(object):
 		self.export()
 
 
-	def test(self,test_data,test_label,N,M):
+	def test(self,my_test_data,my_test_label,N,M):
 		""" testing runs without giving h2 , only v is given and h2 has to be infered 
 		by the DBM 
-		test_data :: images to test, get assigned to v layer
+		my_test_data :: images to test, get assigned to v layer
 		N :: Number of updates from hidden layers 
 		M :: Number of samples taken to reconstruct the image
 		"""
 		#init the vars and reset the weights and biases 		
-		self.batchsize=len(test_data)
+		self.batchsize=len(my_test_data)
 		self.learnrate = dbm_learnrate
 
 		# h1    = np.zeros([N,self.batchsize,self.shape[1]])
@@ -729,7 +735,7 @@ class DBM_class(object):
 		log.start("Testing DBM with %i images"%self.batchsize)
 		
 		#### give input to v layer
-		sess.run(self.assign_l[0], {self.layer_ph[0] : test_data, self.temp : temp})
+		sess.run(self.assign_l[0], {self.layer_ph[0] : my_test_data, self.temp : temp})
 
 		#### update hidden and label N times
 		log.out("Sampling hidden %i times "%N)
@@ -739,12 +745,12 @@ class DBM_class(object):
 		for n in range(N):
 			self.hidden_save = sess.run([self.update_l_p[i] for i in range(1,len(self.shape))], {self.temp : temp})
 			self.layer_act[n,:] = sess.run(self.layer_activities,{self.temp : temp})
-			self.save_h1.append(self.layer[1].eval()[0])
+			# self.save_h1.append(self.layer[1].eval()[0])
 		
 
 		
 		self.h1_test = self.hidden_save[0]
-		self.label_test = self.hidden_save[-1]
+		self.last_layer_save = self.layer[-1].eval()
 
 		#### update v M times
 		self.probs = self.layer[0].eval()
@@ -757,26 +763,26 @@ class DBM_class(object):
 
 
 		#### calculate errors and activations
-		self.test_error  = self.error.eval({self.layer_ph[0] : test_data})
+		self.test_error  = self.error.eval({self.layer_ph[0] : my_test_data})
 		self.test_error_.append(self.test_error) #append to errors if called multiple times
 		# error of classifivation labels
-		self.class_error=np.mean(np.abs(self.label_test-test_label))		
+		self.class_error=np.mean(np.abs(self.last_layer_save-my_test_label))		
 
 		#### count how many images got classified wrong 
 		log.out("Taking only the maximum")
 		n_wrongs=0
-		# label_copy=np.copy(self.label_test)
+		# label_copy=np.copy(self.last_layer_save)
 		wrong_classified_ind=[]
 		wrong_maxis=[]
 
-		for i in range(len(self.label_test)):
-			digit = np.where(test_label[i]==1)[0][0]
-			maxi    = self.label_test[i].max()
-			max_pos = np.where(self.label_test[i] == maxi)[0][0]
+		for i in range(len(self.last_layer_save)):
+			digit = np.where(my_test_label[i]==1)[0][0]
+			maxi    = self.last_layer_save[i].max()
+			max_pos = np.where(self.last_layer_save[i] == maxi)[0][0]
 			if max_pos != digit:
 				wrong_classified_ind.append(i)
 				wrong_maxis.append(maxi)
-		n_wrongs=len(wrong_maxis)
+		n_wrongs = len(wrong_maxis)
 
 
 		log.end()
@@ -1008,12 +1014,12 @@ class DBM_class(object):
 
 num_batches_pretrain = 100
 dbm_batches          = 500
-pretrain_epochs      = [2,10,10,10,10]
-dbm_epochs           = 1
+pretrain_epochs      = [4,7,3,3,3]
+dbm_epochs           = 5
 
 
 rbm_learnrate     = 0.05
-dbm_learnrate     = 0.005
+dbm_learnrate     = 0.007
 dbm_learnrate_end = 0.005
 
 temp = 0.05
@@ -1028,11 +1034,11 @@ noise_stab_test = 0
 
 save_to_file    = 1 	# only save biases and weights for further training
 save_all_params = 0	# also save all test data and reconstructed images (memory heavy)
-save_pretrained = 0	
+save_pretrained = 0
 
 
-load_from_file        = 0
-pathsuffix            = "Mon_Mar_26_09-24-59_2018_[784, 400, 100, 10]"#"Thu Jan 18 20-04-17 2018 80 epochen"
+load_from_file        = 1
+pathsuffix            = "Tue_Mar_13_09-20-37_2018 - 5% fehler"#"Thu Jan 18 20-04-17 2018 80 epochen"
 pathsuffix_pretrained = "Fri_Mar_23_10-22-57_2018"
 ####################################################################################################################################################
 
@@ -1040,9 +1046,20 @@ pathsuffix_pretrained = "Fri_Mar_23_10-22-57_2018"
 DBM_shape = [
 			28*28,
 			20*20,
-			10*10,
 			10
 		 ]
+
+# corr = 0;
+# maxi=[]
+# for i in range(len(DBM.save_label)):
+# 	maxi.append( DBM.save_label[i].max() )
+# 	l  = np.where(DBM.save_label[i] == maxi[-1])
+# 	l2 = np.where(DBM.save_cor_label[i] == DBM.save_cor_label[i].max())
+# 	if l==l2:
+# 		corr += 1;
+# print np.mean(np.square(DBM.save_label-DBM.save_cor_label))
+# print i,corr
+# print np.mean(maxi)
 
 saveto_path=data_dir+"/"+time_now+"_"+str(DBM_shape)
 
@@ -1076,7 +1093,7 @@ for i in range(1):
 					epochs      = dbm_epochs,
 					num_batches = dbm_batches,
 					learnrate   = dbm_learnrate,
-					N           = 2, # freerunning steps
+					N           = 20, # freerunning steps
 					cont        = i)
 
 			DBM.train_time=log.end()
@@ -1086,6 +1103,7 @@ for i in range(1):
 		with tf.Session() as sess:
 			log.start("Test Session")
 			# wrong_classified_id = np.loadtxt("wrongs.txt").astype(np.int)
+			DBM.test(train_data[:1000], train_label[:1000], 50, 10)
 
 			wrong_classified_id = DBM.test(test_data, test_label,
 									N = 50,  # sample ist aus random werten, also mindestens 2 sample machen 
@@ -1289,15 +1307,16 @@ if plotting:
 	fig,ax = plt.subplots(DBM.n_layers-1,1,figsize=(8,10))
 	for i in range(DBM.n_layers-1):
 		ax[i].hist((DBM.w_np[i]).flatten(),bins=60,alpha=0.5,label="Before Training")
-		ax[i].hist((DBM.w_np_old[i]).flatten(),color="r",bins=60,alpha=0.5,label="After Training")
+		try:
+			ax[i].hist((DBM.w_np_old[i]).flatten(),color="r",bins=60,alpha=0.5,label="After Training")
+		except:
+			pass
 		ax[i].set_title("W %i"%i)
 		ax[i].legend()
 	plt.tight_layout()
 
 
-	map3=plt.matshow((DBM.w_np[-1]).T)
-	plt.title("W 3")
-	plt.colorbar(map3)
+
 
 	try:
 		# plot change in w1 
@@ -1309,8 +1328,8 @@ if plotting:
 
 	# plot the layer_act for 100 pictures
 	plt.figure("Layer_activiations_test_run")
-	for i in range(self.n_layers):
-		plt.plot(self.layer_act[:,i],label="Layer %i"%i)
+	for i in range(DBM.n_layers):
+		plt.plot(DBM.layer_act[:,i],label="Layer %i"%i)
 	plt.legend()
 
 
@@ -1319,7 +1338,7 @@ if plotting:
 	plt.tight_layout()
 	for i in range(len(DBM.image_timeline)):
 		ax[0][i].matshow((DBM.image_timeline[i]).reshape(28,28))
-		ax[1][i].matshow((DBM.save_h1[i*2]).reshape(int(sqrt(DBM.shape[1])),int(sqrt(DBM.shape[1]))))
+		# ax[1][i].matshow((DBM.save_h1[i*2]).reshape(int(sqrt(DBM.shape[1])),int(sqrt(DBM.shape[1]))))
 		ax[0][i].set_title(str(i))
 		ax[0][i].set_xticks([])
 		ax[0][i].set_yticks([])
@@ -1375,14 +1394,14 @@ if plotting:
 			ax3[layer+2][i].set_xticks([])
 
 		# plot the last layer 		
-		ax3[-1][i].bar(range(10),DBM.label_test[i])
+		ax3[-1][i].bar(range(10),DBM.last_layer_save[i])
 		ax3[-1][i].set_xticks(range(10))
 		ax3[-1][i].set_ylim(0,1)
 
 		#plot the reconstructed layer h1
 		# ax3[5][i].matshow(DBM.rec_h1[i:i+1].reshape(int(sqrt(DBM.shape[1])),int(sqrt(DBM.shape[1]))))
 		# plt.matshow(random_recon.reshape(28,28))
-	
+
 
 
 	#plot only one digit
@@ -1405,7 +1424,7 @@ if plotting:
 			ax3[layer+2][m].set_xticks([])
 
 		# plot the last layer 		
-		ax3[-1][m].bar(range(10),DBM.label_test[i])
+		ax3[-1][m].bar(range(10),DBM.last_layer_save[i])
 		ax3[-1][m].set_xticks(range(10))
 		ax3[-1][m].set_ylim(0,1)
 		#plot the reconstructed layer h1
