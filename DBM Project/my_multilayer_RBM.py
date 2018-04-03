@@ -68,7 +68,7 @@ if "train_data" not in globals():
 	index_for_number_test  = []
 	index_for_number_train = []
 	for i in range(len(test_label)):
-		if (test_label[i]==[0,0,0,0,0,0,0,0,0,1]).sum()==10:
+		if (test_label[i]==[0,0,0,0,0,0,0,0,1,0]).sum()==10:
 			index_for_number_test.append(i)
 	for i in range(len(train_label)):
 		if (train_label[i]==[0,0,0,1,0,0,0,0,0,0]).sum()==10:
@@ -77,12 +77,14 @@ if "train_data" not in globals():
 	# prepare  data for using on next RBM
 	if 0:
 		log.out("Making data for RBM")
-		bottom_w_file = "" # where the weights of the beforehand trained RBM are stored
-		bottom_b_file = "" # where the bias of the beforehand trained RBM are stored (h layer)
+		# where the weights of the beforehand trained RBM are stored
+		bottom_w_file = "/Users/Niermann/Google Drive/Masterarbeit/Python/DBM Project/data/Sun_Apr__1_17-26-14_2018_[400, 100]/w0.txt"
+		# where the bias of the beforehand trained RBM are stored (h layer)
+		bottom_b_file = "/Users/Niermann/Google Drive/Masterarbeit/Python/DBM Project/data/Sun_Apr__1_17-26-14_2018_[400, 100]/bias1.txt"
 		w_of_bottom_rbm = np.loadtxt(bottom_w_file)
 		b_of_bottom_rbm = np.loadtxt(bottom_b_file)
-		train_data = sigmoid_np(np.dot(train_data, w)+b_of_bottom_rbm)
-		test_data = sigmoid_np(np.dot(test_data, w)+b_of_bottom_rbm)
+		train_data = sigmoid_np(np.dot(train_data, w_of_bottom_rbm)+b_of_bottom_rbm,0.05)
+		test_data = sigmoid_np(np.dot(test_data, w_of_bottom_rbm)+b_of_bottom_rbm,0.05)
 
 
 	# test_data_noise = np.copy(test_data)
@@ -139,14 +141,14 @@ class RBM(object):
 		self.h_prob  = sigmoid(tf.matmul(self.v,self.forw_mult*self.w) + self.bias_h,temp)
 		# h has shape [number of images per batch, number of hidden units]
 		# get the actual activations for h {0,1}
-		self.h       = tf.nn.relu(
-			            tf.sign(
-			            	self.h_prob - tf.random_uniform(tf.shape(self.h_prob)) 
-			            	) 
-		        		) 
+		# self.h       = tf.nn.relu(
+		# 	            tf.sign(
+		# 	            	self.h_prob - tf.random_uniform(tf.shape(self.h_prob)) 
+		# 	            	) 
+		#         		) 
 
 		# and the same for visible units
-		self.v_prob  = sigmoid(tf.matmul(self.h,(self.back_mult*self.w),transpose_b=True) + self.bias_v,temp)
+		self.v_prob  = sigmoid(tf.matmul(self.h_prob,(self.back_mult*self.w),transpose_b=True) + self.bias_v,temp)
 		self.v_recon = tf.nn.relu(
 					tf.sign(
 						self.v_prob - tf.random_uniform(tf.shape(self.v_prob))
@@ -163,7 +165,7 @@ class RBM(object):
 		#### Training with Contrastive Divergence
 		#matrix shape is untouched throu the batches because w*v=h even if v has more columns, but dividing be numpoints is recomended since CD
 		# [] = [784,batchsize]-transposed v * [batchsize,500] -> [784,500] - like w 
-		self.pos_grad  = tf.matmul(self.v,self.h,transpose_a=True)
+		self.pos_grad  = tf.matmul(self.v,self.h_prob,transpose_a=True)
 		self.neg_grad  = tf.matmul(self.v_recon,self.h_gibbs,transpose_a=True)
 		self.numpoints = tf.cast(tf.shape(self.v)[0],tf.float32) #number of train inputs per batch (for averaging the CD matrix -> see practical paper by hinton)
 		# contrastive divergence
@@ -171,13 +173,13 @@ class RBM(object):
 		
 
 		#update w
-		self.update_w = self.w.assign(self.w+self.learnrate*self.CD)
+		self.update_w = self.w.assign_add(self.learnrate*self.CD)
 		self.mean_w   = tf.reduce_mean(self.w)
 
 		#update bias
 		""" Since vectors v and h are actualy matrices with number of batch_size images in them, reduce mean will make them to a vector again """
-		# self.update_bias_v = self.bias_v.assign(self.bias_v+self.learnrate*tf.reduce_mean(self.v-self.v_recon,0))
-		# self.update_bias_h = self.bias_h.assign(self.bias_h+self.learnrate*tf.reduce_mean(self.h-self.h_gibbs,0))
+		self.update_bias_v = self.bias_v.assign_add(self.learnrate*tf.reduce_mean(self.v-self.v_recon,0))
+		self.update_bias_h = self.bias_h.assign_add(self.learnrate*tf.reduce_mean(self.h_prob-self.h_gibbs,0))
 
 
 		# reverse feed
@@ -194,7 +196,7 @@ class RBM(object):
 
 		#### update the weights and biases
 		self.w_i, self.error_i = sess.run([self.update_w,self.error],feed_dict={self.v:self.my_input_data})
-		# sess.run([self.update_bias_h,self.update_bias_v],feed_dict={self.v:self.my_input_data})
+		sess.run([self.update_bias_h,self.update_bias_v],feed_dict={self.v:self.my_input_data})
 
 		return self.w_i,self.error_i
 
@@ -512,7 +514,7 @@ class DBM_class(object):
 		self.energy = -tf.reduce_sum([self.layer_energy[i] for i in range(len(self.layer_energy))])
 
 		#### updates for each layer 
-		if self.classification:
+		if self.classification and self.n_layers > 2:
 			self.update_h2_with_context = self.layer[-2].assign(self.sample(sigmoid(tf.matmul(self.layer[-3],self.w[-2])  
 								+ tf.matmul(tf.multiply(self.layer[-1],self.modification_tf),self.w[-1],transpose_b=True)
 								+ self.bias[-2],self.temp)))
@@ -578,7 +580,10 @@ class DBM_class(object):
 		######## init all vars for training
 		self.batchsize = int(55000/num_batches)
 		num_of_updates = epochs*num_batches
-		M              = 10
+		if self.n_layers <=3 and self.classification==1:
+			M = 2
+		else:
+			M = 10
 
 		log.info("Batchsize:",self.batchsize,"NBatches",num_of_updates)
 
@@ -597,7 +602,7 @@ class DBM_class(object):
 		# self.F=[]
 		# self.F_test=[]
 		
-		if load_from_file:
+		if load_from_file and not cont:
 			# load data from the file
 			self.load_from_file(workdir+"/data/"+pathsuffix)
 			self.graph_init("training")
@@ -615,7 +620,7 @@ class DBM_class(object):
 		if self.liveplot:
 			log.info("Liveplot is on!")
 			fig,ax = plt.subplots(1,1,figsize=(15,10))
-			data   = ax.matshow(tile(self.w1.eval()), vmin=-0.01, vmax=0.01)
+			data   = ax.matshow(tile(self.w[0].eval()), vmin=-0.01, vmax=0.01)
 			plt.colorbar(data)
 
 
@@ -651,9 +656,11 @@ class DBM_class(object):
 				# calc hidden layer probabilities (not the visible & label layer)
 				for hidden in range(M):
 					if self.classification:
-						sess.run(self.update_l_p[1:-1])
+						sess.run(self.update_l_s[1:-1])
 					else:
-						sess.run(self.update_l_p[1:])
+						sess.run(self.update_l_s[1:])
+				# last run calc only the probs to reduce noise
+				sess.run(self.update_l_p[1:-1])
 				# save all layer for bias update
 				sess.run(self.save_layer)
 				# update the positive gradients
@@ -666,6 +673,7 @@ class DBM_class(object):
 				for n in range(N):
 					# using sampling
 					sess.run(self.update_l_s)
+				sess.run(self.update_l_p)
 				# calc he negatie gradients
 				sess.run(self.update_neg_grad)
 
@@ -684,17 +692,17 @@ class DBM_class(object):
 
 
 				# #### add values to the tf.arrays
-				if self.m%self.num_of_skipped==0:
-					try:
-						if self.classification:
-							sess.run([self.assign_arrays],feed_dict={	self.layer_ph[0]  : self.batch,
-														self.layer_ph[-1] : batch_label,
-														self.m_tf: self.m / self.num_of_skipped })
-						else:
-							sess.run([self.assign_arrays],feed_dict={	self.layer_ph[0]  : self.batch,
-														self.m_tf: self.m / self.num_of_skipped })
-					except:
-						log.info("Error for appending %i"%self.m)
+				# if self.m%self.num_of_skipped==0:
+				# 	try:
+				# 		if self.classification:
+				# 			sess.run([self.assign_arrays],feed_dict={	self.layer_ph[0]  : self.batch,
+				# 										self.layer_ph[-1] : batch_label,
+				# 										self.m_tf: self.m / self.num_of_skipped })
+				# 		else:
+				# 			sess.run([self.assign_arrays],feed_dict={	self.layer_ph[0]  : self.batch,
+				# 										self.m_tf: self.m / self.num_of_skipped })
+				# 	except:
+				# 		log.info("Error for appending %i"%self.m)
 
 				# increase the learnrate
 				learnrate += d_learnrate
@@ -705,9 +713,9 @@ class DBM_class(object):
 				if self.liveplot and plt.fignum_exists(fig.number) and start%40==0:
 					if start%4000==0:
 						ax.cla()
-						data = ax.matshow(tile(self.w1.eval()),vmin=tile(self.w1.eval()).min()*1.2,vmax=tile(self.w1.eval()).max()*1.2)
+						data = ax.matshow(tile(self.w[0].eval()),vmin=tile(self.w[0].eval()).min()*1.2,vmax=tile(self.w[0].eval()).max()*1.2)
 
-					matrix_new = tile(self.w1.eval())
+					matrix_new = tile(self.w[0].eval())
 					data.set_data(matrix_new)
 					plt.pause(0.00001)
 
@@ -815,7 +823,7 @@ class DBM_class(object):
 		log.end()
 		log.info("----- Test Log -------")
 		log.info("Reconstr. error normal: ",np.round(self.recon_error,5))
-		log.info("Reconstr. error reverse: ",np.round(self.recon_error_reverse,5))		
+		if self.n_layers==2: log.info("Reconstr. error reverse: ",np.round(self.recon_error_reverse,5)) 
 		log.info("learnrate: ",np.round(dbm_learnrate,5))
 		if self.classification:
 			log.info("Class error: ",np.round(self.class_error, 5))
@@ -852,8 +860,8 @@ class DBM_class(object):
 
 		if liveplot:
 			log.info("Liveplotting gibbs sampling")
-			fig,ax=plt.subplots(1,len(self.shape)+1,figsize=(15,5))
-			plt.tight_layout()
+			fig,ax=plt.subplots(1,len(self.shape)+1,figsize=(15,6))
+			# plt.tight_layout()
 
 
 
@@ -893,7 +901,7 @@ class DBM_class(object):
 
 
 			#### calc the probabiliy for every point in h 
-			# self.p_h = sigmoid_np(np.dot(h2,self.w2_np.T)+np.dot(v_gibbs,self.w1_np), temp)
+			# self.p_h = sigmoid_np(np.dot(h2,self.w2_np.T)+np.dot(v_gibbs,self.w[0]_np), temp)
 			# # calc the standart deviation for every point
 			# self.std_dev_h = np.sqrt(self.p_h*(1-self.p_h))
 
@@ -927,43 +935,65 @@ class DBM_class(object):
 
 				# assign new temp
 				temp += temp_delta 
+		
+		if mode=="freerunning":
+			sess.run(self.assign_l[0],{self.layer_ph[0] : test_data[0:1]})
+			for step in range(gibbs_steps):
+				# update all layer except the last one 
+				layer = sess.run(self.update_l_s, {self.temp : temp})
 
-				#### for checking of the thermal equilibrium
-				# if i%100==0:
-				# 	self.mean_h1.append(np.mean(h1_[i-99:i],axis=0))
-				# 	if len(self.mean_h1)>1:
-				# 		log.out(np.mean(abs(self.mean_h1[-2]-self.mean_h1[-1])))
+				# save layers 
+				for layer_i in range(len(layer)):
+					self.layer_save[layer_i][step] = layer[layer_i]
+
+
+
+				if liveplot:
+					# calc the energy
+					self.energy_.append(sess.run(self.energy))
+					# save values to array
+					temp_[step] = temp
+			
+				# assign new temp
+				temp += temp_delta 
 	
 		if liveplot and plt.fignum_exists(fig.number) and self.batchsize==1:
 			data = [None]*(len(self.shape)+1)
-			for layer_i in range(len(self.shape)-1):
+			ax[0].set_title("Visible Layer")
+			for layer_i in range(len(self.layer_save)):
 				s = int(sqrt(self.shape[layer_i]))
-				data[layer_i]  = ax[layer_i].matshow(self.layer_save[layer_i][0].reshape(s,s))
+				try:
+					data[layer_i]  = ax[layer_i].matshow(self.layer_save[layer_i][layer_i].reshape(s,s))
+				except:
+					pass
 				ax[layer_i].set_yticks([])
 				ax[layer_i].set_xticks([])
 				ax[layer_i].grid(False)
 			
-			data[-2], = ax[-2].plot([],[])
+			if self.classification:
+				data[-2], = ax[-2].plot([],[])
+				ax[-2].set_ylim(0,1)
+				ax[-2].set_xlim(0,10)
+				ax[-2].set_title("Classification")
+
 			data[-1], = ax[-1].plot([],[])
-
-			ax[0].set_title("Visible Layer")
-
 			ax[-1].set_xlim(0,len(self.energy_))
 			ax[-1].set_ylim(np.min(self.energy_),0)
 			ax[-1].set_title("Energy")
 
-			ax[-2].set_ylim(0,1)
-			ax[-2].set_xlim(0,10)
-			ax[-2].set_title("Classification")
 			
 			for step in range(1,gibbs_steps-1,2):
 				if plt.fignum_exists(fig.number):
 					ax[1].set_title("Temp.: %s, Steps: %s"%(str(round(temp_[step],3)),str(step)))
 
-					for layer_i in range(len(self.shape)-1):
+					for layer_i in range(len(self.layer_save)):
 						s = int(sqrt(self.shape[layer_i]))
-						data[layer_i].set_data(self.layer_save[layer_i][step].reshape(s,s))
-					data[-2].set_data(range(10),self.layer_save[-1][step])
+						try:
+							data[layer_i].set_data(self.layer_save[layer_i][step].reshape(s,s))
+						except:
+							pass
+					if self.classification:
+						data[-2].set_data(range(10),self.layer_save[-1][step])
 					data[-1].set_data(range(step),self.energy_[:step])
 					
 					plt.pause(1/50.)
@@ -1048,12 +1078,12 @@ class DBM_class(object):
 #### User Settings ###
 
 num_batches_pretrain = 100
-dbm_batches          = 500
-pretrain_epochs      = [3,3,3,3,3]
-dbm_epochs           = 1
+dbm_batches          = 1000
+pretrain_epochs      = [10,10,10,10,10]
+dbm_epochs           = 4
 
 
-rbm_learnrate     = 0.05
+rbm_learnrate     = 0.005
 dbm_learnrate     = 0.05
 dbm_learnrate_end = 0.05
 
@@ -1069,31 +1099,20 @@ noise_stab_test = 0
 
 save_to_file    = 0 	# only save biases and weights for further training
 save_all_params = 0	# also save all test data and reconstructed images (memory heavy)
-save_pretrained = 0
+save_pretrained = 1
 
 
 load_from_file        = 1
-pathsuffix            = "Sun_Apr__1_15-35-12_2018_[784, 400]"#"Thu Jan 18 20-04-17 2018 80 epochen"
-pathsuffix_pretrained = "Fri_Mar_23_10-22-57_2018"
-####################################################################################################################################################
+pathsuffix            = "Mon_Apr__2_14-12-45_2018_[784, 400, 10]"
+pathsuffix_pretrained = "Mon_Apr__2_13-37-12_2018"
+###########################################################################################################
 
 
 DBM_shape = [
 			28*28,
 			20*20,
+			10
 		 ]
-
-# corr = 0;
-# maxi=[]
-# for i in range(len(DBM.save_label)):
-# 	maxi.append( DBM.save_label[i].max() )
-# 	l  = np.where(DBM.save_label[i] == maxi[-1])
-# 	l2 = np.where(DBM.save_cor_label[i] == DBM.save_cor_label[i].max())
-# 	if l==l2:
-# 		corr += 1;
-# print np.mean(np.square(DBM.save_label-DBM.save_cor_label))
-# print i,corr
-# print np.mean(maxi)
 
 saveto_path=data_dir+"/"+time_now+"_"+str(DBM_shape)
 
@@ -1104,9 +1123,7 @@ if len(additional_args) > 0:
 
 
 ######### DBM #############################################################################################
-#### Pre training is ended - create the DBM with the gained weights
-# if i == 0,1,2,...: (das ist das i von der echo cluster schleife) in der dbm class stehen dann die parameter fur das jeweilige i 
-DBM = DBM_class(	shape = DBM_shape, liveplot = 0, classification = 0 )
+DBM = DBM_class(	shape = DBM_shape, liveplot = 0, classification = 1 )
 
 ###########################################################################################################
 #### Sessions ####
@@ -1119,6 +1136,7 @@ DBM.pretrain()
 log.start("DBM Train Session")
 for i in range(dbm_epochs):
 	if training:
+		log.start("Run %i"%i)
 		with tf.Session() as sess:
 			
 			DBM.train(	train_data  = train_data,
@@ -1126,22 +1144,23 @@ for i in range(dbm_epochs):
 					epochs      = 1,
 					num_batches = dbm_batches,
 					learnrate   = dbm_learnrate,
-					N           = 4, # freerunning steps
+					N           = 3, # freerunning steps
 					cont        = i)
 			
 
-	# test session while training
-	if i!=dbm_epochs-1:
-		with tf.Session() as sess:
-			# wrong_classified_id = np.loadtxt("wrongs.txt").astype(np.int)
-			# DBM.test(train_data[:1000], train_label[:1000], 50, 10)
+		# test session while training
+		if i!=dbm_epochs-1:
+			with tf.Session() as sess:
+				# wrong_classified_id = np.loadtxt("wrongs.txt").astype(np.int)
+				# DBM.test(train_data[:1000], train_label[:1000], 50, 10)
 
-			DBM.test(test_data[:1000], test_label[:1000],
-									N = 3,  # sample ist aus random werten, also mindestens 2 sample machen 
-									M = 3 ) # average v
+				DBM.test(test_data[:1000], test_label[:1000],
+										N = 20,  # sample ist aus random werten, also mindestens 2 sample machen 
+										M = 10 ) # average v
 
 
 			# DBM.test(test_data_noise) 
+		log.end()
 
 DBM.train_time=log.end()
 log.reset()
@@ -1150,8 +1169,8 @@ log.reset()
 if testing:
 	with tf.Session() as sess:
 		DBM.test(test_data, test_label,
-							N = 3,  # sample ist aus random werten, also mindestens 2 sample machen 
-							M = 3 ) # average v. 0->1 sample
+							N = 20,  # sample ist aus random werten, also mindestens 2 sample machen 
+							M = 10 ) # average v. 0->1 sample
 
 
 
@@ -1174,7 +1193,7 @@ if gibbs_sampling:
 
 		# loop through images from all wrong classsified images and find al images that are <5 
 		index_for_number_gibbs=[]
-		for i in range(1000): #wrong_classified_id:			
+		for i in range(5000): 		
 			## find the digit that was presented
 			digit=np.where(test_label[i])[0][0] 		
 			## set desired digit range
@@ -1193,8 +1212,8 @@ if gibbs_sampling:
 
 
 		# #### generation of an image using a label
-		# h2_no_context=DBM.gibbs_sampling([[1,0,0,0,0,0,0,0,0,0]], 500, 0.055 , 0.03, 
-		# 					mode         = "generate",
+		# h2_no_context=DBM.gibbs_sampling([[1,0,0,0,0,0,0,0,0,0]], 1000, 0.05 , 0.05, 
+		# 					mode         = "freerunning",
 		# 					modification = [1,1,1,1,1,1,1,1,1,1],
 		# 					liveplot     = 1)
 
@@ -1388,7 +1407,7 @@ if plotting:
 	fig,ax=plt.subplots(2,len(DBM.image_timeline),figsize=(17,6))
 	plt.tight_layout()
 	for i in range(len(DBM.image_timeline)):
-		ax[0][i].matshow((DBM.image_timeline[i]).reshape(28,28))
+		ax[0][i].matshow((DBM.image_timeline[i]).reshape(int(sqrt(DBM.shape[0])),int(sqrt(DBM.shape[0]))))
 		# ax[1][i].matshow((DBM.save_h1[i*2]).reshape(int(sqrt(DBM.shape[1])),int(sqrt(DBM.shape[1]))))
 		ax[0][i].set_title(str(i))
 		ax[0][i].set_xticks([])
@@ -1439,10 +1458,12 @@ if plotting:
 		
 		#plot all layers that can get imaged
 		for layer in range(len(DBM.shape)-1):
-			ax3[layer+2][i].matshow(DBM.hidden_save[layer][i:i+1].reshape(int(sqrt(DBM.shape[layer+1])),int(sqrt(DBM.shape[layer+1]))))
-			ax3[layer+2][i].set_yticks([])
-			ax3[layer+2][i].set_xticks([])
-
+			try:
+				ax3[layer+2][i].matshow(DBM.hidden_save[layer][i:i+1].reshape(int(sqrt(DBM.shape[layer+1])),int(sqrt(DBM.shape[layer+1]))))
+				ax3[layer+2][i].set_yticks([])
+				ax3[layer+2][i].set_xticks([])
+			except:
+				pass
 		# plot the last layer 	
 		if DBM.classification:	
 			ax3[-1][i].bar(range(DBM.shape[-1]),DBM.last_layer_save[i])
@@ -1451,7 +1472,7 @@ if plotting:
 
 		#plot the reconstructed layer h1
 		# ax3[5][i].matshow(DBM.rec_h1[i:i+1].reshape(int(sqrt(DBM.shape[1])),int(sqrt(DBM.shape[1]))))
-		# plt.matshow(random_recon.reshape(28,28))
+		# plt.matshow(random_recon.reshape(int(sqrt(DBM.shape[0])),int(sqrt(DBM.shape[0]))))
 	plt.tight_layout(pad=0.0)
 
 
@@ -1470,10 +1491,12 @@ if plotting:
 		
 		#plot all layers that can get imaged
 		for layer in range(len(DBM.shape)-1):
-			ax3[layer+2][m].matshow(DBM.hidden_save[layer][i:i+1].reshape(int(sqrt(DBM.shape[layer+1])),int(sqrt(DBM.shape[layer+1]))))
-			ax3[layer+2][m].set_yticks([])
-			ax3[layer+2][m].set_xticks([])
-
+			try:
+				ax3[layer+2][m].matshow(DBM.hidden_save[layer][i:i+1].reshape(int(sqrt(DBM.shape[layer+1])),int(sqrt(DBM.shape[layer+1]))))
+				ax3[layer+2][m].set_yticks([])
+				ax3[layer+2][m].set_xticks([])
+			except:
+				pass
 		# plot the last layer 		
 		if DBM.classification:
 			ax3[-1][m].bar(range(DBM.shape[-1]),DBM.last_layer_save[i])
@@ -1481,7 +1504,7 @@ if plotting:
 			ax3[-1][m].set_ylim(0,1)
 		#plot the reconstructed layer h1
 		# ax4[5][m].matshow(DBM.rec_h1[i:i+1].reshape(int(sqrt(DBM.shape[1])),int(sqrt(DBM.shape[1]))))
-		# plt.matshow(random_recon.reshape(28,28))
+		# plt.matshow(random_recon.reshape(int(sqrt(DBM.shape[0])),int(sqrt(DBM.shape[0]))))
 		m+=1
 	plt.tight_layout(pad=0.0)
 
