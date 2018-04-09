@@ -510,7 +510,7 @@ class DBM_class(object):
 			self.layer_prob[i]       = self.layer_input(i)
 			self.layer_samp[i]       = self.sample(self.layer_prob[i])
 			self.update_l_p[i]       = self.layer[i].assign(self.layer_prob[i])
-			self.layer_activities[i] = tf.reduce_mean(tf.reduce_sum(self.layer[i],1)/self.shape[i])
+			self.layer_activities[i] = tf.reduce_mean(self.layer[i])
 
 		for i in range(len(self.layer)-1):
 			self.layer_energy[i] = tf.matmul(self.layer[i], tf.matmul(self.w[i],self.layer[i+1],transpose_b=True))
@@ -792,8 +792,9 @@ class DBM_class(object):
 		self.save_h1 = []
 		
 		for n in range(N):
-			self.hidden_save    = sess.run([self.update_l_p[i] for i in range(1,len(self.shape))], {self.temp : temp})
 			self.layer_act[n,:] = sess.run(self.layer_activities, {self.temp : temp})
+			self.hidden_save    = sess.run([self.update_l_p[i] for i in range(1,len(self.shape))], {self.temp : temp})
+			sess.run(self.update_l_p[1:],{self.temp : temp})
 			# self.save_h1.append(self.layer[1].eval()[0])
 		
 
@@ -822,22 +823,25 @@ class DBM_class(object):
 
 		#### count how many images got classified wrong 
 		log.out("Taking only the maximum")
-		n_wrongs=0
-		# label_copy=np.copy(self.last_layer_save)
-		wrong_classified_ind=[]
-		wrong_maxis=[]
+		n_wrongs             = 0
+		# label_copy         = np.copy(self.last_layer_save)
+		wrong_classified_ind = []
+		wrong_maxis          = []
+		right_maxis          = []
 
 		if self.classification:
 			# error of classifivation labels
 			self.class_error=np.mean(np.abs(self.last_layer_save-my_test_label[:,:10]))		
 			
 			for i in range(len(self.last_layer_save)):
-				digit = np.where(my_test_label[i]==1)[0][0]
+				digit   = np.where(my_test_label[i]==1)[0][0]
 				maxi    = self.last_layer_save[i].max()
 				max_pos = np.where(self.last_layer_save[i] == maxi)[0][0]
 				if max_pos != digit:
 					wrong_classified_ind.append(i)
-					wrong_maxis.append(maxi)
+					wrong_maxis.append(maxi)#
+				elif max_pos == digit:
+					right_maxis.append(maxi)
 			n_wrongs = len(wrong_maxis)
 			self.class_error_.append(float(n_wrongs)/self.batchsize)
 
@@ -870,6 +874,7 @@ class DBM_class(object):
 		if self.classification:
 			log.info("Class error: ",np.round(self.class_error, 5))
 			log.info("Wrong Digits: ",n_wrongs," with average: ",round(np.mean(wrong_maxis),3))
+			log.info("Correct Digits: ",len(right_maxis)," with average: ",round(np.mean(right_maxis),3))
 		log.reset()
 		return wrong_classified_ind
 
@@ -905,7 +910,8 @@ class DBM_class(object):
 			fig,ax=plt.subplots(1,len(self.shape)+1,figsize=(15,6))
 			# plt.tight_layout()
 
-
+		log.start("Gibbs Sampling")
+		log.info(": Mode: %s | Steps: %i"%(mode,gibbs_steps))
 
 		if mode=="context":
 			sess.run(self.assign_l[0],{self.layer_ph[0] : v_input})
@@ -984,7 +990,7 @@ class DBM_class(object):
 				
 				# update all layer 
 				# layer = [None]*self.n_layers
-				layer =sess.run(self.update_l_s, {self.temp : temp}) 
+				layer=sess.run(self.update_l_s, {self.temp : temp}) 
 				# layer[1:]=sess.run(self.update_l_s[1:], {self.temp : temp})
 				
 				
@@ -1043,7 +1049,7 @@ class DBM_class(object):
 		
 			plt.close(fig)
 
-		
+		log.end()
 		if mode=="freerunning" or mode=="generate":
 			# return the last images that got generated 
 			layer = sess.run(self.update_l_p[0], {self.temp : temp})
@@ -1131,12 +1137,12 @@ class DBM_class(object):
 num_batches_pretrain = 100
 dbm_batches          = 1000
 pretrain_epochs      = [1,1,10,10,10]
-dbm_epochs           = 5
+dbm_epochs           = 1
 
 
 rbm_learnrate     = 0.05
 dbm_learnrate     = 0.01
-dbm_learnrate_end = 0.005
+dbm_learnrate_end = 0.001
 
 temp = 0.05
 
@@ -1155,14 +1161,14 @@ save_pretrained = 0
 
 
 load_from_file        = 1
-pathsuffix            = "Thu_Apr__5_10-23-15_2018_[784, 25, 10]"
+pathsuffix            = "Tue_Mar_13_09-20-37_2018 - 3% fehler"
 pathsuffix_pretrained = "Fri_Mar__9_16-46-01_2018"
 ###########################################################################################################
 
 
 DBM_shape = [
 			28*28,
-			5*5,
+			20*20,
 			10
 		 ]
 
@@ -1185,18 +1191,20 @@ log.info(time_now)
 
 DBM.pretrain()
 
-log.start("DBM Train Session")
-for i in range(dbm_epochs):
-	if training:
+if training:
+	log.start("DBM Train Session")
+	for i in range(dbm_epochs):
+
 		log.start("Run %i"%i)
+
 		with tf.Session() as sess:
 			
 			DBM.train(	train_data  = train_data,
 					train_label = train_label,
-					epochs      = 1,
+					epochs      = 3,
 					num_batches = dbm_batches,
 					learnrate   = dbm_learnrate,
-					N           = 1, # freerunning steps
+					N           = 10, # freerunning steps
 					cont        = i)
 			
 
@@ -1215,16 +1223,16 @@ for i in range(dbm_epochs):
 			# DBM.test(test_data_noise) 
 		log.end()
 
-DBM.train_time=log.end()
-log.reset()
+	DBM.train_time=log.end()
+	log.reset()
 
 # last test session
 if testing:
 	with tf.Session() as sess:
 		DBM.test(test_data, test_label,
-							N = 20,  # sample ist aus random werten, also mindestens 2 sample machen 
-							M = 10,  # average v. 0->1 sample
-							create_conf_mat = 1)
+							N = 40,  # sample ist aus random werten, also mindestens 2 sample machen 
+							M = 20,  # average v. 0->1 sample
+							create_conf_mat = 0)
 
 if generate_images:
 	with tf.Session() as sess:
@@ -1242,8 +1250,8 @@ if generate_images:
 		m=0
 		for i in range(nn):
 			for j in range(nn):
-				generated_img = DBM.gibbs_sampling([[0,0,1,0,0,0,0,0,0,0]], 1000, 0.05 , 0.05, 
-							mode         = "freerunning",
+				generated_img = DBM.gibbs_sampling([[0,0,1.5,0,0,0,0,0,0,0]], 1000, 0.05 , 0.05, 
+							mode         = "generate",
 							modification = [],
 							liveplot     = 0)
 				ax[i,j].matshow(generated_img.reshape(28, 28))
@@ -1257,7 +1265,7 @@ if generate_images:
 
 if context:
 	with tf.Session() as sess:
-		log.start("Gibbs Sampling Session")
+		log.start("Context Session")
 
 		if load_from_file and not training:
 			DBM.load_from_file(workdir+"/data/"+pathsuffix)
@@ -1273,7 +1281,7 @@ if context:
 
 		# loop through images from all wrong classsified images and find al images that are <5 
 		index_for_number_gibbs=[]
-		for i in range(200): 		
+		for i in range(10000):
 			## find the digit that was presented
 			digit=np.where(test_label[i])[0][0] 		
 			## set desired digit range
@@ -1293,13 +1301,13 @@ if context:
 
 		# calculte h2 firerates over all gibbs_steps 
 		log.start("Sampling data")
-		h2_no_context=DBM.gibbs_sampling(test_data[index_for_number_gibbs[:]], 100, 0.05 , 0.05, 
+		h2_no_context=DBM.gibbs_sampling(test_data[index_for_number_gibbs[:]], 500, 0.05 , 0.05, 
 							mode         = "context",
 							modification = [1,1,1,1,1,1,1,1,1,1],
 							liveplot     = 0)
 			
 		# # with context
-		h2_context=DBM.gibbs_sampling(test_data[index_for_number_gibbs[:]], 100, 0.05 , 0.05, 
+		h2_context=DBM.gibbs_sampling(test_data[index_for_number_gibbs[:]], 500, 0.05 , 0.05, 
 							mode         = "context",
 							modification = context_mod,
 							liveplot     = 0)
@@ -1475,18 +1483,18 @@ if plotting:
 	plt.legend()
 
 
-	# timeline
-	fig,ax=plt.subplots(2,len(DBM.image_timeline),figsize=(17,6))
-	plt.tight_layout()
-	for i in range(len(DBM.image_timeline)):
-		ax[0][i].matshow((DBM.image_timeline[i]).reshape(int(sqrt(DBM.shape[0])),int(sqrt(DBM.shape[0]))))
-		# ax[1][i].matshow((DBM.save_h1[i*2]).reshape(int(sqrt(DBM.shape[1])),int(sqrt(DBM.shape[1]))))
-		ax[0][i].set_title(str(i))
-		ax[0][i].set_xticks([])
-		ax[0][i].set_yticks([])
-		ax[1][i].set_xticks([])
-		ax[1][i].set_yticks([])
-		ax[0][i].grid(False)
+	# # timeline
+	# fig,ax=plt.subplots(2,len(DBM.image_timeline),figsize=(17,6))
+	# plt.tight_layout()
+	# for i in range(len(DBM.image_timeline)):
+	# 	ax[0][i].matshow((DBM.image_timeline[i]).reshape(int(sqrt(DBM.shape[0])),int(sqrt(DBM.shape[0]))))
+	# 	# ax[1][i].matshow((DBM.save_h1[i*2]).reshape(int(sqrt(DBM.shape[1])),int(sqrt(DBM.shape[1]))))
+	# 	ax[0][i].set_title(str(i))
+	# 	ax[0][i].set_xticks([])
+	# 	ax[0][i].set_yticks([])
+	# 	ax[1][i].set_xticks([])
+	# 	ax[1][i].set_yticks([])
+	# 	ax[0][i].grid(False)
 	
 
 
