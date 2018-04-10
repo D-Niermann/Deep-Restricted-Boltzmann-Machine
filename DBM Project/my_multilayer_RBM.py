@@ -75,7 +75,7 @@ if "train_data" not in globals():
 			if (test_label[i]==d_array).sum()==10:
 				index_for_number_test[digit][where[digit]]=i
 				where[digit]+=1
-
+	index_for_number_test = index_for_number_test.astype(np.int)
 
 	for i in range(len(train_label)):
 		if (train_label[i]==[0,0,0,1,0,0,0,0,0,0]).sum()==10:
@@ -119,6 +119,7 @@ if "train_data" not in globals():
 
 #### Get the arguments list from terminal
 additional_args=sys.argv[1:]
+
 
 
 ################################################################################################################################################
@@ -242,7 +243,7 @@ class DBM_class(object):
 
 		self.log_list = [	["shape",self.shape],
 					["epochs_pretrain",pretrain_epochs],
-					["epochs_dbm_train",dbm_epochs],
+					["epochs_dbm_train",train_runs],
 					["batches_pretrain",num_batches_pretrain],
 					["batches_dbm_train",dbm_batches],
 					["learnrate_pretrain",rbm_learnrate],
@@ -546,6 +547,7 @@ class DBM_class(object):
 			self.assign_arrays =	[ tf.scatter_update(self.train_error_,self.m_tf,self.error),							  
 							  tf.scatter_update(self.h1_activity_,self.m_tf,self.h1_sum),
 							]
+
 			for i in range(len(self.shape)-1):
 				self.assign_arrays.append(tf.scatter_update(self.w_mean_[i],self.m_tf,self.mean_w[i]))
 			if self.classification:
@@ -554,7 +556,7 @@ class DBM_class(object):
 		sess.run(tf.global_variables_initializer())
 		self.init_state=1
 
-	def test_noise_stability(self,input_data,input_label):
+	def test_noise_stability(self,input_data,input_label,steps):
 		self.batchsize=len(input_data)
 		if load_from_file:
 			self.load_from_file(workdir+"/data/"+pathsuffix)
@@ -565,51 +567,48 @@ class DBM_class(object):
 		h2_     = []
 		r       = rnd.random([self.batchsize,784])
 		v_noise = np.copy(input_data)
-		
-		for i in range(200):
-			h2            = self.h2_prob.eval({self.v:v_noise})
-			v_noise_recon = self.v_recon_prob.eval({self.v:v_noise})
-			
-			for i in range(n):
-				v_noise_recon+=self.v_recon_prob.eval({self.v:v_noise})
-			v_noise_recon*=1./(n+1)
-			
-			# classify the reconstructed image
-			for i in range(n):	
-				h2 += self.h2_prob.eval({self.v:v_noise_recon})
-			h2*=1./(n+1)
-			
-			
-			# make the input more noisy
-			v_noise += (abs(r-0.5)*0.01)
-			v_noise *= 1./v_noise.max()
+		# make the input more noisy
+		v_noise += (abs(r-0.5)*0.5)
+		v_noise = sample_np(v_noise)
 
-			h2_.append(h2[0])
-		
-		return np.array(h2_),v_noise_recon
+		sess.run(self.assign_l[0] , {self.layer_ph[0] : v_noise})
+		sess.run(self.update_l_p[1], {self.temp : temp})
+		sess.run(self.update_l_p[2], {self.temp : temp})
+
+		for i in range(steps):
+			
+			layer = sess.run(self.update_l_s, {self.temp : temp})
+			
+
+			if self.classification:
+				h2_.append(layer[-1])
 
 
-	def train(self,train_data,train_label,epochs,num_batches,learnrate,N,cont):
+		v_noise_recon = sess.run(self.update_l_p[0], {self.temp : temp})
+		return np.array(h2_),v_noise_recon,v_noise
+
+
+	def train(self,train_data,train_label,epochs,num_batches,N,cont):
+		global learnrate
 		""" training the DBM with given h2 as labels and v as input images
 		train_data  :: images
 		train_label :: corresponding label
 		epochs      :: how many epochs to train
 		num_batches :: how many batches
-		learnrate   :: learnrate
 		N           :: Number of gibbs steps
 		"""
 		######## init all vars for training
 		self.batchsize = int(55000/num_batches)
-		num_of_updates = epochs*num_batches
+		num_of_updates = train_runs*epochs*num_batches
 		if self.n_layers <=3 and self.classification==1:
 			M = 2
 		else:
 			M = 10
 
-		log.info("Batchsize:",self.batchsize,"NBatches",num_of_updates)
+		log.info("Batchsize:",self.batchsize,"N_Updates",num_of_updates)
 
 		self.num_of_updates = num_of_updates
-		d_learnrate         = float(dbm_learnrate_end-learnrate)/num_of_updates
+		d_learnrate         = float(dbm_learnrate_end - learnrate)/num_of_updates
 		self.m              = 0
 
 		## arrays for approximation of hidde probs
@@ -728,6 +727,7 @@ class DBM_class(object):
 
 				# increase the learnrate
 				learnrate += d_learnrate
+
 				# increase index for tf arrays
 				self.m += 1
 
@@ -922,9 +922,9 @@ class DBM_class(object):
 			sess.run(self.modification_tf.assign(modification))
 
 			for step in range(gibbs_steps):
-				# update all layer except the last one 
+				# update all layer except first one
 				layer_1 = sess.run(self.update_l_s[1:-2], {self.temp : temp})
-				layer_2 = sess.run(self.update_h2_with_context,{self.temp : temp})
+				layer_2 = sess.run(self.update_h2_with_context, {self.temp : temp})
 				layer_3 = sess.run(self.update_l_s[-1], {self.temp : temp})
 
 				# save layers 
@@ -986,6 +986,11 @@ class DBM_class(object):
 		
 		if mode=="freerunning":
 			sess.run(self.assign_l_rand)
+			rng  =  rnd.randint(100)
+			sess.run(self.assign_l[0], {self.layer_ph[0] : test_data[rng:rng+1]})
+			for i in range(10):
+				sess.run(self.update_l_s[1:],{self.temp : temp})
+
 			for step in range(gibbs_steps):
 				
 				# update all layer 
@@ -1033,7 +1038,7 @@ class DBM_class(object):
 			ax[-1].set_title("Energy")
 
 			
-			for step in range(1,gibbs_steps-1,2):
+			for step in range(1,gibbs_steps-1,6):
 				if plt.fignum_exists(fig.number):
 					ax[1].set_title("Temp.: %s, Steps: %s"%(str(round(temp_[step],3)),str(step)))
 
@@ -1052,8 +1057,8 @@ class DBM_class(object):
 		log.end()
 		if mode=="freerunning" or mode=="generate":
 			# return the last images that got generated 
-			layer = sess.run(self.update_l_p[0], {self.temp : temp})
-			return layer
+			v_layer = sess.run(self.update_l_p[0], {self.temp : temp})
+			return v_layer
 
 		else:
 			# return the mean of the last 20 gibbs samples for all images
@@ -1137,22 +1142,22 @@ class DBM_class(object):
 num_batches_pretrain = 100
 dbm_batches          = 1000
 pretrain_epochs      = [1,1,10,10,10]
-dbm_epochs           = 1
+train_runs           = 2
 
 
-rbm_learnrate     = 0.05
+rbm_learnrate     = 0.005
 dbm_learnrate     = 0.01
-dbm_learnrate_end = 0.001
+dbm_learnrate_end = 0.005
 
 temp = 0.05
 
 pre_training    = 0	# if no pretrain then files are automatically loaded
-training        = 1	# if trianing the whole DBM
-testing         = 1	# if testing the DBM with test data
-plotting        = 1	
+training        = 0	# if trianing the whole DBM
+testing         = 0	# if testing the DBM with test data
+plotting        = 0	
 
 context         = 0
-generate_images = 0
+generate_images = 1
 noise_stab_test = 0
 
 save_to_file    = 0 	# only save biases and weights for further training
@@ -1193,7 +1198,9 @@ DBM.pretrain()
 
 if training:
 	log.start("DBM Train Session")
-	for i in range(dbm_epochs):
+	learnrate  =  dbm_learnrate
+
+	for i in range(train_runs):
 
 		log.start("Run %i"%i)
 
@@ -1201,15 +1208,14 @@ if training:
 			
 			DBM.train(	train_data  = train_data,
 					train_label = train_label,
-					epochs      = 3,
+					epochs      = 2,
 					num_batches = dbm_batches,
-					learnrate   = dbm_learnrate,
 					N           = 10, # freerunning steps
 					cont        = i)
-			
+
 
 		# test session while training
-		if i!=dbm_epochs-1:
+		if i!=train_runs-1:
 			with tf.Session() as sess:
 				# wrong_classified_id = np.loadtxt("wrongs.txt").astype(np.int)
 				# DBM.test(train_data[:1000], train_label[:1000], 50, 10)
@@ -1413,15 +1419,21 @@ if context:
 
 if noise_stab_test:
 	with tf.Session() as sess:
-		s=34
+		plt.figure()
 		my_pal=["#FF3045","#77d846","#466dd8","#ffa700","#48e8ff","#a431e5","#333333","#a5a5a5","#ecbdf9","#b1f6b6"]
-		noise_h2_,v_noise=DBM.test_noise_stability(test_data[s:s+1], test_label[s:s+1])
-		with seaborn.color_palette(my_pal, 10):
-			for i in range(10):
-				plt.plot(smooth(noise_h2_[:,i],20),label=str(i))
-			plt.legend()
-		plt.matshow(v_noise.reshape(28,28))
+		noise_h2_,v_noise_recon,v_noise=DBM.test_noise_stability(test_data[0:10], test_label[0:10],20)
+		# with seaborn.color_palette(my_pal, 10):
+		# 	for i in range(10):
+		# 		plt.plot(smooth(noise_h2_[:,0,i],10),label=str(i))
+		# 	plt.legend()
+		fig,ax=plt.subplots(2,10,figsize=(10,4))
+		for i in range(10):
+			ax[0,i].matshow(v_noise[i].reshape(28,28))
+			ax[1,i].matshow(v_noise_recon[i].reshape(28,28))
+			ax[0,i].set_yticks([])
+			ax[1,i].set_yticks([])
 
+		plt.tight_layout(pad=0.0)
 if training and save_to_file:
 	DBM.write_to_file()
 
@@ -1499,7 +1511,7 @@ if plotting:
 
 
 	if training:
-		x=np.linspace(0,dbm_epochs,len(DBM.w_mean_np[0]))
+		x=np.linspace(0,train_runs,len(DBM.w_mean_np[0]))
 
 		fig_fr=plt.figure(figsize=(7,9))
 		

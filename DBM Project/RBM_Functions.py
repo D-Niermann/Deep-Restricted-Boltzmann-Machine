@@ -13,6 +13,11 @@ def smooth(x,f):
     m=np.ones(f)*1./f
     return np.convolve(x, m,"valid")
 
+def myplot(array,colbar = False):
+    s = int(sqrt(len(array)))
+    plt.matshow(array.reshape(s,s))
+    if colbar:
+        plt.colorbar()
 
 def tile(w):
     a        = np.zeros([int(sqrt(w.shape[0]*w.shape[1])),int(sqrt(w.shape[0]*w.shape[1]))])
