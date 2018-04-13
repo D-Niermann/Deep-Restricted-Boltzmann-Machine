@@ -19,6 +19,14 @@ def myplot(array,colbar = False):
     if colbar:
         plt.colorbar()
 
+def sort_by_index(m,index,axis=0):
+    new_m = np.copy(m)
+    for i in range(m.shape[0]):
+        for j in range(m.shape[1]):
+            new_m[i,j]=m[i,index[i,j]]
+    return new_m
+
+
 def tile(w):
     a        = np.zeros([int(sqrt(w.shape[0]*w.shape[1])),int(sqrt(w.shape[0]*w.shape[1]))])
     j,k      = 0,0

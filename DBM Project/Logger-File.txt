@@ -1,0 +1,27 @@
+
+1.      Loading Data
+2.      Creating RBMs
+3.      2,1
+4.      1,2
+------------------------------------------------
+Info     Thu_Apr_12_15-42-28_2018 
+
+1.-v    Pretrain Session
+2.      	Loading from file
+1.-^    Pretrain Session (took 0.815 sek)
+------------------------------------------------
+
+1.      Loading data from: ... -37_2018 - 3% fehler
+2.      Initializing graph
+3.      loading numpy vars into graph
+4.-v    Testing DBM with 10000 images
+5.      	Sampling hidden 100 times 
+6.      	Taking only the maximum
+4.-^    Testing DBM with 10000 images (took 58.155 sek)
+Info     ----- Test Log ------- 
+Info     Reconstr. error normal:  0.03412 
+Info     learnrate:  0.01 
+Info     Class error:  0.01605 
+Info     Wrong Digits:  337  with average:  0.311 
+Info     Correct Digits:  9663  with average:  0.882 
+------------------------------------------------

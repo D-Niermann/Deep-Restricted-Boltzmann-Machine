@@ -260,10 +260,10 @@ class DBM_class(object):
 		self.RBMs    = [None]*(len(self.shape)-1)
 		for i in range(len(self.RBMs)):
 			if i == 0 and len(self.RBMs)>1:
-				self.RBMs[i] = RBM(self.shape[i],self.shape[i+1], forw_mult= 2, back_mult = 1, learnrate = rbm_learnrate, liveplot=0)
+				self.RBMs[i] = RBM(self.shape[i],self.shape[i+1], forw_mult= 1, back_mult = 1, learnrate = rbm_learnrate, liveplot=1)
 				log.out("2,1")
 			elif i==len(self.RBMs)-1 and len(self.RBMs)>1:
-				self.RBMs[i] = RBM(self.shape[i],self.shape[i+1], forw_mult= 1, back_mult = 2, learnrate = rbm_learnrate, liveplot=0)				
+				self.RBMs[i] = RBM(self.shape[i],self.shape[i+1], forw_mult= 1, back_mult = 1, learnrate = rbm_learnrate, liveplot=0)				
 				log.out("1,2")
 			else:
 				if len(self.RBMs) == 1:
@@ -879,7 +879,7 @@ class DBM_class(object):
 		return wrong_classified_ind
 
 
-	def gibbs_sampling(self,v_input,gibbs_steps,temp_start,temp_end,modification,mode,liveplot=1):
+	def gibbs_sampling(self,v_input,gibbs_steps,temp_start,temp_end,subspace,mode,liveplot=1):
 		""" Repeatedly samples v and label , where label can be modified by the user with the multiplication
 		by the modification array - clamping the labels to certain numbers.
 		v_input :: starting with an image as input can also be a batch of images
@@ -889,7 +889,8 @@ class DBM_class(object):
 		mode 	:: "sampling" calculates h2 and v back and forth usign previous steps
 			:: "context" clamps v and only calculates h1 based on previous h2
 		
-		p :: multiplication of the h2 array to increase the importance of the layer
+		subspace :: {"all", array} if "all" do nothing, if array: set the weights to 0 for all indices not marked by subspace
+		 		used with "context" mode for clamping certain labels to 0
 		"""
 
 		self.layer_save = []
@@ -918,30 +919,49 @@ class DBM_class(object):
 			for i in range(1,len(self.shape)):
 				sess.run( self.assign_l[i], {self.layer_ph[i] : 0.01*rnd.random([self.batchsize, self.shape[i]])} )
 			
-			modification = np.concatenate((modification,)*self.batchsize).reshape(self.batchsize,10)
-			sess.run(self.modification_tf.assign(modification))
+			# modification = np.concatenate((modification,)*self.batchsize).reshape(self.batchsize,10)
+			# sess.run(self.modification_tf.assign(modification))
 
+
+			# set the weights to 0 if context is enebaled and subspace is not "all"
+			if subspace == "all":
+				pass
+			else:
+				subspace_anti = []
+				for i in range(10):
+					if i not in subspace:
+						subspace_anti.append(i)
+				log.out("Setting Weights to 0")
+
+				w_ = self.w[-1].eval()
+				b_ = self.bias[-1].eval()
+				w_[:,subspace_anti] = 0
+				b_[subspace_anti] = -10
+				sess.run(self.w[-1].assign(w_))
+				sess.run(self.bias[-1].assign(b_))
+
+			### gibbs steps
 			for step in range(gibbs_steps):
 				# update all layer except first one
-				layer_1 = sess.run(self.update_l_s[1:-2], {self.temp : temp})
-				layer_2 = sess.run(self.update_h2_with_context, {self.temp : temp})
-				layer_3 = sess.run(self.update_l_s[-1], {self.temp : temp})
+				layer = sess.run(self.update_l_s[1:], {self.temp : temp})
+				# layer_2 = sess.run(self.update_h2_with_context, {self.temp : temp})
+				# layer_3 = sess.run(self.update_l_s[-1], {self.temp : temp})
+
+				### save a generated image 
+				# self.v_g = sigmoid_np(np.dot(self.w_np[0],layer[0][0])+self.bias_np[0], temp)
 
 				# save layers 
 				if liveplot:
 					self.layer_save[0][step] = self.layer[0].eval()
 					for layer_i in range(1,len(self.shape)-2):
-						self.layer_save[layer_i][step] = layer_1[layer_i-1]
-					self.layer_save[-2][step] = layer_2
-
-				self.layer_save[-1][step] = layer_3
-
-
-				if liveplot:
+						self.layer_save[layer_i][step] = layer[layer_i]
+					self.layer_save[-2][step] = layer[-2]
 					# calc the energy
 					self.energy_.append(sess.run(self.energy))
 					# save values to array
 					temp_[step] = temp
+
+				self.layer_save[-1][step] = layer[-1]
 				
 
 				# assign new temp
@@ -1141,28 +1161,28 @@ class DBM_class(object):
 
 num_batches_pretrain = 100
 dbm_batches          = 1000
-pretrain_epochs      = [1,1,10,10,10]
-train_runs           = 2
+pretrain_epochs      = [10,10,10,10,10]
+train_runs           = 5
 
 
-rbm_learnrate     = 0.005
+rbm_learnrate     = 0.001
 dbm_learnrate     = 0.01
-dbm_learnrate_end = 0.005
+dbm_learnrate_end = 0.001
 
 temp = 0.05
 
 pre_training    = 0	# if no pretrain then files are automatically loaded
 training        = 0	# if trianing the whole DBM
-testing         = 0	# if testing the DBM with test data
+testing         = 1	# if testing the DBM with test data
 plotting        = 0	
 
 context         = 0
-generate_images = 1
+generate_images = 0
 noise_stab_test = 0
 
-save_to_file    = 0 	# only save biases and weights for further training
+save_to_file    = 1 	# only save biases and weights for further training
 save_all_params = 0	# also save all test data and reconstructed images (memory heavy)
-save_pretrained = 0
+save_pretrained = 1
 
 
 load_from_file        = 1
@@ -1174,7 +1194,7 @@ pathsuffix_pretrained = "Fri_Mar__9_16-46-01_2018"
 DBM_shape = [
 			28*28,
 			20*20,
-			10
+			10,
 		 ]
 
 saveto_path=data_dir+"/"+time_now+"_"+str(DBM_shape)
@@ -1184,9 +1204,13 @@ if len(additional_args) > 0:
 	# n_samples = int(additional_args[0])
 	saveto_path    += " - "+str(additional_args[0])
 
+## open the logger-file
+if training:
+	log.open(saveto_path)
+
 
 ######### DBM #############################################################################################
-DBM = DBM_class(	shape = DBM_shape, liveplot = 0, classification = 1 )
+DBM = DBM_class(	shape = DBM_shape, liveplot = 0, classification = 1)
 
 ###########################################################################################################
 #### Sessions ####
@@ -1200,22 +1224,22 @@ if training:
 	log.start("DBM Train Session")
 	learnrate  =  dbm_learnrate
 
-	for i in range(train_runs):
+	for run in range(train_runs):
 
-		log.start("Run %i"%i)
+		log.start("Run %i"%run)
 
 		with tf.Session() as sess:
-			
+
+			N = 5#clamp(2+run, 0, 40)
 			DBM.train(	train_data  = train_data,
 					train_label = train_label,
 					epochs      = 2,
 					num_batches = dbm_batches,
-					N           = 10, # freerunning steps
-					cont        = i)
-
+					N           = N , # freerunning steps
+					cont        = run)
 
 		# test session while training
-		if i!=train_runs-1:
+		if run!=train_runs-1:
 			with tf.Session() as sess:
 				# wrong_classified_id = np.loadtxt("wrongs.txt").astype(np.int)
 				# DBM.test(train_data[:1000], train_label[:1000], 50, 10)
@@ -1227,6 +1251,7 @@ if training:
 
 
 			# DBM.test(test_data_noise) 
+
 		log.end()
 
 	DBM.train_time=log.end()
@@ -1236,7 +1261,7 @@ if training:
 if testing:
 	with tf.Session() as sess:
 		DBM.test(test_data, test_label,
-							N = 40,  # sample ist aus random werten, also mindestens 2 sample machen 
+							N = 100,  # sample ist aus random werten, also mindestens 2 sample machen 
 							M = 20,  # average v. 0->1 sample
 							create_conf_mat = 0)
 
@@ -1257,9 +1282,9 @@ if generate_images:
 		for i in range(nn):
 			for j in range(nn):
 				generated_img = DBM.gibbs_sampling([[0,0,1.5,0,0,0,0,0,0,0]], 1000, 0.05 , 0.05, 
-							mode         = "generate",
-							modification = [],
-							liveplot     = 0)
+							mode     = "freerunning",
+							subspace = [],
+							liveplot = 0)
 				ax[i,j].matshow(generated_img.reshape(28, 28))
 				ax[i,j].set_xticks([])
 				ax[i,j].set_yticks([])
@@ -1276,18 +1301,18 @@ if context:
 		if load_from_file and not training:
 			DBM.load_from_file(workdir+"/data/"+pathsuffix)
 
-		subspace = [5,6,7,8,9]
+		subspace = [0,1,2,3,4]
 
-		p = 1
-		log.info("Multiplicator p = ",p)
-		context_mod = np.zeros(10)
-		for i in range(10):
-			if i in subspace:
-				context_mod[i] = 1*p
+		# p = 1
+		# log.info("Multiplicator p = ",p)
+		# context_mod = np.zeros(10)
+		# for i in range(10):
+		# 	if i in subspace:
+		# 		context_mod[i] = 1*p
 
 		# loop through images from all wrong classsified images and find al images that are <5 
 		index_for_number_gibbs=[]
-		for i in range(10000):
+		for i in range(18,19):
 			## find the digit that was presented
 			digit=np.where(test_label[i])[0][0] 		
 			## set desired digit range
@@ -1307,24 +1332,25 @@ if context:
 
 		# calculte h2 firerates over all gibbs_steps 
 		log.start("Sampling data")
-		h2_no_context=DBM.gibbs_sampling(test_data[index_for_number_gibbs[:]], 500, 0.05 , 0.05, 
-							mode         = "context",
-							modification = [1,1,1,1,1,1,1,1,1,1],
-							liveplot     = 0)
-			
+		h2_no_context = DBM.gibbs_sampling(test_data[index_for_number_gibbs[:]], 1000, 0.05 , 0.05, 
+							mode     = "context",
+							subspace = "all",
+							liveplot = 0)
+
 		# # with context
-		h2_context=DBM.gibbs_sampling(test_data[index_for_number_gibbs[:]], 500, 0.05 , 0.05, 
-							mode         = "context",
-							modification = context_mod,
-							liveplot     = 0)
+		h2_context = DBM.gibbs_sampling(test_data[index_for_number_gibbs[:]], 1000, 0.05 , 0.05, 
+							mode     = "context",
+							subspace = subspace,
+							liveplot = 0)
 		# log.end()
+		DBM.export()
 
 		# append h2 activity to array, but only the unit that corresponst to the given digit picture
 		desired_digits_c  = []
 		desired_digits_nc = []
 		wrong_digits_c    = []
 		wrong_digits_nc   = []
-		
+
 		correct_maxis_c    = []
 		correct_maxis_nc   = []
 		incorrect_maxis_c  = []
@@ -1343,7 +1369,8 @@ if context:
 			hist_data_nc[digit].append( h2_no_context[i].tolist() )
 
 			### count how many got right (with context) 
-			maxi_c    = h2_context[i].max()
+			## but only count the labels within subspace
+			maxi_c    = h2_context[i][subspace[:]].max()
 			max_pos_c = np.where(h2_context[i] == maxi_c)[0][0]
 			if max_pos_c == digit:
 				correct_maxis_c.append(maxi_c)
@@ -1353,7 +1380,8 @@ if context:
 				incorrect_maxis_c.append(maxi_c)
 
 			### count how many got right (no context) 
-			maxi_nc    = h2_no_context[i].max()
+			## but only count the labels within subspace
+			maxi_nc    = h2_no_context[i][subspace[:]].max()
 			max_pos_nc = np.where(h2_no_context[i] == maxi_nc)[0][0]			
 			if max_pos_nc == digit:
 				correct_maxis_nc.append(maxi_nc)
@@ -1370,7 +1398,7 @@ if context:
 
 		log.info("Inorrect Context:" , len(incorrect_maxis_c),"/",round(100*len(incorrect_maxis_c)/float(len(index_for_number_gibbs)),2),"%")
 		log.info("Inorrect No Context:" , len(incorrect_maxis_nc),"/",round(100*len(incorrect_maxis_nc)/float(len(index_for_number_gibbs)),2),"%")
-		log.info("Diff:     ",abs(len(incorrect_maxis_c)-len(incorrect_maxis_nc)))
+		log.info("Diff:     ",len(incorrect_maxis_nc)-len(incorrect_maxis_c))
 		log.info("Outside subspace (c/nc):",wrongs_outside_subspace_c,",", wrongs_outside_subspace_nc)
 		log.out("Means: Correct // Wrong (c/nc): \n \t \t ", round(np.mean(correct_maxis_c),4),
 									round(np.mean(correct_maxis_nc),4), "//",
@@ -1603,4 +1631,5 @@ if plotting:
 
 
 
+log.close()
 plt.show()
