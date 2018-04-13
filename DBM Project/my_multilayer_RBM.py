@@ -1111,7 +1111,8 @@ class DBM_class(object):
 		if self.exported!=1:
 			self.export()
 		new_path = saveto_path
-		os.makedirs(new_path)
+		if not os.path.isdir(saveto_path):
+			os.makedirs(new_path)
 		os.chdir(new_path)
 		# save weights 
 		for i in range(len(self.shape)-1):
@@ -1122,7 +1123,8 @@ class DBM_class(object):
 		#save log
 		self.log_list.append(["train_time",self.train_time])
 		# save test error of wrongs classified images 
-		np.savetxt("Classification Error on test images.txt",self.class_error_)
+		if self.classification:
+			np.savetxt("Classification Error on test images.txt",self.class_error_)
 		np.savetxt("Recon Error on test images.txt",self.test_error_)
 
 		with open("logfile.txt","w") as log_file:
@@ -1162,7 +1164,7 @@ class DBM_class(object):
 num_batches_pretrain = 100
 dbm_batches          = 1000
 pretrain_epochs      = [10,10,10,10,10]
-train_runs           = 5
+train_runs           = 1
 
 
 rbm_learnrate     = 0.001
@@ -1172,9 +1174,9 @@ dbm_learnrate_end = 0.001
 temp = 0.05
 
 pre_training    = 0	# if no pretrain then files are automatically loaded
-training        = 0	# if trianing the whole DBM
+training        = 1	# if trianing the whole DBM
 testing         = 1	# if testing the DBM with test data
-plotting        = 0	
+plotting        = 1	
 
 context         = 0
 generate_images = 0
@@ -1205,7 +1207,8 @@ if len(additional_args) > 0:
 	saveto_path    += " - "+str(additional_args[0])
 
 ## open the logger-file
-if training:
+if training and save_to_file:
+	os.makedirs(saveto_path)
 	log.open(saveto_path)
 
 
@@ -1233,7 +1236,7 @@ if training:
 			N = 5#clamp(2+run, 0, 40)
 			DBM.train(	train_data  = train_data,
 					train_label = train_label,
-					epochs      = 2,
+					epochs      = 1,
 					num_batches = dbm_batches,
 					N           = N , # freerunning steps
 					cont        = run)
@@ -1261,7 +1264,7 @@ if training:
 if testing:
 	with tf.Session() as sess:
 		DBM.test(test_data, test_label,
-							N = 100,  # sample ist aus random werten, also mindestens 2 sample machen 
+							N = 40,  # sample ist aus random werten, also mindestens 2 sample machen 
 							M = 20,  # average v. 0->1 sample
 							create_conf_mat = 0)
 
