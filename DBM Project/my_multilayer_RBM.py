@@ -260,7 +260,7 @@ class DBM_class(object):
 		self.RBMs    = [None]*(len(self.shape)-1)
 		for i in range(len(self.RBMs)):
 			if i == 0 and len(self.RBMs)>1:
-				self.RBMs[i] = RBM(self.shape[i],self.shape[i+1], forw_mult= 1, back_mult = 1, learnrate = rbm_learnrate, liveplot=1)
+				self.RBMs[i] = RBM(self.shape[i],self.shape[i+1], forw_mult= 1, back_mult = 1, learnrate = rbm_learnrate, liveplot=0)
 				log.out("2,1")
 			elif i==len(self.RBMs)-1 and len(self.RBMs)>1:
 				self.RBMs[i] = RBM(self.shape[i],self.shape[i+1], forw_mult= 1, back_mult = 1, learnrate = rbm_learnrate, liveplot=0)				
@@ -1477,10 +1477,13 @@ if plotting:
 	log.out("Plotting...")
 	
 	# plot w1 as image	
-	map1=plt.matshow(tile(DBM.w_np[0]),cmap="gray")
+	fig=plt.figure(figsize=(9,9))
+	map1=plt.matshow(tile(DBM.w_np[0]),cmap="gray",fignum=fig.number)
 	plt.colorbar(map1)
 	plt.grid(False)
 	plt.title("W %i"%0)
+	plt.savefig(saveto_path+"/weights_img.png")
+
 
 	# plot all other weights as hists
 	n_weights=DBM.n_layers-1
@@ -1500,14 +1503,16 @@ if plotting:
 		except:
 			pass
 	plt.tight_layout()
-
+	plt.savefig(saveto_path+"/weights_hist.png")
 
 
 	try:
 		# plot change in w1 
-		plt.matshow(tile(DBM.w_np[0]-DBM.w_np_old[0]))
+		fig=plt.figure(figsize=(9,9))
+		plt.matshow(tile(DBM.w_np[0]-DBM.w_np_old[0]),fignum=fig.number)
 		plt.colorbar()
 		plt.title("Change in W1")
+		plt.savefig(saveto_path+"/weights_change.png")
 	except:
 		pass
 
@@ -1524,6 +1529,7 @@ if plotting:
 	plt.ylabel("Squared Mean Error")
 	plt.xlabel("Epoch")
 	plt.legend()
+	plt.savefig(saveto_path+"/errors.png")
 
 
 	# # timeline
@@ -1565,6 +1571,7 @@ if plotting:
 		ax_fr3.set_title("Train Error")
 		
 	plt.tight_layout()
+	
 
 
 	#plot some samples from the testdata 
@@ -1597,6 +1604,7 @@ if plotting:
 		# ax3[5][i].matshow(DBM.rec_h1[i:i+1].reshape(int(sqrt(DBM.shape[1])),int(sqrt(DBM.shape[1]))))
 		# plt.matshow(random_recon.reshape(int(sqrt(DBM.shape[0])),int(sqrt(DBM.shape[0]))))
 	plt.tight_layout(pad=0.0)
+	plt.savefig(saveto_path+"/examples.png")
 
 
 	#plot only one digit
@@ -1630,6 +1638,7 @@ if plotting:
 		# plt.matshow(random_recon.reshape(int(sqrt(DBM.shape[0])),int(sqrt(DBM.shape[0]))))
 		m+=1
 	plt.tight_layout(pad=0.0)
+
 
 
 
