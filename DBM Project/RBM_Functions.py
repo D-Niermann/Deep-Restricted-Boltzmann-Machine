@@ -2,13 +2,20 @@ import tensorflow as tf
 import numpy as np
 import numpy.random as rnd
 import os
+from matplotlib.pyplot import savefig
 from math import sqrt
+def save_fig(path,save_to_file):
+    if save_to_file:
+        return savefig(path)
+    else:
+        return None
 def scale_to_unit_interval(ndar, eps=1e-8):
     """ Scales all values in the ndarray ndar to be between 0 and 1 """
     ndar = ndar.copy()
     ndar -= ndar.min()
     ndar *= 1.0 / (ndar.max() + eps)
     return ndar
+
 def smooth(x,f):
     m=np.ones(f)*1./f
     return np.convolve(x, m,"valid")

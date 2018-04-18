@@ -25,7 +25,7 @@ if True:
 	if 1:
 		import seaborn
 
-		seaborn.set(font_scale=1.3)
+		seaborn.set(font_scale=1.5)
 		seaborn.set_style("ticks",
 			{
 			'axes.grid':            True,
@@ -46,13 +46,11 @@ if True:
 	mpl.rcParams["grid.linewidth"] = 0.5
 	mpl.rcParams["lines.linewidth"] = 1.25
 	mpl.rcParams["font.family"]= "serif"
-	# plt.rcParams['image.cmap'] = 'coolwarm'
-	# seaborn.set_palette(seaborn.color_palette("Set2", 10))
+
+		# plt.rcParams['image.cmap'] = 'coolwarm'
+		# seaborn.set_palette(seaborn.color_palette("Set2", 10))
 
 	log=Logger(True)
-
-
-
 
 from tensorflow.examples.tutorials.mnist import input_data
 time_now = time.asctime()
@@ -149,7 +147,7 @@ class RBM(object):
 
 		self.v       = tf.placeholder(tf.float32,[None,self.visible_units],name="Visible-Layer") # has shape [number of images per batch,number of visible units]
 
-		self.w       = tf.Variable(tf.random_uniform([self.visible_units,self.hidden_units],minval=-1e-3,maxval=1e-3),name="Weights")
+		self.w       = tf.Variable(tf.random_uniform([self.visible_units,self.hidden_units],minval=-1e-4,maxval=1e-4),name="Weights")
 		self.bias_v  = tf.Variable(tf.zeros([self.visible_units]),name="Visible-Bias")
 		self.bias_h  = tf.Variable(tf.zeros([self.hidden_units]), name="Hidden-Bias")
 
@@ -231,7 +229,7 @@ class DBM_class(object):
 		self.liveplot     = liveplot # if true will open a lifeplot of the weight matrix 
 		self.shape        = shape  # contains the number of  neurons in a list from v layer to h1 to h2 
 		self.classification  = classification #weather the machine uses a label layer 
-		
+		self.epochs = 0
 		
 		self.init_state     = 0
 		self.exported       = 0
@@ -253,7 +251,8 @@ class DBM_class(object):
 					["pathsuffix_pretrained",pathsuffix_pretrained],
 					["pathsuffix",pathsuffix],
 					["loaded_from_file",load_from_file],
-					["save_all_params",save_all_params]
+					["save_all_params",save_all_params],
+					["Epochs",self.epochs]
 				   ]
 
 		log.out("Creating RBMs")
@@ -606,6 +605,7 @@ class DBM_class(object):
 			M = 10
 
 		log.info("Batchsize:",self.batchsize,"N_Updates",num_of_updates)
+		self.epochs += 1 
 
 		self.num_of_updates = num_of_updates
 		d_learnrate         = float(dbm_learnrate_end - learnrate)/num_of_updates
@@ -713,17 +713,17 @@ class DBM_class(object):
 
 
 				# #### add values to the tf.arrays
-				# if self.m%self.num_of_skipped==0:
-				# 	try:
-				# 		if self.classification:
-				# 			sess.run([self.assign_arrays],feed_dict={	self.layer_ph[0]  : self.batch,
-				# 										self.layer_ph[-1] : batch_label,
-				# 										self.m_tf: self.m / self.num_of_skipped })
-				# 		else:
-				# 			sess.run([self.assign_arrays],feed_dict={	self.layer_ph[0]  : self.batch,
-				# 										self.m_tf: self.m / self.num_of_skipped })
-				# 	except:
-				# 		log.info("Error for appending %i"%self.m)
+				if self.m%self.num_of_skipped==0:
+					try:
+						if self.classification:
+							sess.run([self.assign_arrays],feed_dict={	self.layer_ph[0]  : self.batch,
+														self.layer_ph[-1] : batch_label,
+														self.m_tf: self.m / self.num_of_skipped })
+						else:
+							sess.run([self.assign_arrays],feed_dict={	self.layer_ph[0]  : self.batch,
+														self.m_tf: self.m / self.num_of_skipped })
+					except:
+						log.info("Error for appending %i"%self.m)
 
 				# increase the learnrate
 				learnrate += d_learnrate
@@ -1124,8 +1124,8 @@ class DBM_class(object):
 		self.log_list.append(["train_time",self.train_time])
 		# save test error of wrongs classified images 
 		if self.classification:
-			np.savetxt("Classification Error on test images.txt",self.class_error_)
-		np.savetxt("Recon Error on test images.txt",self.test_error_)
+			np.savetxt("Classification_Error_on_test_images.txt",self.class_error_)
+		np.savetxt("Recon_Error_on_test_images.txt",self.test_error_)
 
 		with open("logfile.txt","w") as log_file:
 				for i in range(len(self.log_list)):
@@ -1163,18 +1163,18 @@ class DBM_class(object):
 
 num_batches_pretrain = 100
 dbm_batches          = 1000
-pretrain_epochs      = [10,10,10,10,10]
-train_runs           = 1
+pretrain_epochs      = [0,0,0,0,0]
+train_runs           = 4
 
 
 rbm_learnrate     = 0.001
-dbm_learnrate     = 0.01
+dbm_learnrate     = 0.001
 dbm_learnrate_end = 0.001
 
 temp = 0.05
 
 pre_training    = 0	# if no pretrain then files are automatically loaded
-training        = 1	# if trianing the whole DBM
+training        = 0	# if trianing the whole DBM
 testing         = 1	# if testing the DBM with test data
 plotting        = 1	
 
@@ -1182,9 +1182,9 @@ context         = 0
 generate_images = 0
 noise_stab_test = 0
 
-save_to_file    = 1 	# only save biases and weights for further training
+save_to_file    = 0 	# only save biases and weights for further training
 save_all_params = 0	# also save all test data and reconstructed images (memory heavy)
-save_pretrained = 1
+save_pretrained = 0
 
 
 load_from_file        = 1
@@ -1204,7 +1204,7 @@ saveto_path=data_dir+"/"+time_now+"_"+str(DBM_shape)
 ### modify the parameters with additional_args
 if len(additional_args) > 0:
 	# n_samples = int(additional_args[0])
-	saveto_path    += " - "+str(additional_args[0])
+	saveto_path    += " - "+str(additional_args)
 
 ## open the logger-file
 if training and save_to_file:
@@ -1233,7 +1233,10 @@ if training:
 
 		with tf.Session() as sess:
 
-			N = 5#clamp(2+run, 0, 40)
+			# set how many freerunning steps to make
+			N = 2 #clamp(1+run, 1, 40)
+
+			# start a train epoch 
 			DBM.train(	train_data  = train_data,
 					train_label = train_label,
 					epochs      = 1,
@@ -1482,7 +1485,7 @@ if plotting:
 	plt.colorbar(map1)
 	plt.grid(False)
 	plt.title("W %i"%0)
-	plt.savefig(saveto_path+"/weights_img.png")
+	save_fig(saveto_path+"/weights_img.png", save_to_file)
 
 
 	# plot all other weights as hists
@@ -1503,7 +1506,7 @@ if plotting:
 		except:
 			pass
 	plt.tight_layout()
-	plt.savefig(saveto_path+"/weights_hist.png")
+	save_fig(saveto_path+"/weights_hist.png", save_to_file)
 
 
 	try:
@@ -1512,7 +1515,7 @@ if plotting:
 		plt.matshow(tile(DBM.w_np[0]-DBM.w_np_old[0]),fignum=fig.number)
 		plt.colorbar()
 		plt.title("Change in W1")
-		plt.savefig(saveto_path+"/weights_change.png")
+		save_fig(saveto_path+"/weights_change.png", save_to_file)
 	except:
 		pass
 
@@ -1529,7 +1532,7 @@ if plotting:
 	plt.ylabel("Squared Mean Error")
 	plt.xlabel("Epoch")
 	plt.legend()
-	plt.savefig(saveto_path+"/errors.png")
+	save_fig(saveto_path+"/errors.png", save_to_file)
 
 
 	# # timeline
@@ -1604,7 +1607,7 @@ if plotting:
 		# ax3[5][i].matshow(DBM.rec_h1[i:i+1].reshape(int(sqrt(DBM.shape[1])),int(sqrt(DBM.shape[1]))))
 		# plt.matshow(random_recon.reshape(int(sqrt(DBM.shape[0])),int(sqrt(DBM.shape[0]))))
 	plt.tight_layout(pad=0.0)
-	plt.savefig(saveto_path+"/examples.png")
+	save_fig(saveto_path+"/examples.png", save_to_file)
 
 
 	#plot only one digit
