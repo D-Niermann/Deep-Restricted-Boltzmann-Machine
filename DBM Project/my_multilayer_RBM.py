@@ -3,26 +3,33 @@
 if True:
 	# -*- coding: utf-8 -*-
 	print ("Starting...")
+	
+	import matplotlib as mpl
+	try: # if on macbook
+		workdir="/Users/Niermann/Google Drive/Masterarbeit/Python/DBM Project"
+		os.chdir(workdir)
+		import_seaborn = True
+	except: #else on university machine
+		workdir="/home/dario/Dokumente/DBM Project"
+		os.chdir(workdir)
+		mpl.use("Agg") #use this to not display plots but save them
+		import_seaborn = False
+
+	data_dir=workdir+"/data"
+
 	import numpy as np
 	import numpy.random as rnd
 	import matplotlib.pyplot as plt
-	import matplotlib as mpl
 	import tensorflow as tf
-	# import scipy.ndimage.filters as filters
-	# import pandas as pd
 	import os,time,sys
 	from math import exp,sqrt,sin,pi,cos,log
 	np.set_printoptions(precision=3)
-	
-	workdir="/Users/Niermann/Google Drive/Masterarbeit/Python/DBM Project"
-	# workdir="/home/dario/Dokumente/DBM Project"
 
-	data_dir=workdir+"/data"	
-	os.chdir(workdir)
+		
 	from Logger import *
 	from RBM_Functions import *
 	### import seaborn? ###
-	if 1:
+	if import_seaborn:
 		import seaborn
 
 		seaborn.set(font_scale=1.5)
@@ -248,11 +255,15 @@ class DBM_class(object):
 					["batches_dbm_train",dbm_batches],
 					["learnrate_pretrain",rbm_learnrate],
 					["learnrate_dbm_train",dbm_learnrate],
+					["learnrate_dbm_slope",learnrate_slope],
+					["starting_temp",temp_start],
+					["temp_slope",temp_slope],
 					["pathsuffix_pretrained",pathsuffix_pretrained],
 					["pathsuffix",pathsuffix],
 					["loaded_from_file",load_from_file],
 					["save_all_params",save_all_params],
 				   ]## append variables that change during training in the write_to_file function
+
 
 		log.out("Creating RBMs")
 		self.RBMs    = [None]*(len(self.shape)-1)
@@ -1144,8 +1155,8 @@ class DBM_class(object):
 		
 		# save test error of wrongs classified images
 		if self.classification:
-			np.savetxt("Classification_Error_on_test_images.txt",zip(self.test_epochs,self.class_error_))
-		np.savetxt("Recon_Error_on_test_images.txt",zip(self.test_epochs,self.test_error_))
+			np.savetxt("Classification_Error_on_test_images.txt",list(zip(self.test_epochs,self.class_error_)))
+		np.savetxt("Recon_Error_on_test_images.txt",list(zip(self.test_epochs,self.test_error_)))
 
 		with open("logfile.txt","w") as log_file:
 				for i in range(len(self.log_list)):
@@ -1187,7 +1198,7 @@ class DBM_class(object):
 num_batches_pretrain = 100
 dbm_batches          = 1000
 pretrain_epochs      = [0,0,0,0,0]
-train_epochs         = 10
+train_epochs         = 2
 test_every_epoch     = 4
 
 ### learnrates 
@@ -1266,8 +1277,8 @@ if training:
 			N = 2 #clamp(1+run, 1, 40)
 
 			# start a train epoch 
-			DBM.train(	train_data  = train_data,
-					train_label = train_label,
+			DBM.train(	train_data  = train_data[:100],
+					train_label = train_label[:100],
 					epochs      = 1,
 					num_batches = dbm_batches,
 					N           = N , # freerunning steps
@@ -1278,7 +1289,7 @@ if training:
 				# wrong_classified_id = np.loadtxt("wrongs.txt").astype(np.int)
 				# DBM.test(train_data[:1000], train_label[:1000], 50, 10)
 
-				DBM.test(test_data, test_label,
+				DBM.test(test_data[:100], test_label[:100],
 					N = 10,  # sample ist aus random werten, also mindestens 2 sample machen 
 					M = 10,  # average v
 					create_conf_mat = 0)
@@ -1509,175 +1520,178 @@ if training and save_to_file:
 #### Plot
 # Plot the Weights, Errors and other informations
 h1_shape = int(sqrt(DBM.shape[1]))
-if plotting:
-	log.out("Plotting...")
-	
-	# plot w1 as image	
-	fig=plt.figure(figsize=(9,9))
-	map1=plt.matshow(tile(DBM.w_np[0]),cmap="gray",fignum=fig.number)
-	plt.colorbar(map1)
-	plt.grid(False)
-	plt.title("W %i"%0)
-	save_fig(saveto_path+"/weights_img.png", save_to_file)
+
+log.out("Plotting...")
+
+# plot w1 as image	
+fig=plt.figure(figsize=(9,9))
+map1=plt.matshow(tile(DBM.w_np[0]),cmap="gray",fignum=fig.number)
+plt.colorbar(map1)
+plt.grid(False)
+plt.title("W %i"%0)
+save_fig(saveto_path+"/weights_img.png", save_to_file)
 
 
-	# plot all other weights as hists
-	n_weights=DBM.n_layers-1
-	fig,ax = plt.subplots(n_weights,1,figsize=(8,10),sharex="col")
-	for i in range(n_weights):
-		if n_weights>1:
-			ax[i].hist((DBM.w_np[i]).flatten(),bins=60,alpha=0.5,label="After Training")
-			ax[i].set_title("W %i"%i)
-			ax[i].legend()
-		else:
-			ax.hist((DBM.w_np[i]).flatten(),bins=60,alpha=0.5,label="After Training")
-			ax.set_title("W %i"%i)
-			ax.legend()
-
-		try:
-			ax[i].hist((DBM.w_np_old[i]).flatten(),color="r",bins=60,alpha=0.5,label="Before Training")
-		except:
-			pass
-	plt.tight_layout()
-	save_fig(saveto_path+"/weights_hist.png", save_to_file)
-
+# plot all other weights as hists
+n_weights=DBM.n_layers-1
+fig,ax = plt.subplots(n_weights,1,figsize=(8,10),sharex="col")
+for i in range(n_weights):
+	if n_weights>1:
+		ax[i].hist((DBM.w_np[i]).flatten(),bins=60,alpha=0.5,label="After Training")
+		ax[i].set_title("W %i"%i)
+		ax[i].legend()
+	else:
+		ax.hist((DBM.w_np[i]).flatten(),bins=60,alpha=0.5,label="After Training")
+		ax.set_title("W %i"%i)
+		ax.legend()
 
 	try:
-		# plot change in w1 
-		fig=plt.figure(figsize=(9,9))
-		plt.matshow(tile(DBM.w_np[0]-DBM.w_np_old[0]),fignum=fig.number)
-		plt.colorbar()
-		plt.title("Change in W1")
-		save_fig(saveto_path+"/weights_change.png", save_to_file)
+		ax[i].hist((DBM.w_np_old[i]).flatten(),color="r",bins=60,alpha=0.5,label="Before Training")
 	except:
 		pass
-
-	# plot the layer_act for 100 pictures
-	plt.figure("Layer_activiations_test_run")
-	for i in range(DBM.n_layers):
-		plt.plot(DBM.layer_act[:,i],label="Layer %i"%i)
-	plt.legend()
-
-	# plot test errors 
-	plt.figure("test errors")
-	plt.plot(DBM.test_epochs,DBM.test_error_,label="Recon Error")
-	plt.plot(DBM.test_epochs,DBM.class_error_,label="Class Error")
-	plt.ylabel("Squared Mean Error")
-	plt.xlabel("Epoch")
-	plt.legend()
-	save_fig(saveto_path+"/errors.png", save_to_file)
+plt.tight_layout()
+save_fig(saveto_path+"/weights_hist.png", save_to_file)
 
 
-	# # timeline
-	# fig,ax=plt.subplots(2,len(DBM.image_timeline),figsize=(17,6))
-	# plt.tight_layout()
-	# for i in range(len(DBM.image_timeline)):
-	# 	ax[0][i].matshow((DBM.image_timeline[i]).reshape(int(sqrt(DBM.shape[0])),int(sqrt(DBM.shape[0]))))
-	# 	# ax[1][i].matshow((DBM.save_h1[i*2]).reshape(int(sqrt(DBM.shape[1])),int(sqrt(DBM.shape[1]))))
-	# 	ax[0][i].set_title(str(i))
-	# 	ax[0][i].set_xticks([])
-	# 	ax[0][i].set_yticks([])
-	# 	ax[1][i].set_xticks([])
-	# 	ax[1][i].set_yticks([])
-	# 	ax[0][i].grid(False)
+try:
+	# plot change in w1 
+	fig=plt.figure(figsize=(9,9))
+	plt.matshow(tile(DBM.w_np[0]-DBM.w_np_old[0]),fignum=fig.number)
+	plt.colorbar()
+	plt.title("Change in W1")
+	save_fig(saveto_path+"/weights_change.png", save_to_file)
+except:
+	plt.close(fig)
+
+# plot the layer_act for 100 pictures
+plt.figure("Layer_activiations_test_run")
+for i in range(DBM.n_layers):
+	plt.plot(DBM.layer_act[:,i],label="Layer %i"%i)
+plt.legend()
+
+# plot test errors 
+plt.figure("test errors")
+plt.plot(DBM.test_epochs,DBM.test_error_,label="Recon Error")
+plt.plot(DBM.test_epochs,DBM.class_error_,label="Class Error")
+plt.ylabel("Squared Mean Error")
+plt.xlabel("Epoch")
+plt.legend()
+save_fig(saveto_path+"/errors.png", save_to_file)
+
+
+# # timeline
+# fig,ax=plt.subplots(2,len(DBM.image_timeline),figsize=(17,6))
+# plt.tight_layout()
+# for i in range(len(DBM.image_timeline)):
+# 	ax[0][i].matshow((DBM.image_timeline[i]).reshape(int(sqrt(DBM.shape[0])),int(sqrt(DBM.shape[0]))))
+# 	# ax[1][i].matshow((DBM.save_h1[i*2]).reshape(int(sqrt(DBM.shape[1])),int(sqrt(DBM.shape[1]))))
+# 	ax[0][i].set_title(str(i))
+# 	ax[0][i].set_xticks([])
+# 	ax[0][i].set_yticks([])
+# 	ax[1][i].set_xticks([])
+# 	ax[1][i].set_yticks([])
+# 	ax[0][i].grid(False)
+
+
+
+if training:
+	x=np.linspace(0,train_epochs,len(DBM.w_mean_np[0]))
+
+	fig_fr=plt.figure(figsize=(7,9))
 	
-
-
-	if training:
-		x=np.linspace(0,train_epochs,len(DBM.w_mean_np[0]))
-
-		fig_fr=plt.figure(figsize=(7,9))
-		
-		ax_fr1=fig_fr.add_subplot(311)
-		ax_fr1.plot(x,DBM.h1_activity_np)
-		
-		ax_fr2=fig_fr.add_subplot(312)
-		# ax_fr2.plot(DBM.CD1_mean_np,label="CD1")
-		# ax_fr2.plot(DBM.CD2_mean_np,label="CD2")
-		for i in range(len(DBM.shape)-1):
-			ax_fr2.plot(x,DBM.w_mean_np[i],label="Weights %i"%i)
-		ax_fr1.set_title("Firerate h1 layer")
-		ax_fr2.set_title("Weights mean")
-		ax_fr2.legend(loc="best")
-		# ax_fr2.set_ylim([0,np.max(DBM.w_mean_np[0])*1.1])
-		ax_fr3=fig_fr.add_subplot(313)
-		ax_fr3.plot(x,DBM.train_error_np,"k",label="Reconstruction")
-		ax_fr3.plot(x,DBM.train_class_error_np,"r",label="Classification")
-		plt.legend(loc="best")
-		ax_fr3.set_title("Train Error")
-		
-	plt.tight_layout()
+	ax_fr1=fig_fr.add_subplot(311)
+	ax_fr1.plot(x,DBM.h1_activity_np)
 	
+	ax_fr2=fig_fr.add_subplot(312)
+	# ax_fr2.plot(DBM.CD1_mean_np,label="CD1")
+	# ax_fr2.plot(DBM.CD2_mean_np,label="CD2")
+	for i in range(len(DBM.shape)-1):
+		ax_fr2.plot(x,DBM.w_mean_np[i],label="Weights %i"%i)
+	ax_fr1.set_title("Firerate h1 layer")
+	ax_fr2.set_title("Weights mean")
+	ax_fr2.legend(loc="best")
+	# ax_fr2.set_ylim([0,np.max(DBM.w_mean_np[0])*1.1])
+	ax_fr3=fig_fr.add_subplot(313)
+	ax_fr3.plot(x,DBM.train_error_np,"k",label="Reconstruction")
+	ax_fr3.plot(x,DBM.train_class_error_np,"r",label="Classification")
+	plt.legend(loc="best")
+	ax_fr3.set_title("Train Error")
+	
+plt.tight_layout()
 
 
-	#plot some samples from the testdata 
-	fig3,ax3 = plt.subplots(len(DBM.shape)+1,13,figsize=(16,4),sharey="row")
-	for i in range(13):
-		# plot the input
-		ax3[0][i].matshow(test_data[i:i+1].reshape(int(sqrt(DBM.shape[0])),int(sqrt(DBM.shape[0]))))
-		ax3[0][i].set_yticks([])
-		ax3[0][i].set_xticks([])
-		# plot the reconstructed image		
-		ax3[1][i].matshow(DBM.probs[i:i+1].reshape(int(sqrt(DBM.shape[0])),int(sqrt(DBM.shape[0]))))
-		ax3[1][i].set_yticks([])
-		ax3[1][i].set_xticks([])
-		
-		#plot all layers that can get imaged
-		for layer in range(len(DBM.shape)-1):
-			try:
-				ax3[layer+2][i].matshow(DBM.hidden_save[layer][i:i+1].reshape(int(sqrt(DBM.shape[layer+1])),int(sqrt(DBM.shape[layer+1]))))
-				ax3[layer+2][i].set_yticks([])
-				ax3[layer+2][i].set_xticks([])
-			except:
-				pass
-		# plot the last layer 	
-		if DBM.classification:	
-			ax3[-1][i].bar(range(DBM.shape[-1]),DBM.last_layer_save[i])
-			ax3[-1][i].set_xticks(range(DBM.shape[-1]))
-			ax3[-1][i].set_ylim(0,1)
 
-		#plot the reconstructed layer h1
-		# ax3[5][i].matshow(DBM.rec_h1[i:i+1].reshape(int(sqrt(DBM.shape[1])),int(sqrt(DBM.shape[1]))))
-		# plt.matshow(random_recon.reshape(int(sqrt(DBM.shape[0])),int(sqrt(DBM.shape[0]))))
-	plt.tight_layout(pad=0.0)
-	save_fig(saveto_path+"/examples.png", save_to_file)
+#plot some samples from the testdata 
+fig3,ax3 = plt.subplots(len(DBM.shape)+1,13,figsize=(16,4),sharey="row")
+for i in range(13):
+	# plot the input
+	ax3[0][i].matshow(test_data[i:i+1].reshape(int(sqrt(DBM.shape[0])),int(sqrt(DBM.shape[0]))))
+	ax3[0][i].set_yticks([])
+	ax3[0][i].set_xticks([])
+	# plot the reconstructed image		
+	ax3[1][i].matshow(DBM.probs[i:i+1].reshape(int(sqrt(DBM.shape[0])),int(sqrt(DBM.shape[0]))))
+	ax3[1][i].set_yticks([])
+	ax3[1][i].set_xticks([])
+	
+	#plot all layers that can get imaged
+	for layer in range(len(DBM.shape)-1):
+		try:
+			ax3[layer+2][i].matshow(DBM.hidden_save[layer][i:i+1].reshape(int(sqrt(DBM.shape[layer+1])),int(sqrt(DBM.shape[layer+1]))))
+			ax3[layer+2][i].set_yticks([])
+			ax3[layer+2][i].set_xticks([])
+		except:
+			pass
+	# plot the last layer 	
+	if DBM.classification:	
+		ax3[-1][i].bar(range(DBM.shape[-1]),DBM.last_layer_save[i])
+		ax3[-1][i].set_xticks(range(DBM.shape[-1]))
+		ax3[-1][i].set_ylim(0,1)
+
+	#plot the reconstructed layer h1
+	# ax3[5][i].matshow(DBM.rec_h1[i:i+1].reshape(int(sqrt(DBM.shape[1])),int(sqrt(DBM.shape[1]))))
+	# plt.matshow(random_recon.reshape(int(sqrt(DBM.shape[0])),int(sqrt(DBM.shape[0]))))
+plt.tight_layout(pad=0.0)
+save_fig(saveto_path+"/examples.png", save_to_file)
 
 
-	#plot only one digit
-	fig3,ax3 = plt.subplots(len(DBM.shape)+1,10,figsize=(16,4),sharey="row")
-	m=0
-	for i in index_for_number_test.astype(np.int)[8][0:10]:
-		# plot the input
-		ax3[0][m].matshow(test_data[i:i+1].reshape(int(sqrt(DBM.shape[0])),int(sqrt(DBM.shape[0]))))
-		ax3[0][m].set_yticks([])
-		ax3[0][m].set_xticks([])
-		# plot the reconstructed image		
-		ax3[1][m].matshow(DBM.probs[i:i+1].reshape(int(sqrt(DBM.shape[0])),int(sqrt(DBM.shape[0]))))
-		ax3[1][m].set_yticks([])
-		ax3[1][m].set_xticks([])
-		
-		#plot all layers that can get imaged
-		for layer in range(len(DBM.shape)-1):
-			try:
-				ax3[layer+2][m].matshow(DBM.hidden_save[layer][i:i+1].reshape(int(sqrt(DBM.shape[layer+1])),int(sqrt(DBM.shape[layer+1]))))
-				ax3[layer+2][m].set_yticks([])
-				ax3[layer+2][m].set_xticks([])
-			except:
-				pass
-		# plot the last layer 		
-		if DBM.classification:
-			ax3[-1][m].bar(range(DBM.shape[-1]),DBM.last_layer_save[i])
-			ax3[-1][m].set_xticks(range(DBM.shape[-1]))
-			ax3[-1][m].set_ylim(0,1)
-		#plot the reconstructed layer h1
-		# ax4[5][m].matshow(DBM.rec_h1[i:i+1].reshape(int(sqrt(DBM.shape[1])),int(sqrt(DBM.shape[1]))))
-		# plt.matshow(random_recon.reshape(int(sqrt(DBM.shape[0])),int(sqrt(DBM.shape[0]))))
-		m+=1
-	plt.tight_layout(pad=0.0)
+#plot only one digit
+fig3,ax3 = plt.subplots(len(DBM.shape)+1,10,figsize=(16,4),sharey="row")
+m=0
+for i in index_for_number_test.astype(np.int)[8][0:10]:
+	# plot the input
+	ax3[0][m].matshow(test_data[i:i+1].reshape(int(sqrt(DBM.shape[0])),int(sqrt(DBM.shape[0]))))
+	ax3[0][m].set_yticks([])
+	ax3[0][m].set_xticks([])
+	# plot the reconstructed image		
+	ax3[1][m].matshow(DBM.probs[i:i+1].reshape(int(sqrt(DBM.shape[0])),int(sqrt(DBM.shape[0]))))
+	ax3[1][m].set_yticks([])
+	ax3[1][m].set_xticks([])
+	
+	#plot all layers that can get imaged
+	for layer in range(len(DBM.shape)-1):
+		try:
+			ax3[layer+2][m].matshow(DBM.hidden_save[layer][i:i+1].reshape(int(sqrt(DBM.shape[layer+1])),int(sqrt(DBM.shape[layer+1]))))
+			ax3[layer+2][m].set_yticks([])
+			ax3[layer+2][m].set_xticks([])
+		except:
+			pass
+	# plot the last layer 		
+	if DBM.classification:
+		ax3[-1][m].bar(range(DBM.shape[-1]),DBM.last_layer_save[i])
+		ax3[-1][m].set_xticks(range(DBM.shape[-1]))
+		ax3[-1][m].set_ylim(0,1)
+	#plot the reconstructed layer h1
+	# ax4[5][m].matshow(DBM.rec_h1[i:i+1].reshape(int(sqrt(DBM.shape[1])),int(sqrt(DBM.shape[1]))))
+	# plt.matshow(random_recon.reshape(int(sqrt(DBM.shape[0])),int(sqrt(DBM.shape[0]))))
+	m+=1
+plt.tight_layout(pad=0.0)
 
 
 
 
 
 log.close()
-plt.show()
+if plotting:
+	plt.show()
+else:
+	plt.close()
