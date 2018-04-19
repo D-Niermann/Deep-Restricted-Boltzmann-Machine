@@ -1198,7 +1198,7 @@ class DBM_class(object):
 num_batches_pretrain = 100
 dbm_batches          = 1000
 pretrain_epochs      = [0,0,0,0,0]
-train_epochs         = 2
+train_epochs         = 3
 test_every_epoch     = 4
 
 ### learnrates 
@@ -1209,7 +1209,7 @@ learnrate_slope   = 0.1 	# bigger number -> smaller slope
 ### temperature
 temp       = 0.1		# global temp state
 temp_start = temp 	# starting temp
-temp_slope = 0.5		# slope of decresing temp
+temp_slope = 1000		# slope of decresing temp
 
 ### state vars 
 pre_training    = 0	# if no pretrain then files are automatically loaded
@@ -1617,8 +1617,19 @@ if training:
 	plt.legend(loc="best")
 	ax_fr3.set_title("Train Error")
 	
-plt.tight_layout()
+	plt.tight_layout()
+	save_fig(saveto_path+"/weight_means.png", save_to_file)
 
+	fig,ax = plt.subplots(2,1)
+	ax[0].plot(DBM.temp_save,label="Temperature")
+	ax[0].legend()
+	ax[1].plot(DBM.learnrate_save,label="Learnrate")
+	ax[1].legend()
+	ax[1].set_xlabel("Epoch")
+	ax[0].set_xlabel("Epoch")
+	ax[0].set_ylabel("Temperature")
+	ax[0].set_ylabel("Learnrate")
+	save_fig(saveto_path+"/learnr-temp.png", save_to_file)
 
 
 #plot some samples from the testdata 
