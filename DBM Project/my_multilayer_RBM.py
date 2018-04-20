@@ -5,6 +5,8 @@ if True:
 	print ("Starting...")
 	
 	import matplotlib as mpl
+	import os,time,sys
+
 	try: # if on macbook
 		workdir="/Users/Niermann/Google Drive/Masterarbeit/Python/DBM Project"
 		os.chdir(workdir)
@@ -21,7 +23,8 @@ if True:
 	import numpy.random as rnd
 	import matplotlib.pyplot as plt
 	import tensorflow as tf
-	import os,time,sys
+	from pandas import DataFrame,Series
+	
 	from math import exp,sqrt,sin,pi,cos,log
 	np.set_printoptions(precision=3)
 
@@ -32,7 +35,7 @@ if True:
 	if import_seaborn:
 		import seaborn
 
-		seaborn.set(font_scale=1.5)
+		seaborn.set(font_scale=1.1)
 		seaborn.set_style("ticks",
 			{
 			'axes.grid':            True,
@@ -236,18 +239,31 @@ class DBM_class(object):
 		self.liveplot       = liveplot # if true will open a lifeplot of the weight matrix 
 		self.shape          = shape  # contains the number of  neurons in a list from v layer to h1 to h2 
 		self.classification = classification #weather the machine uses a label layer 
-		self.epochs         = 0
 		
-		self.init_state     = 0
-		self.exported       = 0
-		self.tested         = 0
-		# self.m              = 0 #laufvariable
+		self.init_state = 0
+		self.exported   = 0
+		self.tested     = 0
+		
 		self.train_time     = 0
+		self.epochs         = 0
+
 		self.test_error_    = []
 		self.class_error_   = [] 
 		self.test_epochs    = []
 		self.learnrate_save = []
 		self.temp_save      = []
+		self.w_mean_np      = [[],]*(self.n_layers-1)
+
+		self.save_dict ={	"Test_Epoch":  [],
+					"Recon_Error": [],
+					"Class_Error": [],
+					"Temperature": [],
+					"Learnrate":   [],
+					}
+		for i in range(self.n_layers-1):
+			self.save_dict["W_mean_%i"%i] = []
+		for i in range(self.n_layers):
+			self.save_dict["layer_%i_activity"%i] = []
 
 		self.log_list = [	["shape",self.shape],
 					["epochs_pretrain",pretrain_epochs],
@@ -460,14 +476,14 @@ class DBM_class(object):
 
 		if graph_mode=="training":
 			# stuff
-			self.m_tf      = tf.placeholder(tf.int32,[],name="running_array_index")
+			# self.m_tf      = tf.placeholder(tf.int32,[],name="running_array_index")
 			self.learnrate = tf.placeholder(tf.float32,[],name="Learnrate")
 
 			# arrays for saving progress
-			self.h1_activity_ = tf.Variable(tf.zeros([train_epochs]))
-			self.h2_activity_ = tf.Variable(tf.zeros([train_epochs]))
-			self.train_error_ = tf.Variable(tf.zeros([train_epochs]))
-			self.train_class_error_ = tf.Variable(tf.zeros([train_epochs]))
+			# self.h1_activity_ = tf.Variable(tf.zeros([train_epochs]))
+			# self.h2_activity_ = tf.Variable(tf.zeros([train_epochs]))
+			# self.train_error_ = tf.Variable(tf.zeros([train_epochs]))
+			# self.train_class_error_ = tf.Variable(tf.zeros([train_epochs]))
 			
 		#### temperature
 		self.temp_tf = tf.placeholder(tf.float32,[],name="Temperature")
@@ -566,15 +582,15 @@ class DBM_class(object):
 		
 
 		### Training with contrastive Divergence
-		if graph_mode=="training":
-			self.assign_arrays =	[ tf.scatter_update(self.train_error_, self.m_tf, self.error), 							  
-							  tf.scatter_update(self.h1_activity_, self.m_tf, self.h1_sum), 
-							]
+		# if graph_mode=="training":
+			# self.assign_arrays =	[ tf.scatter_update(self.train_error_, self.m_tf, self.error), 							  
+			# 				  tf.scatter_update(self.h1_activity_, self.m_tf, self.h1_sum), 
+			# 				]
 
-			for i in range(len(self.shape)-1):
-				self.assign_arrays.append(tf.scatter_update(self.w_mean_[i], self.m_tf, self.mean_w[i]))
-			if self.classification:
-				self.assign_arrays.append(tf.scatter_update(self.train_class_error_, self.m_tf, self.class_error))
+			# for i in range(len(self.shape)-1):
+			# 	self.assign_arrays.append(tf.scatter_update(self.w_mean_[i], self.m_tf, self.mean_w[i]))
+			# if self.classification:
+			# 	self.assign_arrays.append(tf.scatter_update(self.train_class_error_, self.m_tf, self.class_error))
 
 		sess.run(tf.global_variables_initializer())
 		self.init_state=1
@@ -622,7 +638,7 @@ class DBM_class(object):
 		"""
 		######## init all vars for training
 		self.batchsize = int(55000/num_batches)
-		num_of_updates = train_epochs*epochs*num_batches
+		num_of_updates = train_epochs*num_batches
 		if self.n_layers <=3 and self.classification==1:
 			M = 2
 		else:
@@ -733,20 +749,6 @@ class DBM_class(object):
 				# self.F_test.append(f_test_)
 
 
-				# #### add values to the tf.arrays
-				try:
-					if self.classification:
-						sess.run([self.assign_arrays],feed_dict={	self.layer_ph[0]  : self.batch,
-													self.layer_ph[-1] : batch_label,
-													self.m_tf: self.epochs })
-					else:
-						sess.run([self.assign_arrays],feed_dict={	self.layer_ph[0]  : self.batch,
-													self.m_tf: self.epochs })
-				except:
-					log.info("Error for appending")
-
-
-
 				### liveplot
 				if self.liveplot and plt.fignum_exists(fig.number) and start%40==0:
 					if start%4000==0:
@@ -764,17 +766,26 @@ class DBM_class(object):
 
 		# increase epoch counter
 		self.epochs += 1 
+		
 		# change learnrate
-		log.info("Learnrate: ",learnrate)
-		self.learnrate_save.append(learnrate)
+		log.info("Learnrate: ",np.round(learnrate,5))
+				# self.learnrate_save.append(learnrate)
 		learnrate = self.get_learnrate(self.epochs, learnrate_slope, dbm_learnrate)
+		
 		# change temo
-		log.info("Temp: ",temp)
+		log.info("Temp: ",np.round(temp,5))
 		temp = self.get_temp(self.epochs, temp_slope, temp_start)
-		self.temp_save.append(temp)
+				# self.temp_save.append(temp)
+
+		# append all data to save_dict
+		self.save_dict["Temperature"].append(temp)
+		self.save_dict["Learnrate"].append(learnrate)
+		for i in range(len(self.shape)-1):
+			w_mean = np.mean( np.abs( self.w[i].eval() ) )
+			self.save_dict["W_mean_%i"%i].append(w_mean)
 
 		# normalize the activity arrays
-		self.h1_activity_*=1./(self.shape[1]*self.batchsize)
+		# self.h1_activity_*=1./(self.shape[1]*self.batchsize)
 
 		self.export()
 
@@ -845,7 +856,7 @@ class DBM_class(object):
 
 		#### calculate errors and activations
 		self.recon_error  = self.error.eval({self.layer_ph[0] : my_test_data})
-		self.test_error_.append(self.recon_error) #append to errors if called multiple times
+		
 
 		#### count how many images got classified wrong 
 		log.out("Taking only the maximum")
@@ -870,9 +881,7 @@ class DBM_class(object):
 				elif max_pos == digit:
 					right_maxis.append(maxi)
 			n_wrongs = len(wrong_maxis)
-			self.class_error_.append(float(n_wrongs)/self.batchsize)
-			self.test_epochs.append(self.epochs)
-			
+
 			if create_conf_mat:
 				log.out("Making Confusion Matrix")
 				
@@ -891,6 +900,16 @@ class DBM_class(object):
 				plt.ylabel("Desired Label in %")
 				plt.xlabel("Predicted Label in %")
 								
+
+
+			# self.class_error_.append(float(n_wrongs)/self.batchsize)
+			# self.test_epochs.append(self.epochs)
+			# self.test_error_.append(self.recon_error) #append to errors if called multiple times
+		
+		## append saves to save_dict
+		self.save_dict["Class_Error"].append(float(n_wrongs)/self.batchsize)
+		self.save_dict["Recon_Error"].append(self.recon_error)
+		self.save_dict["Test_Epoch"].append(self.epochs)
 
 		self.tested = 1
 		log.end()
@@ -1121,14 +1140,14 @@ class DBM_class(object):
 			self.bias_np.append(self.bias[i].eval())
 
 		# convert tf.arrays to numpy arrays 
-		if training:
-			self.h1_activity_np = self.h1_activity_.eval()
-			self.h2_activity_np = self.h2_activity_.eval()
-			self.train_error_np = self.train_error_.eval()
-			self.train_class_error_np = self.train_class_error_.eval()
-			self.w_mean_np = []
-			for i in range(len(self.shape)-1):
-				self.w_mean_np.append(self.w_mean_[i].eval())
+		# if training:
+		# 	self.h1_activity_np = self.h1_activity_.eval()
+		# 	self.h2_activity_np = self.h2_activity_.eval()
+		# 	self.train_error_np = self.train_error_.eval()
+		# 	self.train_class_error_np = self.train_class_error_.eval()
+		# 	self.w_mean_np = []
+		# 	for i in range(len(self.shape)-1):
+		# 		self.w_mean_np.append(self.w_mean_[i].eval())
 		
 		self.exported = 1
 
@@ -1145,47 +1164,36 @@ class DBM_class(object):
 		for i in range(len(self.shape)-1):
 			np.savetxt("w%i.txt"%i, self.w_np[i])
 		
-		# save bias
+		##  save bias
 		for i in range(len(self.shape)):
 			np.savetxt("bias%i.txt"%i, self.bias_np[i])
 		
-		#save log
+		## save log
 		self.log_list.append(["train_time",self.train_time])
 		self.log_list.append(["Epochs",self.epochs])
 		
-		# save test error of wrongs classified images
-		if self.classification:
-			np.savetxt("Classification_Error_on_test_images.txt",list(zip(self.test_epochs,self.class_error_)))
-		np.savetxt("Recon_Error_on_test_images.txt",list(zip(self.test_epochs,self.test_error_)))
+		## save save_dict
+		try:
+			save_df = DataFrame(dict([ (k,Series(v)) for k,v in self.save_dict.iteritems() ]))
+		except:
+			log.out("using dataframe items conversion for python 3.x")
+			save_df = DataFrame(dict([ (k,Series(v)) for k,v in DBM.save_dict.items() ]))
+		save_df.to_csv("save_dict.csv")
 
+		## logfile
 		with open("logfile.txt","w") as log_file:
 				for i in range(len(self.log_list)):
 					log_file.write(self.log_list[i][0]+","+str(self.log_list[i][1])+"\n")
-		
-		np.savetxt("learnrate.txt", self.learnrate_save)
-		np.savetxt("temperature.txt", self.temp_save)
+
+
+				# if self.classification:
+				# 	np.savetxt("Classification_Error_on_test_images.txt",list(zip(self.test_epochs,self.class_error_)))
+				# np.savetxt("Recon_Error_on_test_images.txt",list(zip(self.test_epochs,self.test_error_)))
+				
+				# np.savetxt("learnrate.txt", self.learnrate_save)
+				# np.savetxt("temperature.txt", self.temp_save)
 
 		log.info("Saved data and log to:",new_path)
-
-		if save_all_params:
-			if training:
-				np.savetxt("h1_activity.txt", self.h1_activity_np)
-				np.savetxt("train_error.txt", self.train_error_np)
-				np.savetxt("train_class_error.txt", self.train_class_error_np)
-				np.savetxt("w1_mean.txt", self.w_mean_np[0])
-
-			# test results
-			np.savetxt("test_error_mean.txt", self.test_error[None]) 
-			np.savetxt("class_error_mean.txt", self.class_error[None]) 
-			np.savetxt("h1_act_test_mean.txt", self.h1_act_test[None])
-			np.savetxt("h2_act_test_mean.txt", self.h2_act_test[None])
-			np.savetxt("v_recon_prob_test.txt", self.probs) 
-			np.savetxt("v_recon_test.txt", self.rec) 
-			np.savetxt("h1_recon_test.txt", self.rec_h1) 
-			np.savetxt("h1_test.txt", self.h1_test) 
-			np.savetxt("h2_prob_test.txt", self.h2_test) 
-
-			log.info("Saved Parameters to same path")
 
 
 		
@@ -1198,13 +1206,13 @@ class DBM_class(object):
 num_batches_pretrain = 100
 dbm_batches          = 1000
 pretrain_epochs      = [0,0,0,0,0]
-train_epochs         = 3
-test_every_epoch     = 4
+train_epochs         = 20
+test_every_epoch     = 2
 
 ### learnrates 
-rbm_learnrate     = 0.001	# learnrate for pretraining
-dbm_learnrate     = 0.001	# starting learnrates
-learnrate_slope   = 0.1 	# bigger number -> smaller slope
+rbm_learnrate     = 0.01	# learnrate for pretraining
+dbm_learnrate     = 0.01	# starting learnrates
+learnrate_slope   = 0.5 	# bigger number -> smaller slope
 
 ### temperature
 temp       = 0.1		# global temp state
@@ -1224,7 +1232,6 @@ noise_stab_test = 0
 
 ### saving and loading 
 save_to_file    = 1 	# only save biases and weights for further training
-save_all_params = 0	# also save all test data and reconstructed images (memory heavy)
 save_pretrained = 0
 
 load_from_file        = 0
@@ -1571,8 +1578,8 @@ plt.legend()
 
 # plot test errors 
 plt.figure("test errors")
-plt.plot(DBM.test_epochs,DBM.test_error_,label="Recon Error")
-plt.plot(DBM.test_epochs,DBM.class_error_,label="Class Error")
+plt.plot(DBM.save_dict["Test_Epoch"],DBM.save_dict["Recon_Error"],label="Recon Error")
+plt.plot(DBM.save_dict["Test_Epoch"],DBM.save_dict["Class_Error"],label="Class Error")
 plt.ylabel("Squared Mean Error")
 plt.xlabel("Epoch")
 plt.legend()
@@ -1595,40 +1602,17 @@ save_fig(saveto_path+"/errors.png", save_to_file)
 
 
 if training:
-	x=np.linspace(0,train_epochs,len(DBM.w_mean_np[0]))
-
-	fig_fr=plt.figure(figsize=(7,9))
-	
-	ax_fr1=fig_fr.add_subplot(311)
-	ax_fr1.plot(x,DBM.h1_activity_np)
-	
-	ax_fr2=fig_fr.add_subplot(312)
-	# ax_fr2.plot(DBM.CD1_mean_np,label="CD1")
-	# ax_fr2.plot(DBM.CD2_mean_np,label="CD2")
-	for i in range(len(DBM.shape)-1):
-		ax_fr2.plot(x,DBM.w_mean_np[i],label="Weights %i"%i)
-	ax_fr1.set_title("Firerate h1 layer")
-	ax_fr2.set_title("Weights mean")
-	ax_fr2.legend(loc="best")
-	# ax_fr2.set_ylim([0,np.max(DBM.w_mean_np[0])*1.1])
-	ax_fr3=fig_fr.add_subplot(313)
-	ax_fr3.plot(x,DBM.train_error_np,"k",label="Reconstruction")
-	ax_fr3.plot(x,DBM.train_class_error_np,"r",label="Classification")
-	plt.legend(loc="best")
-	ax_fr3.set_title("Train Error")
-	
-	plt.tight_layout()
-	save_fig(saveto_path+"/weight_means.png", save_to_file)
-
-	fig,ax = plt.subplots(2,1)
-	ax[0].plot(DBM.temp_save,label="Temperature")
+	fig,ax = plt.subplots(3,1)
+	ax[0].plot(DBM.save_dict["Temperature"],label="Temperature")
 	ax[0].legend()
-	ax[1].plot(DBM.learnrate_save,label="Learnrate")
+	ax[1].plot(DBM.save_dict["Learnrate"],label="Learnrate")
 	ax[1].legend()
 	ax[1].set_xlabel("Epoch")
 	ax[0].set_xlabel("Epoch")
 	ax[0].set_ylabel("Temperature")
 	ax[0].set_ylabel("Learnrate")
+	for i in range(len(DBM.shape)-1):
+		ax[2].plot(DBM.save_dict["W_mean_%i"%i],label="Weights Mean %i"%i)
 	save_fig(saveto_path+"/learnr-temp.png", save_to_file)
 
 

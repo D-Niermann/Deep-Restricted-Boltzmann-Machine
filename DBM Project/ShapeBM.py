@@ -203,11 +203,18 @@ class RBM(object):
 		# self.v_prob_rev  = sigmoid(tf.matmul(self.h_rev,(self.w),transpose_b=True) + self.bias_v,temp)
 		# self.v_recon_rev = tf.nn.relu(tf.sign(self.v_prob_rev - tf.random_uniform(tf.shape(self.v_prob_rev))))
 
-	def train(self,sess,RBM_i,RBMs,batch):
+	def train(self,sess,layer_i,RBM_sub_n,RBMs,batch,w_mean):
+		""" RBM_sub_n : number of receptive field rbm - if 0 no receptive fields are given
+		w_mean : if 0 no rec field given
+		"""
+		# sync all weights between the RBMs 
+		if RBM_sub_n != 0:
+			sess.run(self.w.assign(w_mean))
+
 		self.my_input_data = batch
 		# iterate which RBM level this is and calculate the proper input 
 		for j in range(1,len(RBMs)):
-			if RBM_i >= j:
+			if layer_i >= j:
 				self.my_input_data = RBMs[j-1].h_prob.eval({RBMs[j-1].v : self.my_input_data})
 
 		#### update the weights and biases
@@ -225,12 +232,12 @@ class DBM_class(object):
 	"""defines a deep boltzmann machine
 	"""
 
-	def __init__(self,shape,liveplot,classification):
+	def __init__(self,shape,liveplot,classification,n_rec_fields=4):
 		self.n_layers     = len(shape)
 		self.liveplot     = liveplot # if true will open a lifeplot of the weight matrix 
 		self.shape        = shape  # contains the number of  neurons in a list from v layer to h1 to h2 
 		self.classification  = classification #weather the machine uses a label layer 
-		
+		self.n_rec_fields = n_rec_fields
 		
 		self.init_state     = 0
 		self.exported       = 0
@@ -256,22 +263,27 @@ class DBM_class(object):
 				   ]
 
 		log.out("Creating RBMs")
-		self.RBMs    = [None]*(len(self.shape)-1)
-		for i in range(len(self.RBMs)):
-			if i == 0 and len(self.RBMs)>1:
-				self.RBMs[i] = RBM(self.shape[i],self.shape[i+1], forw_mult= 2, back_mult = 1, learnrate = rbm_learnrate, liveplot=0)
-				log.out("2,1")
-			elif i==len(self.RBMs)-1 and len(self.RBMs)>1:
-				self.RBMs[i] = RBM(self.shape[i],self.shape[i+1], forw_mult= 1, back_mult = 2, learnrate = rbm_learnrate, liveplot=0)				
+		self.RBMs    = []
+		rbm_len = len(self.shape)-1
+		
+		for i in range(rbm_len):	
+			if i == 0 and rbm_len>1:
+				self.RBMs_unter =[]
+				for r in range(self.n_rec_fields):
+					self.RBMs_unter.append( RBM(self.shape[i],self.shape[i+1], forw_mult= 2, back_mult = 1, learnrate = rbm_learnrate, liveplot=0))
+					log.out("2,1")
+				self.RBMs.append(self.RBMs_unter)
+			elif i==rbm_len-1 and rbm_len>1:
+				self.RBMs.append( [RBM(self.shape[i],self.shape[i+1], forw_mult= 1, back_mult = 2, learnrate = rbm_learnrate, liveplot=0)])
 				log.out("1,2")
 			else:
-				if len(self.RBMs) == 1:
-					self.RBMs[i] = RBM(self.shape[i],self.shape[i+1], forw_mult= 1, back_mult = 1, learnrate = rbm_learnrate, liveplot=0)
+				if rbm_len == 1:
+					self.RBMs.append( [RBM(self.shape[i],self.shape[i+1], forw_mult= 1, back_mult = 1, learnrate = rbm_learnrate, liveplot=0)])
 					log.out("1,1")
 				else:
-					self.RBMs[i] = RBM(self.shape[i],self.shape[i+1], forw_mult= 2, back_mult = 2, learnrate = rbm_learnrate, liveplot=0)
+					self.RBMs.append( [RBM(self.shape[i],self.shape[i+1], forw_mult= 2, back_mult = 2, learnrate = rbm_learnrate, liveplot=0)])
 					log.out("2,2")
-				
+			
 		# self.RBMs[1] = RBM(self.shape[1],self.shape[2], forw_mult= 1, back_mult = 1, learnrate = rbm_learnrate, liveplot=0)
 		# self.RBMs[2] = RBM(self.shape[2],self.shape[3], forw_mult= 1, back_mult = 1, learnrate = rbm_learnrate, liveplot=0)
 
@@ -284,43 +296,65 @@ class DBM_class(object):
 		"""
 
 		if pre_training:
-			for rbm in self.RBMs:
-				if rbm.liveplot:
-					log.info("Liveplot is open!")
-					fig,ax=plt.subplots(1,1,figsize=(15,10))
-					break
+			for layer in range(len(self.RBMs)):
+				for rbm in self.RBMs[layer]:
+					if rbm.liveplot:
+						log.info("Liveplot is open!")
+						fig,ax=plt.subplots(1,1,figsize=(15,10))
+						break
 
 		batchsize_pretrain = int(55000/num_batches_pretrain)
+		w_mean_after  = np.zeros([self.shape[0],self.shape[1]])
+
 
 		with tf.Session() as sess:
 			# train session - v has batchsize length
 			log.start("Pretrain Session")
 			
 			
-			#iterate through the RBMs , each iteration is a RBM
+			
 			if pre_training:	
 				sess.run(tf.global_variables_initializer())
 
-				for RBM_i, RBM in enumerate(self.RBMs):
-					log.start("Pretraining ",str(RBM_i+1)+".", "RBM")
+				#iterate through the Layers , each iteration is a Layer
+				for layer_i, RBM_list in enumerate(self.RBMs):
+					log.start("Pretraining ",str(layer_i+1)+".", "Layer")
 					
+					# iter through epochs 
+					for epoch in range(pretrain_epochs[layer_i]):
 
-					for epoch in range(pretrain_epochs[RBM_i]):
-
-						log.start("Epoch:",epoch+1,"/",pretrain_epochs[RBM_i])
-						
+						log.start("Epoch:",epoch+1,"/",pretrain_epochs[layer_i])
+						# iter through data and make batch
 						for start, end in zip( range(0, len(train_data), batchsize_pretrain), range(batchsize_pretrain, len(train_data), batchsize_pretrain)):
-							#### define a batch
-							batch = train_data[start:end]
-							# train the rbm  
-							w_i,error_i = RBM.train(sess,RBM_i,self.RBMs,batch)
+
+							
+
+							# if only one rbm is in this layer than preceed normaly
+							if len(self.RBMs[layer_i]) == 1:
+								#### define a batch
+								batch = train_data[start:end]
+								# train the rbm  
+								w_i,error_i = RBM_list[0].train(sess,layer_i,0,self.RBMs,batch,0)
+							# if more rbms are in one layer than split the images and contraint the weights
+							else:
+								# iter through rbms 
+								w_mean_before = np.zeros([self.shape[0],self.shape[1]])
+								
+								for sub_RBM in range(len(self.RBMs[layer_i])):
+									## split the batch 
+									batch         = train_data[start:end][:,0+self.shape[0]*sub_RBM:self.shape[0]+self.shape[0]*sub_RBM]
+									w_i , error_i = RBM_list[sub_RBM].train(sess,layer_i,sub_RBM,self.RBMs,batch,w_mean_after)
+									w_mean_before += w_i
+								w_mean_before *= 1./self.n_rec_fields
+								w_mean_after  = w_mean_before
+
 							#### liveplot
-							if RBM.liveplot and plt.fignum_exists(fig.number) and start%40==0:
-								ax.cla()
-								rbm_shape  = int(sqrt(RBM.visible_units))
-								matrix_new = tile_raster_images(X=w_i.T, img_shape=(rbm_shape, rbm_shape), tile_shape=(10, 10), tile_spacing=(0,0))
-								ax.matshow(matrix_new)
-								plt.pause(0.00001)
+							# if RBM.liveplot and plt.fignum_exists(fig.number) and start%40==0:
+								# ax.cla()
+								# rbm_shape  = int(sqrt(RBM.visible_units))
+								# matrix_new = tile_raster_images(X=w_i.T, img_shape=(rbm_shape, rbm_shape), tile_shape=(10, 10), tile_spacing=(0,0))
+								# ax.matshow(matrix_new)
+								# plt.pause(0.00001)
 
 
 						log.info("Learnrate:",round(rbm_learnrate,4))
@@ -385,6 +419,7 @@ class DBM_class(object):
 		for i in range(len(self.shape)):
 			sess.run(self.bias[i].assign(self.bias_np[i]))
 
+
 	def layer_input(self, layer_i):
 		""" calculate input of layer layer_i
 		layer_i :: for which layer
@@ -403,6 +438,7 @@ class DBM_class(object):
 					self.temp)
 		return _input_
 
+
 	def sample(self,x):
 		""" takes sample from x where x is a probability vector.
 		subtracts a random uniform from each prob and then applies the 
@@ -415,9 +451,7 @@ class DBM_class(object):
 					)
 				) 
 
-	################################################################################################################################################
-	####  DBM Graph 
-	################################################################################################################################################
+
 	def graph_init(self,graph_mode):
 		""" sets the graph up and loads the pretrained weights in , these are given
 		at class definition
@@ -553,6 +587,7 @@ class DBM_class(object):
 
 		sess.run(tf.global_variables_initializer())
 		self.init_state=1
+
 
 	def test_noise_stability(self,input_data,input_label):
 		self.batchsize=len(input_data)
@@ -1140,8 +1175,8 @@ dbm_learnrate_end = 0.005
 
 temp = 0.05
 
-pre_training    = 0	# if no pretrain then files are automatically loaded
-training        = 1	# if trianing the whole DBM
+pre_training    = 1	# if no pretrain then files are automatically loaded
+training        = 0	# if trianing the whole DBM
 testing         = 1	# if testing the DBM with test data
 plotting        = 1	
 
@@ -1154,16 +1189,16 @@ save_all_params = 0	# also save all test data and reconstructed images (memory h
 save_pretrained = 0
 
 
-load_from_file        = 1
+load_from_file        = 0
 pathsuffix            = "Thu_Apr__5_10-23-15_2018_[784, 25, 10]"
 pathsuffix_pretrained = "Fri_Mar__9_16-46-01_2018"
 ###########################################################################################################
 
 
 DBM_shape = [
-			28*28,
-			5*5,
-			10
+			784/4,
+			7*7,
+			20
 		 ]
 
 saveto_path=data_dir+"/"+time_now+"_"+str(DBM_shape)
