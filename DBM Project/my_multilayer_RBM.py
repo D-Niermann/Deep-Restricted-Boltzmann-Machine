@@ -1602,20 +1602,27 @@ save_fig(saveto_path+"/errors.png", save_to_file)
 
 
 if training:
-	fig,ax = plt.subplots(3,1)
+	fig,ax = plt.subplots(3,1,sharex="col")
+	
 	ax[0].plot(DBM.save_dict["Temperature"],label="Temperature")
-	ax[0].legend()
-	ax[1].plot(DBM.save_dict["Learnrate"],label="Learnrate")
-	ax[1].legend()
-	ax[1].set_xlabel("Epoch")
-	ax[0].set_xlabel("Epoch")
+	ax[0].legend(loc="center left",bbox_to_anchor = (1.0,0.5))
+
 	ax[0].set_ylabel("Temperature")
-	ax[0].set_ylabel("Learnrate")
+	
+	ax[1].plot(DBM.save_dict["Learnrate"],label="Learnrate")
+	ax[1].legend(loc="center left",bbox_to_anchor = (1.0,0.5))
+	ax[1].set_ylabel("Learnrate")
+
+	ax[2].set_ylabel("Weights Mean")
 	for i in range(len(DBM.shape)-1):
-		ax[2].plot(DBM.save_dict["W_mean_%i"%i],label="Weights Mean %i"%i)
+		ax[2].plot(DBM.save_dict["W_mean_%i"%i],label="Weight %i"%i)
+	ax[2].legend(loc="center left",bbox_to_anchor = (1.0,0.5))
+	ax[2].set_xlabel("Epoch")
+	plt.subplots_adjust(left=None, bottom=None, right=0.8, top=None,
+                wspace=None, hspace=None)
 	save_fig(saveto_path+"/learnr-temp.png", save_to_file)
 
-
+	
 #plot some samples from the testdata 
 fig3,ax3 = plt.subplots(len(DBM.shape)+1,13,figsize=(16,4),sharey="row")
 for i in range(13):
