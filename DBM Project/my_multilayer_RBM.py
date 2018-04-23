@@ -462,9 +462,23 @@ class DBM_class(object):
 
 	def get_N(self,epoch):
 		N=2
-		if epoch > 10:
-			N = 10
+
 		return N
+	def update_savedict(self,mode):
+		if mode=="training":
+			# append all data to save_dict
+			self.save_dict["Temperature"].append(temp)
+			self.save_dict["Learnrate"].append(learnrate)
+			self.save_dict["Freerun_Steps"].append(freerun_steps)
+			for i in range(len(self.shape)-1):
+				w_mean = np.mean( np.abs( self.w[i].eval() ) )
+				self.save_dict["W_mean_%i"%i].append(w_mean)
+
+		if mode == "testing":
+			if self.classification:
+				self.save_dict["Class_Error"].append(float(n_wrongs)/self.batchsize)
+			self.save_dict["Recon_Error"].append(self.recon_error)
+			self.save_dict["Test_Epoch"].append(self.epochs)
 
 	################################################################################################################################################
 	####  DBM Graph 
@@ -645,22 +659,14 @@ class DBM_class(object):
 		######## init all vars for training
 		self.batchsize = int(55000/num_batches)
 		num_of_updates = train_epochs*num_batches
+		self.num_of_updates = num_of_updates
 		if self.n_layers <=3 and self.classification==1:
 			M = 2
 		else:
 			M = 10
 
-		log.info("Batchsize:",self.batchsize,"N_Updates",num_of_updates)
-
-		self.num_of_updates = num_of_updates
-
-
-		## arrays for approximation of hidde probs
-		h1_p=np.zeros([M,self.batchsize,self.shape[1]])
-		try:
-			h2_p=np.zeros([M,self.batchsize,self.shape[2]])
-		except:
-			pass
+		### write vars into savedict
+		self.update_savedict("training")
 
 		### free energy
 		# self.F=[]
@@ -690,6 +696,7 @@ class DBM_class(object):
 
 
 		# starting the training
+		log.info("Batchsize:",self.batchsize,"N_Updates",num_of_updates)
 		for epoch in range(epochs):
 			log.start("Deep BM Epoch:",self.epochs+1,"/",train_epochs)
 
@@ -783,13 +790,6 @@ class DBM_class(object):
 		log.info("freerun_steps: ",freerun_steps)
 		freerun_steps = self.get_N(self.epochs)
 
-		# append all data to save_dict
-		self.save_dict["Temperature"].append(temp)
-		self.save_dict["Learnrate"].append(learnrate)
-		self.save_dict["Freerun_Steps"].append(freerun_steps)
-		for i in range(len(self.shape)-1):
-			w_mean = np.mean( np.abs( self.w[i].eval() ) )
-			self.save_dict["W_mean_%i"%i].append(w_mean)
 
 		# normalize the activity arrays
 		# self.h1_activity_*=1./(self.shape[1]*self.batchsize)
@@ -913,12 +913,11 @@ class DBM_class(object):
 			# self.test_epochs.append(self.epochs)
 			# self.test_error_.append(self.recon_error) #append to errors if called multiple times
 		
-		## append saves to save_dict
-		self.save_dict["Class_Error"].append(float(n_wrongs)/self.batchsize)
-		self.save_dict["Recon_Error"].append(self.recon_error)
-		self.save_dict["Test_Epoch"].append(self.epochs)
+		# append test results to save_dict
+		self.update_savedict("training")
 
-		self.tested = 1
+		self.tested = 1 # this tells the train function that the batchsize has changed 
+		
 		log.end()
 		log.info("------------- Test Log -------------")
 		log.info("Reconstr. error normal: ",np.round(self.recon_error,5))
@@ -1219,7 +1218,7 @@ test_every_epoch     = 1
 ### learnrates 
 rbm_learnrate     = 0.01	# learnrate for pretraining
 dbm_learnrate     = 0.01	# starting learnrates
-learnrate_slope   = 0.2 	# bigger number -> smaller slope
+learnrate_slope   = 0.05	# bigger number -> smaller slope
 
 ### temperature
 temp       = 0.1		# global temp state
@@ -1271,7 +1270,7 @@ if training and save_to_file:
 
 ######### DBM #############################################################################################
 DBM = DBM_class(	shape = DBM_shape,
-			liveplot = 1, 
+			liveplot = 0, 
 			classification = 1,
 			# start_temp = ,
 			# start_N = ,
@@ -1631,7 +1630,7 @@ if training:
 		ax[2].plot(DBM.save_dict["W_mean_%i"%i],label="Weight %i"%i)
 	ax[2].legend(loc="center left",bbox_to_anchor = (1.0,0.5))
 	ax[2].set_xlabel("Epoch")
-	plt.subplots_adjust(left=None, bottom=None, right=0.78, top=None,
+	plt.subplots_adjust(left=None, bottom=None, right=0.73, top=None,
                 wspace=None, hspace=None)
 	save_fig(saveto_path+"/learnr-temp.png", save_to_file)
 
