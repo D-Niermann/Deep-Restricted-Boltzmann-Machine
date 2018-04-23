@@ -254,11 +254,12 @@ class DBM_class(object):
 		self.temp_save      = []
 		self.w_mean_np      = [[],]*(self.n_layers-1)
 
-		self.save_dict ={	"Test_Epoch":  [],
-					"Recon_Error": [],
-					"Class_Error": [],
-					"Temperature": [],
-					"Learnrate":   [],
+		self.save_dict ={	"Test_Epoch":    [],
+					"Recon_Error":   [],
+					"Class_Error":   [],
+					"Temperature":   [],
+					"Learnrate":     [],
+					"Freerun_Steps": [],
 					}
 		for i in range(self.n_layers-1):
 			self.save_dict["W_mean_%i"%i] = []
@@ -277,7 +278,6 @@ class DBM_class(object):
 					["pathsuffix_pretrained",pathsuffix_pretrained],
 					["pathsuffix",pathsuffix],
 					["loaded_from_file",load_from_file],
-					["save_all_params",save_all_params],
 				   ]## append variables that change during training in the write_to_file function
 
 
@@ -459,6 +459,12 @@ class DBM_class(object):
 		T = a / (a/y_off+epoch)
 		return T
 
+	def get_N(self,epoch):
+		N=2
+		if epoch > 10:
+			N = 10
+		return N
+
 	################################################################################################################################################
 	####  DBM Graph 
 	################################################################################################################################################
@@ -627,14 +633,13 @@ class DBM_class(object):
 		return np.array(h2_),v_noise_recon,v_noise
 
 
-	def train(self,train_data,train_label,epochs,num_batches,N,cont):
-		global learnrate, temp
+	def train(self,train_data,train_label,epochs,num_batches,cont):
+		global learnrate, temp, freerun_steps
 		""" training the DBM with given h2 as labels and v as input images
 		train_data  :: images
 		train_label :: corresponding label
 		epochs      :: how many epochs to train
 		num_batches :: how many batches
-		N           :: Number of gibbs steps
 		"""
 		######## init all vars for training
 		self.batchsize = int(55000/num_batches)
@@ -695,8 +700,6 @@ class DBM_class(object):
 
 			log.out("Running Batch")
 			# log.info("++ Using Weight Decay! Not updating bias! ++")
-			log.info("Freerunning for %i steps"%N)
-
 
 
 			for start, end in zip( range(0, len(train_data), self.batchsize), range(self.batchsize, len(train_data), self.batchsize)):
@@ -728,7 +731,7 @@ class DBM_class(object):
 
 				#### Free Running 
 				# update all layers N times (Gibbs sampling) 
-				for n in range(N):
+				for n in range(freerun_steps):
 					# using sampling
 					sess.run(self.update_l_s,{self.temp_tf : temp})
 				sess.run(self.update_l_p,{self.temp_tf : temp})
@@ -769,17 +772,20 @@ class DBM_class(object):
 		
 		# change learnrate
 		log.info("Learnrate: ",np.round(learnrate,5))
-				# self.learnrate_save.append(learnrate)
 		learnrate = self.get_learnrate(self.epochs, learnrate_slope, dbm_learnrate)
 		
 		# change temo
 		log.info("Temp: ",np.round(temp,5))
 		temp = self.get_temp(self.epochs, temp_slope, temp_start)
-				# self.temp_save.append(temp)
+
+		# change freerun_steps
+		log.info("freerun_steps: ",freerun_steps)
+		freerun_steps = self.get_N(self.epochs)
 
 		# append all data to save_dict
 		self.save_dict["Temperature"].append(temp)
 		self.save_dict["Learnrate"].append(learnrate)
+		self.save_dict["Freerun_Steps"].append(freerun_steps)
 		for i in range(len(self.shape)-1):
 			w_mean = np.mean( np.abs( self.w[i].eval() ) )
 			self.save_dict["W_mean_%i"%i].append(w_mean)
@@ -1177,7 +1183,7 @@ class DBM_class(object):
 			save_df = DataFrame(dict([ (k,Series(v)) for k,v in self.save_dict.iteritems() ]))
 		except:
 			log.out("using dataframe items conversion for python 3.x")
-			save_df = DataFrame(dict([ (k,Series(v)) for k,v in DBM.save_dict.items() ]))
+			save_df = DataFrame(dict([ (k,Series(v)) for k,v in self.save_dict.items() ]))
 		save_df.to_csv("save_dict.csv")
 
 		## logfile
@@ -1204,23 +1210,26 @@ class DBM_class(object):
 #### User Settings ###
 
 num_batches_pretrain = 100
-dbm_batches          = 1000
+dbm_batches          = 2000
 pretrain_epochs      = [0,0,0,0,0]
-train_epochs         = 20
-test_every_epoch     = 2
+train_epochs         = 3
+test_every_epoch     = 1
 
 ### learnrates 
-rbm_learnrate     = 0.01	# learnrate for pretraining
-dbm_learnrate     = 0.01	# starting learnrates
-learnrate_slope   = 0.5 	# bigger number -> smaller slope
+rbm_learnrate     = 0.001	# learnrate for pretraining
+dbm_learnrate     = 0.001	# starting learnrates
+learnrate_slope   = 0.2 	# bigger number -> smaller slope
 
 ### temperature
 temp       = 0.1		# global temp state
 temp_start = temp 	# starting temp
 temp_slope = 1000		# slope of decresing temp
 
+### freerun_steps
+freerun_steps = 2
+
 ### state vars 
-pre_training    = 0	# if no pretrain then files are automatically loaded
+pre_training    = 1	# if no pretrain then files are automatically loaded
 training        = 1	# if trianing the whole DBM
 testing         = 1	# if testing the DBM with test data
 plotting        = 1	
@@ -1260,7 +1269,13 @@ if training and save_to_file:
 
 
 ######### DBM #############################################################################################
-DBM = DBM_class(	shape = DBM_shape, liveplot = 0, classification = 1)
+DBM = DBM_class(	shape = DBM_shape,
+			liveplot = 0, 
+			classification = 1,
+			# start_temp = ,
+			# start_N = ,
+			# start_learn = ,
+			)
 
 ###########################################################################################################
 #### Sessions ####
@@ -1280,15 +1295,12 @@ if training:
 
 			log.start("Run %i"%run)
 
-			# set how many freerunning steps to make
-			N = 2 #clamp(1+run, 1, 40)
 
 			# start a train epoch 
-			DBM.train(	train_data  = train_data[:100],
-					train_label = train_label[:100],
+			DBM.train(	train_data  = train_data,
+					train_label = train_label,
 					epochs      = 1,
 					num_batches = dbm_batches,
-					N           = N , # freerunning steps
 					cont        = run)
 
 			# test session while training
@@ -1296,7 +1308,7 @@ if training:
 				# wrong_classified_id = np.loadtxt("wrongs.txt").astype(np.int)
 				# DBM.test(train_data[:1000], train_label[:1000], 50, 10)
 
-				DBM.test(test_data[:100], test_label[:100],
+				DBM.test(test_data, test_label,
 					N = 10,  # sample ist aus random werten, also mindestens 2 sample machen 
 					M = 10,  # average v
 					create_conf_mat = 0)
@@ -1618,11 +1630,11 @@ if training:
 		ax[2].plot(DBM.save_dict["W_mean_%i"%i],label="Weight %i"%i)
 	ax[2].legend(loc="center left",bbox_to_anchor = (1.0,0.5))
 	ax[2].set_xlabel("Epoch")
-	plt.subplots_adjust(left=None, bottom=None, right=0.8, top=None,
+	plt.subplots_adjust(left=None, bottom=None, right=0.78, top=None,
                 wspace=None, hspace=None)
 	save_fig(saveto_path+"/learnr-temp.png", save_to_file)
 
-	
+
 #plot some samples from the testdata 
 fig3,ax3 = plt.subplots(len(DBM.shape)+1,13,figsize=(16,4),sharey="row")
 for i in range(13):
