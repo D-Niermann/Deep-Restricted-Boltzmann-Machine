@@ -157,12 +157,12 @@ class RBM(object):
 
 		self.v       = tf.placeholder(tf.float32,[None,self.visible_units],name="Visible-Layer") # has shape [number of images per batch,number of visible units]
 
-		self.w       = tf.Variable(tf.random_uniform([self.visible_units,self.hidden_units],minval=-1e-4,maxval=1e-4),name="Weights")
+		self.w       = tf.Variable(tf.random_uniform([self.visible_units,self.hidden_units],minval=-1e-6,maxval=1e-6),name="Weights")
 		self.bias_v  = tf.Variable(tf.zeros([self.visible_units]),name="Visible-Bias")
 		self.bias_h  = tf.Variable(tf.zeros([self.hidden_units]), name="Hidden-Bias")
 
 
-		# get the probabilities of the hidden units in 
+		# get the probabilities of the hidden units in w
 		self.h_prob  = sigmoid(tf.matmul(self.v,self.forw_mult*self.w) + self.bias_h,temp)
 		# h has shape [number of images per batch, number of hidden units]
 		# get the actual activations for h {0,1}
@@ -278,6 +278,7 @@ class DBM_class(object):
 					["pathsuffix_pretrained",pathsuffix_pretrained],
 					["pathsuffix",pathsuffix],
 					["loaded_from_file",load_from_file],
+					["test_every_epoch",test_every_epoch]
 				   ]## append variables that change during training in the write_to_file function
 
 
@@ -1210,14 +1211,14 @@ class DBM_class(object):
 #### User Settings ###
 
 num_batches_pretrain = 100
-dbm_batches          = 2000
+dbm_batches          = 1000
 pretrain_epochs      = [0,0,0,0,0]
 train_epochs         = 3
 test_every_epoch     = 1
 
 ### learnrates 
-rbm_learnrate     = 0.001	# learnrate for pretraining
-dbm_learnrate     = 0.001	# starting learnrates
+rbm_learnrate     = 0.01	# learnrate for pretraining
+dbm_learnrate     = 0.01	# starting learnrates
 learnrate_slope   = 0.2 	# bigger number -> smaller slope
 
 ### temperature
@@ -1270,7 +1271,7 @@ if training and save_to_file:
 
 ######### DBM #############################################################################################
 DBM = DBM_class(	shape = DBM_shape,
-			liveplot = 0, 
+			liveplot = 1, 
 			classification = 1,
 			# start_temp = ,
 			# start_N = ,
