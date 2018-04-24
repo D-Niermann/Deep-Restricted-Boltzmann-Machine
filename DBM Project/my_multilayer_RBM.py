@@ -476,7 +476,7 @@ class DBM_class(object):
 
 		if mode == "testing":
 			if self.classification:
-				self.save_dict["Class_Error"].append(float(n_wrongs)/self.batchsize)
+				self.save_dict["Class_Error"].append(self.class_error)
 			self.save_dict["Recon_Error"].append(self.recon_error)
 			self.save_dict["Test_Epoch"].append(self.epochs)
 
@@ -876,7 +876,7 @@ class DBM_class(object):
 
 		if self.classification:
 			# error of classifivation labels
-			self.class_error=np.mean(np.abs(self.last_layer_save-my_test_label[:,:10]))		
+			# self.class_error=np.mean(np.abs(self.last_layer_save-my_test_label[:,:10]))		
 			
 			for i in range(len(self.last_layer_save)):
 				digit   = np.where(my_test_label[i]==1)[0][0]
@@ -907,7 +907,7 @@ class DBM_class(object):
 				plt.ylabel("Desired Label in %")
 				plt.xlabel("Predicted Label in %")
 								
-
+			self.class_error = float(n_wrongs)/self.batchsize
 
 			# self.class_error_.append(float(n_wrongs)/self.batchsize)
 			# self.test_epochs.append(self.epochs)
