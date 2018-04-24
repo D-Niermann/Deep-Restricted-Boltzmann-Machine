@@ -457,7 +457,7 @@ class DBM_class(object):
 		a :: slope
 		y_off :: y offset -> start learningrate
 		"""
-		T = a / (a/y_off+epoch)
+		T = y_off + a*epoch
 		return T
 
 	def get_N(self,epoch):
@@ -665,9 +665,6 @@ class DBM_class(object):
 		else:
 			M = 10
 
-		### write vars into savedict
-		self.update_savedict("training")
-
 		### free energy
 		# self.F=[]
 		# self.F_test=[]
@@ -693,6 +690,9 @@ class DBM_class(object):
 			fig,ax = plt.subplots(1,1,figsize=(15,10))
 			data   = ax.matshow(tile(self.w[0].eval()), vmin=-0.01, vmax=0.01)
 			plt.colorbar(data)
+
+		### write vars into savedict
+		self.update_savedict("training")
 
 
 		# starting the training
@@ -914,7 +914,7 @@ class DBM_class(object):
 			# self.test_error_.append(self.recon_error) #append to errors if called multiple times
 		
 		# append test results to save_dict
-		self.update_savedict("training")
+		self.update_savedict("testing")
 
 		self.tested = 1 # this tells the train function that the batchsize has changed 
 		
@@ -1212,7 +1212,7 @@ class DBM_class(object):
 num_batches_pretrain = 100
 dbm_batches          = 1000
 pretrain_epochs      = [0,0,0,0,0]
-train_epochs         = 3
+train_epochs         = 1
 test_every_epoch     = 1
 
 ### learnrates 
@@ -1223,7 +1223,7 @@ learnrate_slope   = 0.05	# bigger number -> smaller slope
 ### temperature
 temp       = 0.1		# global temp state
 temp_start = temp 	# starting temp
-temp_slope = 1000		# slope of decresing temp
+temp_slope = 0.01		# slope of decresing temp
 
 ### freerun_steps
 freerun_steps = 2
