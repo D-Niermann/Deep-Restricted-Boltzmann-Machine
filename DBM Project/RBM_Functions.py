@@ -3,12 +3,13 @@ import numpy as np
 import numpy.random as rnd
 import os
 from matplotlib.pyplot import savefig
+import matplotlib as mpl
+mpl.rcParams["image.cmap"] = "gray"
 from math import sqrt
-def save_fig(path,save_to_file):
-    if save_to_file:
-        return savefig(path)
-    else:
-        return None
+
+
+
+
 def scale_to_unit_interval(ndar, eps=1e-8):
     """ Scales all values in the ndarray ndar to be between 0 and 1 """
     ndar = ndar.copy()
@@ -16,15 +17,25 @@ def scale_to_unit_interval(ndar, eps=1e-8):
     ndar *= 1.0 / (ndar.max() + eps)
     return ndar
 
+
+def save_fig(path,save_to_file):
+    if save_to_file:
+        return savefig(path)
+    else:
+        return None
+
+
 def smooth(x,f):
     m=np.ones(f)*1./f
     return np.convolve(x, m,"valid")
+
 
 def myplot(array,colbar = False):
     s = int(sqrt(len(array)))
     plt.matshow(array.reshape(s,s))
     if colbar:
         plt.colorbar()
+
 
 def sort_by_index(m,index,axis=0):
     new_m = np.copy(m)
@@ -165,32 +176,32 @@ def save(name_extension, w=[],bias_v=[],bias_h=[]):
       path="/Users/Niermann/Google Drive/Masterarbeit/Python"
       os.chdir(path)
       if len(w)!=0:
-      	np.savetxt("weights-%s.txt"%name_extension, w)
+        np.savetxt("weights-%s.txt"%name_extension, w)
       if len(bias_v)!=0:
-      	np.savetxt("bias_v-%s.txt"%name_extension, bias_v)
+        np.savetxt("bias_v-%s.txt"%name_extension, bias_v)
       if len(bias_h)!=0:
-      	np.savetxt("bias_h-%s.txt"%name_extension, bias_h)
-      print "saved weights and biases with name_extension=%s"%name_extension
+        np.savetxt("bias_h-%s.txt"%name_extension, bias_h)
+      print ("saved weights and biases with name_extension=%s"%name_extension)
 
 def init_pretrained(name_extension="0.0651765",w=None,bias_v=None,bias_h=None):
-	path="/Users/Niermann/Google Drive/Masterarbeit/Python"
-	os.chdir(path)
-	print "loading from: "+ path
-	m=[]
-	if (w)!=None:
-		w=np.loadtxt("weights-%s.txt"%name_extension)
-		m.append(w)
-	if (bias_v)!=None:
-		bias_v=np.loadtxt("bias_v-%s.txt"%name_extension)
-		m.append(bias_v)
-	if (bias_h)!=None:
-		bias_h=np.loadtxt("bias_h-%s.txt"%name_extension)
-		m.append(bias_h)
-	print "loaded %s objects from file"%str(len(m))
-	return m
+    path="/Users/Niermann/Google Drive/Masterarbeit/Python"
+    os.chdir(path)
+    print ("loading from: "+ path)
+    m=[]
+    if (w)!=None:
+        w=np.loadtxt("weights-%s.txt"%name_extension)
+        m.append(w)
+    if (bias_v)!=None:
+        bias_v=np.loadtxt("bias_v-%s.txt"%name_extension)
+        m.append(bias_v)
+    if (bias_h)!=None:
+        bias_h=np.loadtxt("bias_h-%s.txt"%name_extension)
+        m.append(bias_h)
+    print ("loaded %s objects from file"%str(len(m)))
+    return m
 
 def sigmoid(x,T):
-	return 1./tf.add(1.,tf.exp(-tf.multiply(1./T,x)))
+    return 1./tf.add(1.,tf.exp(-tf.multiply(1./T,x)))
 
 
 def sigmoid_np(x,T):
@@ -202,6 +213,7 @@ def sample_np(x):
     rng = rnd.random(x.shape)
     x=(x-rng)>=0
     return x
+
 
 def clamp(x,x_min,x_max):
     if x>x_max:
@@ -298,9 +310,78 @@ def sort_by_index(w,line_change):
         w_new[move_to] = w[move_from]
     return w_new
 
+def split_image(batch,N,overlap):
+    """ splits a image batch in N equal parts (rectangle)
+    batch :: batch of images (flattend) with shape [batchsize,n_pixels]
+    N :: Number of parts
+    overlap:: how many pixels each part overlaps into adjacent parts
+    return :: new batch of shape [old_shape,N]
+    """ 
+    if sqrt(N) != int(sqrt(N)):
+        raise ValueError("Number of parts must be quadratic number")
+
+
+
+    # image has side length of im_shape
+    im_shape = int(np.sqrt(batch.shape[1]))
+    if im_shape/sqrt(N)!=int(im_shape/sqrt(N)):
+        raise ValueError("Splitting %i pixels by %i gives no integer"%(im_shape,sqrt(N)))
+        
+    batch = batch.reshape([batch.shape[0],im_shape,im_shape])
+    
+
+
+    # devision point
+    dev = int(im_shape / np.sqrt(N))
+    # with overlap
+    dev_p = dev+overlap
+    dev_m = dev-overlap
+ 
+    # new batch that get returned
+    # new img size is (dev_p * dev_p)
+    new_batch = np.zeros([batch.shape[0],dev_p,dev_p,4])
+
+    ## create sections on which to split the image in both directions (x,y)
+    s = [0]
+    for i in range(1,int(np.sqrt(N))):
+        s.append(int(dev_p*i))
+        s.append(int(dev_m*i))
+    s.append(im_shape)
+    
+
+    # split the images (see how sections are always permuted and only 0,1 - 2,3 - 4,5 sections are used as limits)
+    s1 = 0
+    s2 = 0
+    ss=[]
+    for i in range(0,len(s),2):
+        for j in range(0,len(s),2):
+            ss.append((i,j))
+    
+    for n in range(N):
+        
+        s1 = ss[n][0]
+        s2 = ss[n][1]
+        
+        new_batch[:, :, :, n] = batch[:, s[s1]:s[s1+1], s[s2]:s[s2+1]]
+
+    # new_batch[:, :, :, 1] = batch[:, s[2]:s[3], s[2]:s[3]]
+    # new_batch[:, :, :, 2] = batch[:, s[0]:s[1], s[2]:s[3]]
+    # new_batch[:, :, :, 3] = batch[:, s[2]:s[3], s[0]:s[1]]
+    return new_batch
+
 
 if __name__ == "__main__":
-    w1_new, pos_change = sort_receptive_field(DBM.w1_np)
-    w1_unt = untile(w1_new, [784,400])
-    w1_test = untile(tile(w1_unt), [784,400]) #works 
-    w2_new = sort_by_index(DBM.w2_np, pos_change)
+    import matplotlib.pyplot as plt
+    import time
+    N = 4
+    img_num = 9921
+    test_img = test_data[1:10000]#np.round(rnd.random([3,784])*0.55)
+    myplot(test_img[img_num])
+    
+    test_img_new = split_image(test_img,N,2)
+    
+    new_im_shape = test_img_new.shape[2]
+    for i in range(N):
+        plt.matshow(test_img_new[img_num,:,:,i].reshape(new_im_shape,new_im_shape))
+        print("imshape: ",test_img_new[img_num,:,:,i].shape)
+    plt.show()
