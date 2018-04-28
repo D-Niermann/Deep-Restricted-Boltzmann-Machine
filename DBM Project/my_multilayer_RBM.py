@@ -239,33 +239,34 @@ class DBM_class(object):
 		self.SHAPE          = shape  # contains the number of  neurons in a list from v layer to h1 to h2 
 		self.classification = classification #weather the machine uses a label layer 
 		
-		self.init_state = 0
-		self.exported   = 0
-		self.tested     = 0
+		self.init_state     = 0
+		self.exported       = 0
+		self.tested         = 0
+		self.l_mean         = np.zeros([self.n_layers])
 		
+
+
 		self.train_time     = 0
 		self.epochs         = 0
 
-		self.test_error_    = []
-		self.class_error_   = [] 
-		self.test_epochs    = []
-		self.learnrate_save = []
-		self.temp_save      = []
-		self.w_mean_np      = [[],]*(self.n_layers-1)
 
+
+		### save dictionary where time series data from test and train is stored
 		self.save_dict ={	"Test_Epoch":    [],
-					"Recon_Error":   [],
-					"Class_Error":   [],
-					"Temperature":   [],
-					"Learnrate":     [],
-					"Freerun_Steps": [],
-					}
+							"Train_Epoch":   [],
+							"Recon_Error":   [],
+							"Class_Error":   [],
+							"Temperature":   [],
+							"Learnrate":     [],
+							"Freerun_Steps": [],
+							}
 		for i in range(self.n_layers-1):
 			self.save_dict["W_mean_%i"%i] = []
 		for i in range(self.n_layers):
 			self.save_dict["Layer_Activity_%i"%i] = []
 
-		self.log_list =	[["shape",                self.SHAPE],
+		### log list where all constants are saved
+		self.log_list =	[["SHAPE",                self.SHAPE],
 						["N_EPOCHS_PRETRAIN",     N_EPOCHS_PRETRAIN], 
 						["N_BATCHES_PRETRAIN",    N_BATCHES_PRETRAIN], 
 						["N_BATCHES_TRAIN",       N_BATCHES_TRAIN], 
@@ -276,7 +277,7 @@ class DBM_class(object):
 						["TEMP_SLOPE",            TEMP_SLOPE], 
 						["PATHSUFFIX_PRETRAINED", PATHSUFFIX_PRETRAINED], 
 						["PATHSUFFIX",            PATHSUFFIX], 
-						["loaded_from_file",      DO_LOAD_FROM_FILE], 
+						["DO_LOAD_FROM_FILE",      DO_LOAD_FROM_FILE], 
 						["TEST_EVERY_EPOCH",      TEST_EVERY_EPOCH]
 						]## append variables that change during training in the write_to_file function
 
@@ -464,7 +465,7 @@ class DBM_class(object):
 		a :: slope
 		y_off :: y offset -> start learningrate
 		"""
-		L = a / (a/y_off+epoch)
+		L = a / (float(a)/y_off+epoch)
 		return L
 
 	def get_temp(self,epoch,a,y_off):
@@ -473,7 +474,7 @@ class DBM_class(object):
 		a :: slope
 		y_off :: y offset -> start learningrate
 		"""
-		T = a / (a/y_off+epoch)
+		T = a / (float(a)/y_off+epoch)
 		return T
 
 	def get_N(self,epoch):
@@ -484,6 +485,7 @@ class DBM_class(object):
 	def update_savedict(self,mode):
 		if mode=="training":
 			# append all data to save_dict
+			self.save_dict["Train_Epoch"].append(self.epochs)
 			self.save_dict["Temperature"].append(temp)
 			self.save_dict["Learnrate"].append(learnrate)
 			self.save_dict["Freerun_Steps"].append(freerun_steps)
@@ -493,11 +495,10 @@ class DBM_class(object):
 				self.save_dict["W_mean_%i"%i].append(w_mean)
 
 			for i in range(self.n_layers):
-				l_mean = sess.run(self.layer_activities[i], {self.temp_tf : temp})
-				self.save_dict["Layer_Activity_%i"%i].append(l_mean)
+				self.save_dict["Layer_Activity_%i"%i].append(self.l_mean[i])
 
 		if mode == "testing":
-			
+
 			if self.classification:
 				self.save_dict["Class_Error"].append(self.class_error)
 
@@ -592,7 +593,7 @@ class DBM_class(object):
 			self.layer_prob[i]       = self.layer_input(i)
 			self.layer_samp[i]       = self.sample(self.layer_prob[i])
 			self.update_l_p[i]       = self.layer[i].assign(self.layer_prob[i])
-			self.layer_activities[i] = tf.reduce_mean(self.layer[i])
+			self.layer_activities[i] = tf.reduce_sum(self.layer[i])/(self.batchsize*self.SHAPE[i])*100
 
 		for i in range(len(self.layer)-1):
 			self.layer_energy[i] = tf.matmul(self.layer[i], tf.matmul(self.w[i],self.layer[i+1],transpose_b=True))
@@ -668,22 +669,24 @@ class DBM_class(object):
 		v_noise_recon = sess.run(self.update_l_p[0], {self.temp_tf : temp})
 		return np.array(h2_),v_noise_recon,v_noise
 
-	def train(self,train_data,train_label,epochs,num_batches,cont):
+	def train(self,train_data,train_label,num_batches,cont):
 		global learnrate, temp, freerun_steps
 		""" training the DBM with given h2 as labels and v as input images
 		train_data  :: images
 		train_label :: corresponding label
-		epochs      :: how many epochs to train
 		num_batches :: how many batches
 		"""
 		######## init all vars for training
 		self.batchsize = int(55000/num_batches)
-		num_of_updates = N_EPOCHS_TRAIN*num_batches
-		self.num_of_updates = num_of_updates
+		self.num_of_updates = N_EPOCHS_TRAIN*num_batches
+
+
+		# number of clamped sample steps
 		if self.n_layers <=3 and self.classification==1:
 			M = 2
 		else:
 			M = 10
+
 
 
 
@@ -714,88 +717,88 @@ class DBM_class(object):
 			plt.colorbar(data)
 
 
-		### write vars into savedict
-		self.update_savedict("training")
-
 		# starting the training
-		log.info("Batchsize:",self.batchsize,"N_Updates",num_of_updates)
-		for epoch in range(epochs):
-			log.start("Deep BM Epoch:",self.epochs+1,"/",N_EPOCHS_TRAIN)
+		log.info("Batchsize:",self.batchsize,"N_Updates",self.num_of_updates)
+		
+		log.start("Deep BM Epoch:",self.epochs+1,"/",N_EPOCHS_TRAIN)
 
-			# shuffle test data and labels so that batches are not equal every epoch 
-			log.out("Shuffling TrainData")
-			self.seed   = rnd.randint(len(train_data),size=(int(len(train_data)/10),2))
-			train_data  = shuffle(train_data, self.seed)
-			train_label = shuffle(train_label, self.seed)
+		# shuffle test data and labels so that batches are not equal every epoch 
+		log.out("Shuffling TrainData")
+		self.seed   = rnd.randint(len(train_data),size=(int(len(train_data)/10),2))
+		train_data  = shuffle(train_data, self.seed)
+		train_label = shuffle(train_label, self.seed)
 
-			log.out("Running Batch")
-			# log.info("++ Using Weight Decay! Not updating bias! ++")
+		log.out("Running Batch")
+		# log.info("++ Using Weight Decay! Not updating bias! ++")
 
 
-			for start, end in zip( range(0, len(train_data), self.batchsize), range(self.batchsize, len(train_data), self.batchsize)):
-				# define a batch
-				self.batch = train_data[start:end]
-				batch_label = train_label[start:end]
+		for start, end in zip( range(0, len(train_data), self.batchsize), range(self.batchsize, len(train_data), self.batchsize)):
+			# define a batch
+			self.batch = train_data[start:end]
+			batch_label = train_label[start:end]
 
-				#### Clamped Run 
-				# assign v and h2 to the self.batch data
-				sess.run(self.assign_l[0], { self.layer_ph[0]  : self.batch })
+			#### Clamped Run 
+			# assign v and h2 to the self.batch data
+			sess.run(self.assign_l[0], { self.layer_ph[0]  : self.batch })
+			if self.classification:
+				sess.run(self.assign_l[-1], {self.layer_ph[-1] : batch_label})
+
+			# calc hidden layer probabilities (not the visible & label layer)
+			for hidden in range(M):
 				if self.classification:
-					sess.run(self.assign_l[-1], {self.layer_ph[-1] : batch_label})
+					sess.run(self.update_l_s[1:-1],{self.temp_tf : temp})
+				else:
+					sess.run(self.update_l_s[1:],{self.temp_tf : temp})
 
-				# calc hidden layer probabilities (not the visible & label layer)
-				for hidden in range(M):
-					if self.classification:
-						sess.run(self.update_l_s[1:-1],{self.temp_tf : temp})
-					else:
-						sess.run(self.update_l_s[1:],{self.temp_tf : temp})
-
-				# last run calc only the probs to reduce noise
-				sess.run(self.update_l_p[1:-1],{self.temp_tf : temp})
-				# save all layer for bias update
-				sess.run(self.assign_save_layer)
-				# update the positive gradients
-				sess.run(self.update_pos_grad)
+			# last run calc only the probs to reduce noise
+			sess.run(self.update_l_p[1:-1],{self.temp_tf : temp})
+			# save all layer for bias update
+			sess.run(self.assign_save_layer)
+			# update the positive gradients
+			sess.run(self.update_pos_grad)
 
 
 
-				#### Free Running 
-				# update all layers N times (Gibbs sampling) 
-				for n in range(freerun_steps):
-					# using sampling
-					sess.run(self.update_l_s,{self.temp_tf : temp})
-				sess.run(self.update_l_p,{self.temp_tf : temp})
-				# calc he negatie gradients
-				sess.run(self.update_neg_grad)
+			#### Free Running 
+			# update all layers N times (Gibbs sampling) 
+			for n in range(freerun_steps):
+				# using sampling
+				sess.run(self.update_l_s,{self.temp_tf : temp})
+			sess.run(self.update_l_p,{self.temp_tf : temp})
+			# calc he negatie gradients
+			sess.run(self.update_neg_grad)
 
 
-				#### run all parameter updates 
-				sess.run([self.update_w, self.update_bias], {self.learnrate : learnrate})
+			#### run all parameter updates 
+			sess.run([self.update_w, self.update_bias], {self.learnrate : learnrate})
 
 
-				#### calculate free energy for test and train data
-				# self.F.append(self.free_energy.eval({self.v:self.batch}))
-				# f_test_ = self.free_energy.eval({self.v:test_data[0:self.batchsize]})
-				# for i in range(1,10):
-				# 	f_test_ += self.free_energy.eval({self.v:test_data[i*self.batchsize:i*self.batchsize+self.batchsize]})
-				# f_test_*=1./10
-				# self.F_test.append(f_test_)
+			#### calculate free energy for test and train data
+			# self.F.append(self.free_energy.eval({self.v:self.batch}))
+			# f_test_ = self.free_energy.eval({self.v:test_data[0:self.batchsize]})
+			# for i in range(1,10):
+			# 	f_test_ += self.free_energy.eval({self.v:test_data[i*self.batchsize:i*self.batchsize+self.batchsize]})
+			# f_test_*=1./10
+			# self.F_test.append(f_test_)
 
+			self.l_mean += sess.run(self.layer_activities)
 
-				### liveplot
-				if self.liveplot and plt.fignum_exists(fig.number) and start%40==0:
-					if start%4000==0:
-						ax.cla()
-						data = ax.matshow(tile(self.w[0].eval()),vmin=tile(self.w[0].eval()).min()*1.2,vmax=tile(self.w[0].eval()).max()*1.2)
+			### liveplot
+			if self.liveplot and plt.fignum_exists(fig.number) and start%40==0:
+				if start%4000==0:
+					ax.cla()
+					data = ax.matshow(tile(self.w[0].eval()),vmin=tile(self.w[0].eval()).min()*1.2,vmax=tile(self.w[0].eval()).max()*1.2)
 
-					matrix_new = tile(self.w[0].eval())
-					data.set_data(matrix_new)
-					plt.pause(0.00001)
-
-			
-			log.end() #ending the epoch
+				matrix_new = tile(self.w[0].eval())
+				data.set_data(matrix_new)
+				plt.pause(0.00001)
 
 		
+		log.end() #ending the epoch
+
+		### write vars into savedict
+		self.update_savedict("training")
+		self.l_mean[:] = 0
 
 		# increase epoch counter
 		self.epochs += 1 
@@ -812,9 +815,8 @@ class DBM_class(object):
 		log.info("freerun_steps: ",freerun_steps)
 		freerun_steps = self.get_N(self.epochs)
 
-
-		# normalize the activity arrays
-		# self.h1_activity_*=1./(self.SHAPE[1]*self.batchsize)
+		# average layer activities over epochs 
+		self.l_mean *= 1.0/num_batches
 
 		self.export()
 
@@ -1209,77 +1211,65 @@ class DBM_class(object):
 				for i in range(len(self.log_list)):
 					log_file.write(self.log_list[i][0]+","+str(self.log_list[i][1])+"\n")
 
-
-				# if self.classification:
-				# 	np.savetxt("Classification_Error_on_test_images.txt",list(zip(self.test_epochs,self.class_error_)))
-				# np.savetxt("Recon_Error_on_test_images.txt",list(zip(self.test_epochs,self.test_error_)))
-				
-				# np.savetxt("learnrate.txt", self.learnrate_save)
-				# np.savetxt("temperature.txt", self.temp_save)
-
 		log.info("Saved data and log to:",new_path)
-
-
-		
 		os.chdir(workdir)
 
 
 ###########################################################################################################
 #### User Settings ###
-global_state_vars = {		# maybe use this as new way to manage all global state vars 
-	"learnrate":     0,
-	"freerun_steps": 0,
-	"Temp":          0,
-}
 
 N_BATCHES_PRETRAIN = 500 			# how many batches per epoch for pretraining
-N_BATCHES_TRAIN    = 1000 			# how many batches per epoch for complete DBM training
+N_BATCHES_TRAIN    = 500 			# how many batches per epoch for complete DBM training
 N_EPOCHS_PRETRAIN  = [0,0,0,0,0] 	# pretrain epochs for each RBM
-N_EPOCHS_TRAIN     = 1 				# how often to iter through the test images
-TEST_EVERY_EPOCH   = 1 				# how many epochs to train before testing on the test data
+N_EPOCHS_TRAIN     = 10				# how often to iter through the test images
+TEST_EVERY_EPOCH   = 2 				# how many epochs to train before testing on the test data
 
 ### learnrates 
 LEARNRATE_PRETRAIN = 0.1		# learnrate for pretraining
-LEARNRATE_START    = 0.1		# starting learnrates
-LEARNRATE_SLOPE    = 10000.0	# bigger number -> smaller slope
+LEARNRATE_START    = 0.01		# starting learnrates
+LEARNRATE_SLOPE    = 5.0		# bigger number -> smaller slope
 
 ### temperature
-TEMP_START    = 1.0 		# starting temp
-TEMP_SLOPE    = 10000.0		# slope of dereasing temp bigger number -> smaller slope
+TEMP_START    = 0.1 		# starting temp
+TEMP_SLOPE    = 90.0		# slope of dereasing temp bigger number -> smaller slope
 
-### globals (to be set as DBM self values)
-freerun_steps = 2 					# global number of freerun steps for training
-learnrate     = LEARNRATE_START		# global learnrate
-temp          = TEMP_START			# global temp state
 
 ### state vars 
 DO_PRETRAINING = 1		# if no pretrain then files are automatically loaded
 DO_TRAINING    = 1		# if to train the whole DBM
 DO_TESTING     = 1		# if testing the DBM with test data
-DO_SHOW_PLOT   = 0		# if plots will show on display - either way they get saved into saveto_path
+DO_SHOW_PLOTS  = 1		# if plots will show on display - either way they get saved into saveto_path
 
 DO_CONTEXT    = 0 	# if to test the context
-DO_GEN_IMAGES = 1 	# if to generate images (mode can be choosen at function call)
+DO_GEN_IMAGES = 0 	# if to generate images (mode can be choosen at function call)
 DO_NOISE_STAB = 0 	# if to make a noise stability test
 
 
 ### saving and loading 
-DO_SAVE_TO_FILE       = 1 	# if to save plots and data to file
+DO_SAVE_TO_FILE       = 0 	# if to save plots and data to file
 DO_SAVE_PRETRAINED    = 0 	# if to save the pretrained weights seperately (for later use)
 DO_LOAD_FROM_FILE     = 1 	# if to load weights and biases from datadir + pathsuffix
-PATHSUFFIX            = "Tue_Mar_13_09-20-37_2018 - 3% fehler"
+PATHSUFFIX            = "Sat_Apr_28_20-53-18_2018_[784, 400, 10]"
 PATHSUFFIX_PRETRAINED = "Fri_Mar__9_16-46-01_2018"
 
 
-DBM_shape = [	28*28,
+DBM_SHAPE = [	28*28,
 				20*20,
 				10]
 ###########################################################################################################
 
+global_state_vars = {		# maybe use this as new way to manage all global state vars 
+	"learnrate":     0,
+	"freerun_steps": 0,
+	"Temp":          0,
+}
+### globals (to be set as DBM self values)
+freerun_steps = 2 					# global number of freerun steps for training
+learnrate     = LEARNRATE_START		# global learnrate
+temp          = TEMP_START			# global temp state
 
 
-
-saveto_path=data_dir+"/"+time_now+"_"+str(DBM_shape)
+saveto_path=data_dir+"/"+time_now+"_"+str(DBM_SHAPE)
 
 ### modify the parameters with additional_args
 if len(additional_args) > 0:
@@ -1297,7 +1287,7 @@ if DO_TRAINING and DO_SAVE_TO_FILE:
 
 
 ######### DBM #############################################################################################
-DBM = DBM_class(	shape = DBM_shape,
+DBM = DBM_class(	shape = DBM_SHAPE,
 					liveplot = 0, 
 					classification = 1,
 			)
@@ -1324,7 +1314,6 @@ if DO_TRAINING:
 			# start a train epoch 
 			DBM.train(	train_data  = train_data,
 						train_label = train_label,
-						epochs      = 1,
 						num_batches = N_BATCHES_TRAIN,
 						cont        = run)
 
@@ -1733,7 +1722,7 @@ if DO_TRAINING:
 
 
 log.close()
-if DO_SHOW_PLOT:
+if DO_SHOW_PLOTS:
 	plt.show()
 else:
 	plt.close()
