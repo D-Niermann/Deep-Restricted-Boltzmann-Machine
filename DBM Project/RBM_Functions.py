@@ -3,8 +3,6 @@ import numpy as np
 import numpy.random as rnd
 import os
 from matplotlib.pyplot import savefig
-import matplotlib as mpl
-mpl.rcParams["image.cmap"] = "gray"
 from math import sqrt
 
 
