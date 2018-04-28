@@ -1,0 +1,128 @@
+2.      Creating RBMs
+3.      2,1
+4.      1,2
+------------------------------------------------
+Info     Sat_Apr_28_18-26-53_2018 
+
+1.-v    Pretrain Session
+2.--v   	Pretraining  1. RBM
+2.--^   	Pretraining  1. RBM (took 0.0 sek)
+3.--v   	Pretraining  2. RBM
+3.--^   	Pretraining  2. RBM (took 0.0 sek)
+1.-^    Pretrain Session (took 0.2 sek)
+------------------------------------------------
+
+1.-v    DBM Train Session
+2.--v   	Run 0
+3.      		Loading data from: ... -37_2018 - 3% fehler
+4.      		Overriding Values from save
+Info     		Error overriding: Could not find save_dict.csv 
+5.      		Initializing graph
+6.      		loading numpy vars into graph
+Info     		Batchsize: 55 N_Updates 1000 
+7.---v  		Deep BM Epoch: 1 / 1
+8.      			Shuffling TrainData
+9.      			Running Batch
+7.---^  		Deep BM Epoch: 1 / 1 (took 50.412 sek)
+Info     		Learnrate:  0.1 
+Info     		Temp:  1.0 
+Info     		freerun_steps:  2 
+------------------------------------------------
+2.--^   	Run 0 (took 54.113 sek)
+1.-^    DBM Train Session (took 54.113 sek)
+------------------------------------------------
+
+1.      Initializing graph
+2.      loading numpy vars into graph
+3.-v    Testing DBM with 10000 images
+4.      	Sampling hidden 40 times 
+5.      	Taking only the maximum
+3.-^    Testing DBM with 10000 images (took 25.755 sek)
+Info     ------------- Test Log ------------- 
+Info     Reconstr. error normal:  0.04272 
+Info     Class error:  0.0636 
+Info     Wrong Digits:  636  with average:  0.475 
+Info     Correct Digits:  9364  with average:  0.89 
+------------------------------------------------
+
+1.-v    Generation Session
+2.      	Initializing graph
+3.      	loading numpy vars into graph
+4.--v   	Gibbs Sampling
+Info     		: Mode: freerunning | Steps: 500 
+4.--^   	Gibbs Sampling (took 0.495 sek)
+5.--v   	Gibbs Sampling
+Info     		: Mode: freerunning | Steps: 500 
+5.--^   	Gibbs Sampling (took 0.592 sek)
+6.--v   	Gibbs Sampling
+Info     		: Mode: freerunning | Steps: 500 
+6.--^   	Gibbs Sampling (took 0.544 sek)
+7.--v   	Gibbs Sampling
+Info     		: Mode: freerunning | Steps: 500 
+7.--^   	Gibbs Sampling (took 0.461 sek)
+8.--v   	Gibbs Sampling
+Info     		: Mode: freerunning | Steps: 500 
+8.--^   	Gibbs Sampling (took 0.536 sek)
+9.--v   	Gibbs Sampling
+Info     		: Mode: freerunning | Steps: 500 
+9.--^   	Gibbs Sampling (took 0.549 sek)
+10.--v   	Gibbs Sampling
+Info     		: Mode: freerunning | Steps: 500 
+10.--^   	Gibbs Sampling (took 0.541 sek)
+11.--v   	Gibbs Sampling
+Info     		: Mode: freerunning | Steps: 500 
+11.--^   	Gibbs Sampling (took 0.526 sek)
+12.--v   	Gibbs Sampling
+Info     		: Mode: freerunning | Steps: 500 
+12.--^   	Gibbs Sampling (took 0.428 sek)
+13.--v   	Gibbs Sampling
+Info     		: Mode: freerunning | Steps: 500 
+13.--^   	Gibbs Sampling (took 0.494 sek)
+14.--v   	Gibbs Sampling
+Info     		: Mode: freerunning | Steps: 500 
+14.--^   	Gibbs Sampling (took 0.542 sek)
+15.--v   	Gibbs Sampling
+Info     		: Mode: freerunning | Steps: 500 
+15.--^   	Gibbs Sampling (took 0.553 sek)
+16.--v   	Gibbs Sampling
+Info     		: Mode: freerunning | Steps: 500 
+16.--^   	Gibbs Sampling (took 0.555 sek)
+17.--v   	Gibbs Sampling
+Info     		: Mode: freerunning | Steps: 500 
+17.--^   	Gibbs Sampling (took 0.563 sek)
+18.--v   	Gibbs Sampling
+Info     		: Mode: freerunning | Steps: 500 
+18.--^   	Gibbs Sampling (took 0.509 sek)
+19.--v   	Gibbs Sampling
+Info     		: Mode: freerunning | Steps: 500 
+19.--^   	Gibbs Sampling (took 0.552 sek)
+20.--v   	Gibbs Sampling
+Info     		: Mode: freerunning | Steps: 500 
+20.--^   	Gibbs Sampling (took 0.526 sek)
+21.--v   	Gibbs Sampling
+Info     		: Mode: freerunning | Steps: 500 
+21.--^   	Gibbs Sampling (took 0.548 sek)
+22.--v   	Gibbs Sampling
+Info     		: Mode: freerunning | Steps: 500 
+22.--^   	Gibbs Sampling (took 0.506 sek)
+23.--v   	Gibbs Sampling
+Info     		: Mode: freerunning | Steps: 500 
+23.--^   	Gibbs Sampling (took 0.648 sek)
+24.--v   	Gibbs Sampling
+Info     		: Mode: freerunning | Steps: 500 
+24.--^   	Gibbs Sampling (took 0.473 sek)
+25.--v   	Gibbs Sampling
+Info     		: Mode: freerunning | Steps: 500 
+25.--^   	Gibbs Sampling (took 0.416 sek)
+26.--v   	Gibbs Sampling
+Info     		: Mode: freerunning | Steps: 500 
+26.--^   	Gibbs Sampling (took 0.408 sek)
+27.--v   	Gibbs Sampling
+Info     		: Mode: freerunning | Steps: 500 
+27.--^   	Gibbs Sampling (took 0.525 sek)
+28.--v   	Gibbs Sampling
+Info     		: Mode: freerunning | Steps: 500 
+28.--^   	Gibbs Sampling (took 0.426 sek)
+1.-^    Generation Session (took 16.202 sek)
+Info     Saved data and log to: /Users/Niermann/Google Drive/Masterarbeit/Python/DBM Project/data/Sat_Apr_28_18-26-53_2018_[784, 400, 10] 
+29.      Plotting...

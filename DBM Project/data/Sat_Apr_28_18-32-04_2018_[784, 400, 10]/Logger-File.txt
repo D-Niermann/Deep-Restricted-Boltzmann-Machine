@@ -1,0 +1,122 @@
+
+1.      Creating RBMs
+2.      2,1
+3.      1,2
+------------------------------------------------
+Info     Sat_Apr_28_18-32-04_2018 
+
+1.-v    Pretrain Session
+2.--v   	Pretraining  1. RBM
+2.--^   	Pretraining  1. RBM (took 0.0 sek)
+3.--v   	Pretraining  2. RBM
+3.--^   	Pretraining  2. RBM (took 0.0 sek)
+1.-^    Pretrain Session (took 1.249 sek)
+------------------------------------------------
+
+1.-v    DBM Train Session
+2.--v   	Run 0
+3.      		Loading data from: ... -37_2018 - 3% fehler
+4.      		Overriding Values from save
+Info     		Error overriding: Could not find save_dict.csv 
+5.      		Initializing graph
+6.      		loading numpy vars into graph
+Info     		Batchsize: 55 N_Updates 10000 
+7.---v  		Deep BM Epoch: 1 / 10
+8.      			Shuffling TrainData
+9.      			Running Batch
+7.---^  		Deep BM Epoch: 1 / 10 (took 42.81 sek)
+Info     		Learnrate:  0.1 
+Info     		Temp:  1.0 
+Info     		freerun_steps:  2 
+------------------------------------------------
+
+1.      		Initializing graph
+2.      		loading numpy vars into graph
+3.---v  		Testing DBM with 10000 images
+4.      			Sampling hidden 10 times 
+5.      			Taking only the maximum
+3.---^  		Testing DBM with 10000 images (took 13.029 sek)
+Info     		------------- Test Log ------------- 
+Info     		Reconstr. error normal:  0.04286 
+Info     		Class error:  0.0644 
+Info     		Wrong Digits:  644  with average:  0.485 
+Info     		Correct Digits:  9356  with average:  0.894 
+------------------------------------------------
+2.--^   	Run 0 (took 61.535 sek)
+
+1.--v   	Run 1
+2.      		Initializing graph
+3.      		loading numpy vars into graph
+Info     		Batchsize: 55 N_Updates 10000 
+4.---v  		Deep BM Epoch: 2 / 10
+5.      			Shuffling TrainData
+6.      			Running Batch
+4.---^  		Deep BM Epoch: 2 / 10 (took 42.765 sek)
+Info     		Learnrate:  0.1 
+Info     		Temp:  0.9999 
+Info     		freerun_steps:  2 
+------------------------------------------------
+1.--^   	Run 1 (took 45.243 sek)
+
+1.--v   	Run 2
+Info     		Batchsize: 55 N_Updates 10000 
+2.---v  		Deep BM Epoch: 3 / 10
+3.      			Shuffling TrainData
+4.      			Running Batch
+2.---^  		Deep BM Epoch: 3 / 10 (took 41.548 sek)
+Info     		Learnrate:  0.1 
+Info     		Temp:  0.9998 
+Info     		freerun_steps:  2 
+------------------------------------------------
+
+1.      		Initializing graph
+2.      		loading numpy vars into graph
+3.---v  		Testing DBM with 10000 images
+4.      			Sampling hidden 10 times 
+5.      			Taking only the maximum
+3.---^  		Testing DBM with 10000 images (took 12.986 sek)
+Info     		------------- Test Log ------------- 
+Info     		Reconstr. error normal:  0.03701 
+Info     		Class error:  0.0484 
+Info     		Wrong Digits:  484  with average:  0.522 
+Info     		Correct Digits:  9516  with average:  0.926 
+------------------------------------------------
+1.--^   	Run 2 (took 57.233 sek)
+
+1.--v   	Run 3
+2.      		Initializing graph
+3.      		loading numpy vars into graph
+Info     		Batchsize: 55 N_Updates 10000 
+4.---v  		Deep BM Epoch: 4 / 10
+5.      			Shuffling TrainData
+6.      			Running Batch
+4.---^  		Deep BM Epoch: 4 / 10 (took 42.517 sek)
+Info     		Learnrate:  0.1 
+Info     		Temp:  0.9997 
+Info     		freerun_steps:  2 
+------------------------------------------------
+1.--^   	Run 3 (took 47.27 sek)
+
+1.--v   	Run 4
+Info     		Batchsize: 55 N_Updates 10000 
+2.---v  		Deep BM Epoch: 5 / 10
+3.      			Shuffling TrainData
+4.      			Running Batch
+2.---^  		Deep BM Epoch: 5 / 10 (took 41.889 sek)
+Info     		Learnrate:  0.1 
+Info     		Temp:  0.9996 
+Info     		freerun_steps:  2 
+------------------------------------------------
+
+1.      		Initializing graph
+2.      		loading numpy vars into graph
+3.---v  		Testing DBM with 10000 images
+4.      			Sampling hidden 10 times 
+5.      			Taking only the maximum
+3.---^  		Testing DBM with 10000 images (took 11.896 sek)
+Info     		------------- Test Log ------------- 
+Info     		Reconstr. error normal:  0.03627 
+Info     		Class error:  0.0457 
+Info     		Wrong Digits:  457  with average:  0.539 
+Info     		Correct Digits:  9543  with average:  0.936 
+--------------------
