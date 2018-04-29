@@ -1240,9 +1240,9 @@ DO_TRAINING    = 1		# if to train the whole DBM
 DO_TESTING     = 1		# if testing the DBM with test data
 DO_SHOW_PLOTS  = 1		# if plots will show on display - either way they get saved into saveto_path
 
-DO_CONTEXT    = 0 	# if to test the context
-DO_GEN_IMAGES = 0 	# if to generate images (mode can be choosen at function call)
-DO_NOISE_STAB = 0 	# if to make a noise stability test
+DO_CONTEXT    = 0	 	# if to test the context
+DO_GEN_IMAGES = 0	 	# if to generate images (mode can be choosen at function call)
+DO_NOISE_STAB = 0	 	# if to make a noise stability test
 
 
 ### saving and loading 
