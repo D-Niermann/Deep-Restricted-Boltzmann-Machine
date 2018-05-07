@@ -102,29 +102,6 @@ if "train_data" not in globals():
 		test_data = sigmoid_np(np.dot(test_data, w_of_bottom_rbm)+b_of_bottom_rbm,0.05)
 	
 
-# 	new_data_train = np.zeros([len(train_label),100])
-# 	new_data_test = np.zeros([len(test_label),100])
-# 	for i in range(len(train_label)):
-# 		new_data_train[i]  = np.repeat(train_label[i],10).reshape(10,10).T.flatten()
-# 	for i in range(len(test_label)):
-# 		new_data_test[i]  = np.repeat(test_label[i],10).reshape(10,10).T.flatten()
-# 	train_label = new_data_train
-# 	test_label = new_data_test
-# log.out("Setting trian label = 10*10")
-	# test_data_noise = np.copy(test_data)
-	# # making noise 
-	# for i in range(len(test_data_noise)):
-	# 	test_data_noise[i]  += np.round(rnd.random(test_data_noise[i,:].shape)*0.55)
-	# 	# half_images[i] = abs(half_images[i])
-	# 	# half_images[i] *= 1/half_images[i].max()
-	# 	# half_images[i] *= rnd.random(half_images[i].shape)
-	# test_data_noise   = test_data_noise>0
-
-	# noise_data_train = sample_np(rnd.random(train_data.shape)*0.2)
-	# noise_data_test = sample_np(rnd.random(test_data.shape)*0.2)
-	# noise_label_train = np.zeros(train_label.shape)
-	# noise_label_test = np.zeros(test_label.shape)
-
 #### Get the arguments list from terminal
 additional_args=sys.argv[1:]
 
@@ -134,15 +111,22 @@ additional_args=sys.argv[1:]
 ### Class RBM 
 class RBM(object):
 	""" defines a 2 layer restricted boltzmann machine - first layer = input, second
-	layer = output. Training with contrastive divergence """
+	layer = hidden. Training with contrastive divergence """
 
-	def __init__(self,vu,hu,forw_mult,back_mult,learnrate,liveplot=0):
+	def __init__(self,vu,hu,forw_mult,back_mult,learnrate,liveplot=0,split = 0):
+		"""
+			split :: makes a splitted RBM
+		"""
 		#### User Variables
 
 		self.hidden_units  = hu
 		self.visible_units = vu
 		self.learnrate = learnrate
-
+		self.split = split
+		if self.split==1:
+			self.n_splits = N_SPLITS
+		else:
+			self.n_splits = 1
 
 		self.liveplot  = liveplot
 
@@ -155,25 +139,18 @@ class RBM(object):
 		################################################################################################################################################
 		#shape definitions are wired here-normally one would define [rows,columns] but here it is reversed with [columns,rows]? """
 
-		self.v       = tf.placeholder(tf.float32,[None,self.visible_units],name="Visible-Layer") # has shape [number of images per batch,number of visible units]
+		self.v       = tf.placeholder(tf.float32,[None,self.visible_units],name="Visible-Layer") # has shape [# of img per batch,number of visible units]
 
 		self.w       = tf.Variable(tf.random_uniform([self.visible_units,self.hidden_units],minval=-1e-6,maxval=1e-6),name="Weights")
-		self.bias_v  = tf.Variable(tf.zeros([self.visible_units]),name="Visible-Bias")
-		self.bias_h  = tf.Variable(tf.zeros([self.hidden_units]), name="Hidden-Bias")
+		self.bias_v  = tf.Variable(tf.zeros([self.n_splits,self.visible_units]),name="Visible-Bias")
+		self.bias_h  = tf.Variable(tf.zeros([self.n_splits,self.hidden_units]), name="Hidden-Bias")
 
-
+		self.split_i = tf.placeholder_with_default(0,shape=[])
 		# get the probabilities of the hidden units in w
-		self.h_prob  = sigmoid(tf.matmul(self.v,self.forw_mult*self.w) + self.bias_h,temp)
-		# h has shape [number of images per batch, number of hidden units]
-		# get the actual activations for h {0,1}
-		# self.h       = tf.nn.relu(
-		# 	            tf.sign(
-		# 	            	self.h_prob - tf.random_uniform(tf.shape(self.h_prob)) 
-		# 	            	) 
-		#         		) 
+		self.h_prob  = sigmoid(tf.matmul(self.v,self.forw_mult*self.w) + self.bias_h[self.split_i],temp)
 
 		# and the same for visible units
-		self.v_prob  = sigmoid(tf.matmul(self.h_prob,(self.back_mult*self.w),transpose_b=True) + self.bias_v,temp)
+		self.v_prob  = sigmoid(tf.matmul(self.h_prob,(self.back_mult*self.w),transpose_b=True) + self.bias_v[self.split_i],temp)
 		self.v_recon = tf.nn.relu(
 					tf.sign(
 						self.v_prob - tf.random_uniform(tf.shape(self.v_prob))
@@ -181,18 +158,19 @@ class RBM(object):
 					)
 
 		# Gibbs sampling: get the probabilities of h again from the reconstructed v_recon
-		self.h_gibbs = sigmoid(tf.matmul(self.v_recon, self.w) + self.bias_h,temp) 
+		self.h_gibbs = sigmoid(tf.matmul(self.v_recon, self.w) + self.bias_h[self.split_i],temp) 
 
 		##### define reconstruction error and the energy  
 		# energy = -tf.reduce_sum(bias_v*v_recon)-tf.reduce_sum(bias_h*h)-tf.matmul(tf.matmul(h,tf.transpose(w)), v_recon)
 		self.error  = tf.reduce_mean(tf.square(self.v-self.v_recon))
 
 		#### Training with Contrastive Divergence
-		#matrix shape is untouched throu the batches because w*v=h even if v has more columns, but dividing be numpoints is recomended since CD
+		# matrix shape is untouched throu the batches because w*v=h even if v has more columns, but dividing be numpoints is recomended since CD
 		# [] = [784,batchsize]-transposed v * [batchsize,500] -> [784,500] - like w 
 		self.pos_grad  = tf.matmul(self.v,self.h_prob,transpose_a=True)
 		self.neg_grad  = tf.matmul(self.v_recon,self.h_gibbs,transpose_a=True)
-		self.numpoints = tf.cast(tf.shape(self.v)[0],tf.float32) #number of train inputs per batch (for averaging the CD matrix -> see practical paper by hinton)
+		#number of train inputs per batch (for averaging the CD matrix -> see practical paper by hinton)
+		self.numpoints = tf.cast(tf.shape(self.v)[0],tf.float32) 
 		# contrastive divergence
 		self.CD        = (self.pos_grad - self.neg_grad)/self.numpoints
 		
@@ -202,26 +180,41 @@ class RBM(object):
 		self.mean_w   = tf.reduce_mean(self.w)
 
 		#update bias
-		""" Since vectors v and h are actualy matrices with number of batch_size images in them, reduce mean will make them to a vector again """
-		self.update_bias_v = self.bias_v.assign_add(self.learnrate*tf.reduce_mean(self.v-self.v_recon,0))
-		self.update_bias_h = self.bias_h.assign_add(self.learnrate*tf.reduce_mean(self.h_prob-self.h_gibbs,0))
+		self.update_bias_v = self.bias_v[self.split_i].assign(self.bias_v[self.split_i]+self.learnrate*tf.reduce_mean(self.v-self.v_recon,0))
+		self.update_bias_h = self.bias_h[self.split_i].assign(self.bias_h[self.split_i]+self.learnrate*tf.reduce_mean(self.h_prob-self.h_gibbs,0))
+
+		# if split == 1:
+		# 	self.bias_v_ph = tf.placeholder(tf.float32,[self.visible_units],name = "bias_v_placeholder")
+		# 	self.bias_h_ph = tf.placeholder(tf.float32,[self.hidden_units],name = "bias_h_placeholder")
+		# 	self.assign_bias_v = self.bias_v.assign(self.bias_v_ph)
+		# 	self.assign_bias_h = self.bias_h.assign(self.bias_h_ph)
 
 
-		# reverse feed
-		# self.h_rev       = tf.placeholder(tf.float32,[None,self.hidden_units],name="Reverse-hidden")
-		# self.v_prob_rev  = sigmoid(tf.matmul(self.h_rev,(self.w),transpose_b=True) + self.bias_v,temp)
-		# self.v_recon_rev = tf.nn.relu(tf.sign(self.v_prob_rev - tf.random_uniform(tf.shape(self.v_prob_rev))))
 
-	def train(self,sess,RBM_i,RBMs,batch):
+	def train(self,sess,RBM_i,RBMs,batch,split_i=0):
 		self.my_input_data = batch
 		# iterate which RBM level this is and calculate the proper input 
 		for j in range(1,len(RBMs)):
 			if RBM_i >= j:
-				self.my_input_data = RBMs[j-1].h_prob.eval({RBMs[j-1].v : self.my_input_data})
+				if RBMs[j-1].split==1:
+					# split the batch to be feed in the splitted rbm
+					batch_split = split_image(batch, N_SPLITS, PX_OVERHANG)
+					# define array with shape of batchsize,n_hu_RBMs[j-1],N_SPLITS
+					h_split = np.zeros([batch_split.shape[0],RBMs[j-1].hidden_units,N_SPLITS])
+					# iter though every split and fill array 
+					for split in range(N_SPLITS):
+						# calc the hidden layer of every RBM - bias for v and h switch with every split !
+						h_split[:,:,split] = RBMs[j-1].h_prob.eval({RBMs[j-1].v : batch_split[:,:,split], RBMs[j-1].split_i : split})
+					# concatenate the resulting hidden layer -> use this as feed for the current BRM!
+					s = h_split.shape
+					self.my_input_data = h_split.reshape(s[0],s[1]*N_SPLITS)
+				else:
+					# if previous RBM is not split then just proceed with normal h calculation
+					self.my_input_data = RBMs[j-1].h_prob.eval({RBMs[j-1].v : self.my_input_data})
 
 		#### update the weights and biases
-		self.w_i, self.error_i = sess.run([self.update_w,self.error],feed_dict={self.v:self.my_input_data})
-		sess.run([self.update_bias_h,self.update_bias_v],feed_dict={self.v:self.my_input_data})
+		self.w_i, self.error_i = sess.run([self.update_w,self.error],feed_dict={self.v:self.my_input_data , self.split_i : split_i})
+		sess.run([self.update_bias_h],feed_dict={self.v:self.my_input_data , self.split_i : split_i})
 
 		return self.w_i,self.error_i
 
@@ -243,7 +236,8 @@ class DBM_class(object):
 		self.exported       = 0
 		self.tested         = 0
 		self.l_mean         = np.zeros([self.n_layers])
-		
+		self.split_img_length = (sqrt(784/N_SPLITS)+PX_OVERHANG)**2
+
 
 
 		self.train_time     = 0
@@ -267,9 +261,11 @@ class DBM_class(object):
 
 		### log list where all constants are saved
 		self.log_list =	[["SHAPE",                self.SHAPE],
+						["N_SPLITS",			  N_SPLITS],
+						["PX_OVERHANG",			  PX_OVERHANG],
 						["N_EPOCHS_PRETRAIN",     N_EPOCHS_PRETRAIN], 
 						["N_BATCHES_PRETRAIN",    N_BATCHES_PRETRAIN], 
-						["N_BATCHES_TRAIN",       N_BATCHES_TRAIN], 
+						["N_BATCHES_TRAIN",       N_BATCHES_TRAIN],
 						["LEARNRATE_PRETRAIN",    LEARNRATE_PRETRAIN], 
 						["LEARNRATE_START",       LEARNRATE_START], 
 						["LEARNRATE_SLOPE",       LEARNRATE_SLOPE], 
@@ -277,30 +273,32 @@ class DBM_class(object):
 						["TEMP_SLOPE",            TEMP_SLOPE], 
 						["PATHSUFFIX_PRETRAINED", PATHSUFFIX_PRETRAINED], 
 						["PATHSUFFIX",            PATHSUFFIX], 
-						["DO_LOAD_FROM_FILE",      DO_LOAD_FROM_FILE], 
+						["DO_LOAD_FROM_FILE",     DO_LOAD_FROM_FILE],
 						["TEST_EVERY_EPOCH",      TEST_EVERY_EPOCH]
 						]## append variables that change during training in the write_to_file function
 
 
 		log.out("Creating RBMs")
 		self.RBMs    = [None]*(self.n_layers-1)
+		
 		for i in range(len(self.RBMs)):
+			splitted_shape = int((sqrt(self.SHAPE[i]/N_SPLITS)+PX_OVERHANG)**2)
+
 			if i == 0 and len(self.RBMs)>1:
-				self.RBMs[i] = RBM(self.SHAPE[i],self.SHAPE[i+1], forw_mult= 1, back_mult = 1, learnrate = LEARNRATE_PRETRAIN, liveplot=0)
-				log.out("2,1")
+				self.RBMs[i] = RBM(splitted_shape, self.SHAPE[i+1]/N_SPLITS, 1, 1, LEARNRATE_PRETRAIN, split = 1 , liveplot = 0)
+				log.out("2, 1")
+
 			elif i==len(self.RBMs)-1 and len(self.RBMs)>1:
-				self.RBMs[i] = RBM(self.SHAPE[i],self.SHAPE[i+1], forw_mult= 1, back_mult = 1, learnrate = LEARNRATE_PRETRAIN, liveplot=0)				
-				log.out("1,2")
+				self.RBMs[i] = RBM(self.SHAPE[i], self.SHAPE[i+1], 1, 1, LEARNRATE_PRETRAIN)				
+				log.out("1, 2")
+
 			else:
 				if len(self.RBMs) == 1:
-					self.RBMs[i] = RBM(self.SHAPE[i],self.SHAPE[i+1], forw_mult= 1, back_mult = 1, learnrate = LEARNRATE_PRETRAIN, liveplot=0)
-					log.out("1,1")
+					self.RBMs[i] = RBM(splitted_shape, self.SHAPE[i+1]/N_SPLITS, 1, 1, LEARNRATE_PRETRAIN, split = 1)
+					log.out("1, 1")
 				else:
-					self.RBMs[i] = RBM(self.SHAPE[i],self.SHAPE[i+1], forw_mult= 2, back_mult = 2, learnrate = LEARNRATE_PRETRAIN, liveplot=0)
-					log.out("2,2")
-				
-		# self.RBMs[1] = RBM(self.SHAPE[1],self.SHAPE[2], forw_mult= 1, back_mult = 1, learnrate = LEARNRATE_PRETRAIN, liveplot=0)
-		# self.RBMs[2] = RBM(self.SHAPE[2],self.SHAPE[3], forw_mult= 1, back_mult = 1, learnrate = LEARNRATE_PRETRAIN, liveplot=0)
+					self.RBMs[i] = RBM(self.SHAPE[i], self.SHAPE[i+1], 2, 2, LEARNRATE_PRETRAIN)
+					log.out("2, 2")
 
 	def pretrain(self):
 		""" this function will pretrain the RBMs and define a self.weights list where every
@@ -320,6 +318,7 @@ class DBM_class(object):
 		with tf.Session() as sess:
 			# train session - v has batchsize length
 			log.start("Pretrain Session")
+			log.out("++ Only pretraining hidden bias ! ++")
 			
 			
 			#iterate through the RBMs , each iteration is a RBM
@@ -335,10 +334,21 @@ class DBM_class(object):
 						log.start("Epoch:",epoch+1,"/",N_EPOCHS_PRETRAIN[RBM_i])
 						
 						for start, end in zip( range(0, len(train_data), batchsize_pretrain), range(batchsize_pretrain, len(train_data), batchsize_pretrain)):
-							#### define a batch
-							batch = train_data[start:end]
-							# train the rbm  
-							w_i,error_i = RBM.train(sess,RBM_i,self.RBMs,batch)
+							
+							if RBM.split == 0:
+								#### define a batch
+								batch = train_data[start:end]
+								# train the rbm  
+								w_i,error_i = RBM.train(sess,RBM_i,self.RBMs,batch)
+							
+							elif RBM.split == 1:
+								# go through all splitted parts of the img
+								for split in range(N_SPLITS):
+									## define splitted batch
+									batch = train_data_split[start:end,:,split]
+									## train the RBM
+									w_i,error_i = RBM.train(sess,RBM_i,self.RBMs,batch,split)
+
 							#### liveplot
 							if RBM.liveplot and plt.fignum_exists(fig.number) and start%40==0:
 								ax.cla()
@@ -355,31 +365,44 @@ class DBM_class(object):
 
 					log.end() #ending training the rbm 
 
-				
 
-				# define the weights
+				# get the weights and biases from pretrained RBMs
 				self.weights  =  []
+				self.biases = []
 				for i in range(len(self.RBMs)):
 					self.weights.append(self.RBMs[i].w.eval())
+					if i==0:
+						self.biases.append(self.RBMs[i].bias_v.eval())
+					self.biases.append(self.RBMs[i].bias_h.eval())
+
 
 				if DO_SAVE_PRETRAINED:
 					for i in range(len(self.weights)):
 						np.savetxt(workdir+"/pretrain_data/"+"Pretrained-"+" %i "%i+str(time_now)+".txt", self.weights[i])
+					for i in range(len(self.biases)):
+						np.savetxt(workdir+"/pretrain_data/"+"Pretrained-bias-"+" %i "%i+str(time_now)+".txt", self.biases[i])
 					log.out("Saved Pretrained under "+str(time_now))
 			else:
 				if not DO_LOAD_FROM_FILE:
 					### load the pretrained weights
-					self.weights=[]
+					self.weights= []
+					self.biases = []
 					log.out("Loading Pretrained from file")
 					for i in range(self.n_layers-1):
 						self.weights.append(np.loadtxt(workdir+"/pretrain_data/"+"Pretrained-"+" %i "%i+PATHSUFFIX_PRETRAINED+".txt").astype(np.float32))
+					for i in range(self.n_layers):
+						self.biases.append(np.loadtxt(workdir+"/pretrain_data/"+"Pretrained-bias-"+" %i "%i+PATHSUFFIX_PRETRAINED+".txt").astype(np.float32))
 				else:
 					### if loading from file is active the pretrained weights would get 
 					### reloaded anyway so directly load them here
-					self.weights=[]
+					self.weights= []
+					self.biases = []
 					log.out("Loading from file")
 					for i in range(self.n_layers-1):
 						self.weights.append(np.loadtxt(data_dir+"/"+PATHSUFFIX+"/"+"w%i.txt"%(i)).astype(np.float32))
+					for i in range(self.n_layers):
+						self.biases.append(np.loadtxt(data_dir+"/"+PATHSUFFIX+"/"+"bias%i.txt"%(i)).astype(np.float32))
+
 			log.end()
 			log.reset()
 
@@ -442,9 +465,10 @@ class DBM_class(object):
 		
 		else:
 			_input_ = sigmoid(tf.matmul(self.layer[layer_i-1],self.w[layer_i-1]) 
-					+ tf.matmul(self.layer[layer_i+1],self.w[layer_i],transpose_b=True) 
-					+ self.bias[layer_i], 
-					self.temp_tf)
+								+ tf.matmul(self.layer[layer_i+1],self.w[layer_i],transpose_b=True) 
+								+ self.bias[layer_i], 
+						       self.temp_tf
+							  )
 		return _input_
 
 	def sample(self,x):
@@ -505,12 +529,70 @@ class DBM_class(object):
 			self.save_dict["Recon_Error"].append(self.recon_error)
 			self.save_dict["Test_Epoch"].append(self.epochs)
 
+	def merge_weights(self):
+		""" merge the weight matrix w from pretraining into N_SPLITs 
+		matrixes that get the w at correct indices and all other indices
+		are filled with zeros.
+		"""
+		N = N_SPLITS
+		R = PX_OVERHANG
+
+		a = int(sqrt(self.SHAPE[0])) ## image sidelength
+		b = int(a/sqrt(N)) ## new img sidelength
+		ind = np.zeros([N,(b+R)**2]).astype(np.int) ## which matrix values (x,y) to set to the weight values for each split
+
+		for s in range(N):
+		    m=0
+		    if s ==0:
+		        for i in range(0,b+R): #row
+		            for j in range(i*a,(i*a)+b+R):
+		                ind[s][m] = j
+		                m+=1
+		    if s == 1:
+		        for i in range(b-R,a): # row
+		            for j in range(i*a,(i*a)+b+R):
+		                ind[s][m] = j
+		                m+=1
+		    if s == 2:
+		        for i in range(0,b+R):
+		            for j in range((i*a)+b-R,(i*a)+a): #col
+		                ind[s][m] = j
+		                m+=1
+		    if s == 3:
+		        for i in range(b-R,a): #row
+		            for j in range((i*a)+b-R,(i*a)+a): #col
+		                ind[s][m] = j
+		                m+=1
+
+		w_patt_partial = np.zeros([4,self.SHAPE[0],self.SHAPE[1]])
+		w_full         = np.zeros([self.SHAPE[0],self.SHAPE[1]])
+		intervall      = self.SHAPE[1]/N
+		beg            = 0
+		end            = beg+intervall
+
+		for s in range(N):
+			w_patt_partial[s,ind[s],beg:end] = DBM.weights[0]
+			beg += intervall
+			end  = beg+intervall
+
+		for i in range(N):
+		    w_full += w_patt_partial[i]
+
+		where  = np.where(w_full != 0)
+		w_patt = np.copy(w_full)
+		w_patt[where]  = 1
+
+		where = np.where(w_patt_partial != 0)
+		w_patt_partial[where] = 1
+
+
+		return w_full,w_patt,w_patt_partial
+
+
 	def graph_init(self,graph_mode):
 		""" sets the graph up and loads the pretrained weights in , these are given
 		at class definition
-		graph_mode  :: "training" if the graph is used in training - this will set h2 to placeholder for the label data
-				:: "testing"  if the graph is used in testing - this will set h2 to a random value and to be calculated from h1 
-				:: "gibbs"    if the graph is used in gibbs sampling 
+		graph_mode  :: "training" if the graph is used in training
 		"""
 		log.out("Initializing graph")
 		
@@ -528,20 +610,23 @@ class DBM_class(object):
 			# self.train_error_ = tf.Variable(tf.zeros([N_EPOCHS_TRAIN]))
 			# self.train_class_error_ = tf.Variable(tf.zeros([N_EPOCHS_TRAIN]))
 			
-		#### temperature
+		#### placeholders
 		self.temp_tf = tf.placeholder(tf.float32,[],name="Temperature")
-
+		self.split_i = tf.placeholder(tf.int32,[],name="Which_Split")
+		self.w_0_ph = tf.placeholder(tf.float32,name="Weight0_ph")
 
 		### init all Parameters like weights , biases , layers and their updates
 		# weights
 		self.w               = [None]*(self.n_layers-1)
 		self.pos_grad        = [None]*(self.n_layers-1)
 		self.neg_grad        = [None]*(self.n_layers-1)
+		self.CD              = [None]*(self.n_layers-1)
 		self.update_pos_grad = [None]*(self.n_layers-1)
 		self.update_neg_grad = [None]*(self.n_layers-1)
 		self.update_w        = [None]*(self.n_layers-1)
-		self.w_mean_ 	   = [None]*(self.n_layers-1) # variable to store means
+		self.w_mean_ 	     = [None]*(self.n_layers-1) # variable to store means
 		self.mean_w          = [None]*(self.n_layers-1) # calc of mean for each w
+
 
 		# bias
 		self.bias        = [None]*self.n_layers
@@ -549,6 +634,9 @@ class DBM_class(object):
 
 		# layer
 		self.layer             = [None]*self.n_layers # layer variable 
+		self.layer_split       = [[None]*N_SPLITS]*2  # splitted layer satates
+		self.update_l_split_p  = [[None]*N_SPLITS]*2
+		self.update_l_split_s  = [[None]*N_SPLITS]*2
 		self.layer_save        = [None]*self.n_layers # save variable (used for storing older layers)
 		self.assign_save_layer = [None]*self.n_layers # save variable (used for storing older layers)
 		self.layer_ph          = [None]*self.n_layers # placeholder 
@@ -569,25 +657,34 @@ class DBM_class(object):
 
 		### weight calculations and assignments
 		for i in range(len(self.w)):
-			self.w[i] = tf.Variable(self.weights[i],name="Weights%i"%i)
+			if i==0:
+				w, self.w_patt, self.w_patt_partial = self.merge_weights()
+				self.w[i] = tf.Variable(w,name="Weights%i"%i,dtype=tf.float32)
+			else:
+				self.w[i] = tf.Variable(self.weights[i],name="Weights%i"%i,dtype=tf.float32)
 			if graph_mode=="training":
 				self.pos_grad[i]        = tf.Variable(tf.zeros([self.SHAPE[i],self.SHAPE[i+1]]))
 				self.neg_grad[i]        = tf.Variable(tf.zeros([self.SHAPE[i],self.SHAPE[i+1]]))
 				self.update_pos_grad[i] = self.pos_grad[i].assign(tf.matmul(self.layer[i], self.layer[i+1],transpose_a=True))
 				self.update_neg_grad[i] = self.neg_grad[i].assign(tf.matmul(self.layer[i], self.layer[i+1],transpose_a=True))
-				self.update_w[i]        = self.w[i].assign_add(self.learnrate*(self.pos_grad[i] - self.neg_grad[i])/self.batchsize)
-				self.w_mean_[i]         = tf.Variable(tf.zeros([N_EPOCHS_TRAIN]))
-				self.mean_w[i]          = tf.reduce_mean(tf.square(self.w[i]))
+				if i == 0:
+					self.update_w[i]    = self.learnrate*self.w_patt*(self.pos_grad[i] - self.neg_grad[i])/self.batchsize
+				else:	
+					self.update_w[i] = self.w[i].assign_add(self.learnrate*(self.pos_grad[i] - self.neg_grad[i])/self.batchsize)
+				
+				self.w_mean_[i] = tf.Variable(tf.zeros([N_EPOCHS_TRAIN]))
+				self.mean_w[i]  = tf.reduce_mean(tf.square(self.w[i]))
+		self.assign_w_0 = self.w[0].assign_add(self.w_0_ph)
 
 		### bias calculations and assignments
 		for i in range(len(self.bias)):
 			self.bias[i] = tf.Variable(tf.zeros([self.SHAPE[i]]),name="Bias%i"%i)
-			if graph_mode == "training":
+			if graph_mode == "training": 
 				self.update_bias[i] = self.bias[i].assign_add(self.learnrate*tf.reduce_mean(tf.subtract(self.layer_save[i],self.layer[i]),0))
 
 		### layer calculations and assignments
 		for i in range(len(self.layer)):
-			self.assign_save_layer[i]       = self.layer_save[i].assign(self.layer[i])
+			self.assign_save_layer[i] = self.layer_save[i].assign(self.layer[i])
 			self.assign_l[i]         = self.layer[i].assign(self.layer_ph[i])
 			self.assign_l_rand[i]    = self.layer[i].assign(tf.random_uniform([self.batchsize,self.SHAPE[i]]))
 			self.layer_prob[i]       = self.layer_input(i)
@@ -603,8 +700,6 @@ class DBM_class(object):
 		# modification array size 10 that gehts multiplied to the label vector for context
 		self.modification_tf = tf.Variable(tf.ones([self.batchsize,self.SHAPE[-1]]),name="Modification")
 
-
-
 		### Error and stuff
 		self.error       = tf.reduce_mean(tf.square(self.layer_ph[0]-self.layer[0]))
 		self.class_error = tf.reduce_mean(tf.square(self.layer_ph[-1]-self.layer[-1]))
@@ -617,24 +712,12 @@ class DBM_class(object):
 
 		self.energy = -tf.reduce_sum([self.layer_energy[i] for i in range(len(self.layer_energy))])
 
-		#### updates for each layer 
+		#### updates with context
 		if self.classification and self.n_layers > 2:
 			self.update_h2_with_context = self.layer[-2].assign(self.sample(sigmoid(tf.matmul(self.layer[-3],self.w[-2])  
 								+ tf.matmul(tf.multiply(self.layer[-1],self.modification_tf),self.w[-1],transpose_b=True)
 								+ self.bias[-2],self.temp_tf)))
 		
-
-		### Training with contrastive Divergence
-		# if graph_mode=="training":
-			# self.assign_arrays =	[ tf.scatter_update(self.train_error_, self.m_tf, self.error), 							  
-			# 				  tf.scatter_update(self.h1_activity_, self.m_tf, self.h1_sum), 
-			# 				]
-
-			# for i in range(self.n_layers-1):
-			# 	self.assign_arrays.append(tf.scatter_update(self.w_mean_[i], self.m_tf, self.mean_w[i]))
-			# if self.classification:
-			# 	self.assign_arrays.append(tf.scatter_update(self.train_class_error_, self.m_tf, self.class_error))
-
 		sess.run(tf.global_variables_initializer())
 		self.init_state=1
 
@@ -688,12 +771,6 @@ class DBM_class(object):
 			M = 10
 
 
-
-
-		### free energy
-		# self.F=[]
-		# self.F_test=[]
-		
 		if DO_LOAD_FROM_FILE and not cont:
 			# load data from the file
 			self.load_from_file(workdir+"/data/"+PATHSUFFIX,override_params=1)
@@ -731,10 +808,10 @@ class DBM_class(object):
 		log.out("Running Batch")
 		# log.info("++ Using Weight Decay! Not updating bias! ++")
 
-
+		part_w = [None]*N_SPLITS
 		for start, end in zip( range(0, len(train_data), self.batchsize), range(self.batchsize, len(train_data), self.batchsize)):
 			# define a batch
-			self.batch = train_data[start:end]
+			self.batch  = train_data[start:end]
 			batch_label = train_label[start:end]
 
 			#### Clamped Run 
@@ -770,7 +847,23 @@ class DBM_class(object):
 
 
 			#### run all parameter updates 
-			sess.run([self.update_w, self.update_bias], {self.learnrate : learnrate})
+			## update the CD matrix for W1 and average over the N_SPLIT partial weights
+			CD_0 = sess.run(self.update_w[0],{self.learnrate : learnrate})
+			# find the partial Ws in the full CD matrix 
+			for s in range(N_SPLITS):
+				ind = np.where(self.w_patt_partial[s]!=0)
+				part_w[s] = CD_0[ind]
+			# average all partial W
+			CD_mean = np.mean(part_w,axis=0)
+			# set every partial W in the full matrix to the average partial W
+			for s in range(N_SPLITS):
+				ind = np.where(self.w_patt_partial[s]!=0)
+				CD_0[ind] = CD_mean
+			# assign the tf variable 
+			sess.run(self.assign_w_0,{self.w_0_ph : CD_0})
+
+			## run the other updates
+			sess.run([self.update_w[1:], self.update_bias], {self.learnrate : learnrate})
 
 
 			#### calculate free energy for test and train data
@@ -1219,13 +1312,17 @@ class DBM_class(object):
 #### User Settings ###
 
 N_BATCHES_PRETRAIN = 500 			# how many batches per epoch for pretraining
-N_BATCHES_TRAIN    = 500 			# how many batches per epoch for complete DBM training
+N_BATCHES_TRAIN    = 200 			# how many batches per epoch for complete DBM training
 N_EPOCHS_PRETRAIN  = [0,0,0,0,0] 	# pretrain epochs for each RBM
-N_EPOCHS_TRAIN     = 10				# how often to iter through the test images
-TEST_EVERY_EPOCH   = 2 				# how many epochs to train before testing on the test data
+N_EPOCHS_TRAIN     = 4				# how often to iter through the test images
+TEST_EVERY_EPOCH   = 5 			    # how many epochs to train before testing on the test data
+
+### Shape BM Params
+N_SPLITS = 4
+PX_OVERHANG  = 2
 
 ### learnrates 
-LEARNRATE_PRETRAIN = 0.1		# learnrate for pretraining
+LEARNRATE_PRETRAIN = 0.05		# learnrate for pretraining
 LEARNRATE_START    = 0.01		# starting learnrates
 LEARNRATE_SLOPE    = 5.0		# bigger number -> smaller slope
 
@@ -1235,7 +1332,7 @@ TEMP_SLOPE    = 90.0		# slope of dereasing temp bigger number -> smaller slope
 
 
 ### state vars 
-DO_PRETRAINING = 1		# if no pretrain then files are automatically loaded
+DO_PRETRAINING = 0		# if no pretrain then files are automatically loaded
 DO_TRAINING    = 1		# if to train the whole DBM
 DO_TESTING     = 1		# if testing the DBM with test data
 DO_SHOW_PLOTS  = 1		# if plots will show on display - either way they get saved into saveto_path
@@ -1247,22 +1344,17 @@ DO_NOISE_STAB = 0	 	# if to make a noise stability test
 
 ### saving and loading 
 DO_SAVE_TO_FILE       = 0 	# if to save plots and data to file
-DO_SAVE_PRETRAINED    = 0 	# if to save the pretrained weights seperately (for later use)
-DO_LOAD_FROM_FILE     = 1 	# if to load weights and biases from datadir + pathsuffix
+DO_SAVE_PRETRAINED    = 1 	# if to save the pretrained weights seperately (for later use)
+DO_LOAD_FROM_FILE     = 0 	# if to load weights and biases from datadir + pathsuffix
 PATHSUFFIX            = "Sat_Apr_28_20-53-18_2018_[784, 400, 10]"
-PATHSUFFIX_PRETRAINED = "Fri_Mar__9_16-46-01_2018"
+PATHSUFFIX_PRETRAINED = "Mon_May__7_11-41-34_2018"
 
 
 DBM_SHAPE = [	28*28,
-				20*20,
-				10]
+				10*10,
+				7*7]
 ###########################################################################################################
 
-global_state_vars = {		# maybe use this as new way to manage all global state vars 
-	"learnrate":     0,
-	"freerun_steps": 0,
-	"Temp":          0,
-}
 ### globals (to be set as DBM self values)
 freerun_steps = 2 					# global number of freerun steps for training
 learnrate     = LEARNRATE_START		# global learnrate
@@ -1286,11 +1378,18 @@ if DO_TRAINING and DO_SAVE_TO_FILE:
 	log.open(saveto_path)
 
 
+
+#################################
+log.out("Splitting the dataset")
+# new image shape will be [old_size/N_SPLITS+PX_Overhang,old_size/N_SPLITS+PX_Overhang]
+train_data_split = split_image(train_data,N_SPLITS,PX_OVERHANG)
+test_data_split  = split_image(test_data,N_SPLITS,PX_OVERHANG)
+
+
 ######### DBM #############################################################################################
 DBM = DBM_class(	shape = DBM_SHAPE,
 					liveplot = 0, 
-					classification = 1,
-			)
+					classification = 0)
 
 ###########################################################################################################
 #### Sessions ####
@@ -1607,7 +1706,8 @@ if DO_TRAINING:
 	# plot test errors 
 	plt.figure("test errors")
 	plt.plot(DBM.save_dict["Test_Epoch"],DBM.save_dict["Recon_Error"],label="Recon Error")
-	plt.plot(DBM.save_dict["Test_Epoch"],DBM.save_dict["Class_Error"],label="Class Error")
+	if DBM.classification:
+		plt.plot(DBM.save_dict["Test_Epoch"],DBM.save_dict["Class_Error"],label="Class Error")
 	plt.ylabel("Squared Mean Error")
 	plt.xlabel("Epoch")
 	plt.legend()
@@ -1677,6 +1777,10 @@ if DO_TRAINING:
 			ax3[-1][i].bar(range(DBM.SHAPE[-1]),DBM.last_layer_save[i])
 			ax3[-1][i].set_xticks(range(DBM.SHAPE[-1]))
 			ax3[-1][i].set_ylim(0,1)
+		else:
+			ax3[-1][i].matshow(DBM.last_layer_save[i].reshape(int(sqrt(DBM.SHAPE[-1])),int(sqrt(DBM.SHAPE[-1]))))
+			ax3[-1][i].set_xticks([])
+			ax3[-1][i].set_yticks([])
 
 		#plot the reconstructed layer h1
 		# ax3[5][i].matshow(DBM.rec_h1[i:i+1].reshape(int(sqrt(DBM.SHAPE[1])),int(sqrt(DBM.SHAPE[1]))))

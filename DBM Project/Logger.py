@@ -32,7 +32,15 @@ class Logger(object):
 			print printstr
 			if self.write_file:
 				self.file.write(printstr+"\n")
-
+	def error(self,*args):
+		if self.on:			
+			string="ERROR    "+"\t"*(len(self.start_time)-1)
+			for i in args:
+				string+=str(i)+" "
+			printstr = string 
+			print printstr
+			if self.write_file:
+				self.file.write(printstr+"\n")
 
 	def out(self,input_str,*args):
 		if self.on:

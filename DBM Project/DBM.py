@@ -417,7 +417,7 @@ class DBM_class(object):
 				log.info("T = ",temp)
 				log.info("N = ",freerun_steps)
 			except:
-				log.info("Error overriding: Could not find save_dict.csv")
+				log.error("Error overriding: Could not find save_dict.csv")
 		os.chdir(workdir)
 
 	def import_(self):
@@ -1000,16 +1000,21 @@ class DBM_class(object):
 			if subspace == "all":
 				pass
 			else:
+				# get all numbers that are not in subspace
 				subspace_anti = []
 				for i in range(10):
 					if i not in subspace:
 						subspace_anti.append(i)
-				log.out("Setting Weights to 0")
+				
 
+				log.out("Setting Weights to 0")
+				# get the weights as numpy arrays
 				w_ = self.w[-1].eval()
 				b_ = self.bias[-1].eval()
+				# set values to 0
 				w_[:,subspace_anti] = 0
 				b_[subspace_anti] = -10
+				# assign to tf variables
 				sess.run(self.w[-1].assign(w_))
 				sess.run(self.bias[-1].assign(b_))
 
@@ -1221,17 +1226,17 @@ class DBM_class(object):
 N_BATCHES_PRETRAIN = 500 			# how many batches per epoch for pretraining
 N_BATCHES_TRAIN    = 500 			# how many batches per epoch for complete DBM training
 N_EPOCHS_PRETRAIN  = [0,0,0,0,0] 	# pretrain epochs for each RBM
-N_EPOCHS_TRAIN     = 10				# how often to iter through the test images
+N_EPOCHS_TRAIN     = 3				# how often to iter through the test images
 TEST_EVERY_EPOCH   = 2 				# how many epochs to train before testing on the test data
 
 ### learnrates 
 LEARNRATE_PRETRAIN = 0.1		# learnrate for pretraining
-LEARNRATE_START    = 0.01		# starting learnrates
+LEARNRATE_START    = 0.1		# starting learnrates
 LEARNRATE_SLOPE    = 5.0		# bigger number -> smaller slope
 
 ### temperature
-TEMP_START    = 0.1 		# starting temp
-TEMP_SLOPE    = 90.0		# slope of dereasing temp bigger number -> smaller slope
+TEMP_START    = 1 		# starting temp
+TEMP_SLOPE    = 5.0		# slope of dereasing temp bigger number -> smaller slope
 
 
 ### state vars 
@@ -1240,21 +1245,20 @@ DO_TRAINING    = 1		# if to train the whole DBM
 DO_TESTING     = 1		# if testing the DBM with test data
 DO_SHOW_PLOTS  = 1		# if plots will show on display - either way they get saved into saveto_path
 
-DO_CONTEXT    = 0	 	# if to test the context
+DO_CONTEXT    = 1	 	# if to test the context
 DO_GEN_IMAGES = 0	 	# if to generate images (mode can be choosen at function call)
 DO_NOISE_STAB = 0	 	# if to make a noise stability test
 
 
 ### saving and loading 
-DO_SAVE_TO_FILE       = 0 	# if to save plots and data to file
+DO_SAVE_TO_FILE       = 1 	# if to save plots and data to file
 DO_SAVE_PRETRAINED    = 0 	# if to save the pretrained weights seperately (for later use)
-DO_LOAD_FROM_FILE     = 1 	# if to load weights and biases from datadir + pathsuffix
-PATHSUFFIX            = "Sat_Apr_28_20-53-18_2018_[784, 400, 10]"
+DO_LOAD_FROM_FILE     = 0 	# if to load weights and biases from datadir + pathsuffix
+PATHSUFFIX            = "Sun_Apr_29_16-51-36_2018_[784, 10]"
 PATHSUFFIX_PRETRAINED = "Fri_Mar__9_16-46-01_2018"
 
 
 DBM_SHAPE = [	28*28,
-				20*20,
 				10]
 ###########################################################################################################
 
@@ -1344,7 +1348,7 @@ if DO_TESTING:
 		DBM.test(test_data, test_label,
 				N = 40,  # sample ist aus random werten, also mindestens 2 sample machen 
 				M = 20,  # average v. 0->1 sample
-				create_conf_mat = 0)
+				create_conf_mat = 1)
 
 if DO_GEN_IMAGES:
 	with tf.Session() as sess:
@@ -1393,7 +1397,7 @@ if DO_CONTEXT:
 
 		# loop through images from all wrong classsified images and find al images that are <5 
 		index_for_number_gibbs=[]
-		for i in range(18,19):
+		for i in range(10000):
 			## find the digit that was presented
 			digit=np.where(test_label[i])[0][0] 		
 			## set desired digit range
@@ -1607,7 +1611,8 @@ if DO_TRAINING:
 	# plot test errors 
 	plt.figure("test errors")
 	plt.plot(DBM.save_dict["Test_Epoch"],DBM.save_dict["Recon_Error"],label="Recon Error")
-	plt.plot(DBM.save_dict["Test_Epoch"],DBM.save_dict["Class_Error"],label="Class Error")
+	if DBM.classification:
+		plt.plot(DBM.save_dict["Test_Epoch"],DBM.save_dict["Class_Error"],label="Class Error")
 	plt.ylabel("Squared Mean Error")
 	plt.xlabel("Epoch")
 	plt.legend()

@@ -2,7 +2,7 @@ import tensorflow as tf
 import numpy as np
 import numpy.random as rnd
 import os
-from matplotlib.pyplot import savefig
+from matplotlib.pyplot import savefig,matshow,colorbar
 from math import sqrt
 
 
@@ -365,6 +365,8 @@ def split_image(batch,N,overlap):
     # new_batch[:, :, :, 1] = batch[:, s[2]:s[3], s[2]:s[3]]
     # new_batch[:, :, :, 2] = batch[:, s[0]:s[1], s[2]:s[3]]
     # new_batch[:, :, :, 3] = batch[:, s[2]:s[3], s[0]:s[1]]
+    s = new_batch.shape
+    new_batch = new_batch.reshape(s[0],s[1]**2,s[-1])
     return new_batch
 
 
@@ -372,14 +374,85 @@ if __name__ == "__main__":
     import matplotlib.pyplot as plt
     import time
     N = 4
-    img_num = 9921
-    test_img = test_data[1:10000]#np.round(rnd.random([3,784])*0.55)
-    myplot(test_img[img_num])
+    R = 2
+    IMG_NUM = 921
+
+    a = int(sqrt(DBM.SHAPE[0])) ## image sidelength
+    b = int(a/sqrt(N)) ## new img sidelength
+    ind = np.zeros([N,(b+R)**2]).astype(np.int) ## which matrix values (x,y) to set to the weight values for each split
     
-    test_img_new = split_image(test_img,N,2)
-    
-    new_im_shape = test_img_new.shape[2]
+    for s in range(N):
+        m=0
+        if s ==0:
+            for i in range(0,b+R): #row
+                for j in range(i*a,(i*a)+b+R):
+                    ind[s][m] = j
+                    m+=1
+        if s == 1:
+            for i in range(b-R,a): # row
+                for j in range(i*a,(i*a)+b+R):
+                    ind[s][m] = j
+                    m+=1
+        if s == 2:
+            for i in range(0,b+R):
+                for j in range((i*a)+b-R,(i*a)+a): #col
+                    ind[s][m] = j
+                    m+=1
+        if s == 3:
+            for i in range(b-R,a): #row
+                for j in range((i*a)+b-R,(i*a)+a): #col
+                    ind[s][m] = j
+                    m+=1
+
+    # fig,ax = plt.subplots(1,4)
+    # fig_,ax_full = plt.subplots(1,4)
+    w      = np.zeros([4,784,100])
+    w_full = np.zeros([784,100])
+
+    w[0,ind[0],:25]   = DBM.weights[0]
+    w[1,ind[1],25:50] = DBM.weights[0]
+    w[2,ind[2],50:75] = DBM.weights[0]
+    w[3,ind[3],75:]   = DBM.weights[0]
     for i in range(N):
-        plt.matshow(test_img_new[img_num,:,:,i].reshape(new_im_shape,new_im_shape))
-        print("imshape: ",test_img_new[img_num,:,:,i].shape)
+        w_full+=w[i]
+
+    plt.matshow(w_full.T)
+    # h=[[]]*N
+    # v=[[]]*N
+    # h_full=[[]]*N
+    # v_full=[[]]*N
+    # for s in range(N):
+    #     h[s] = np.dot(test_data[0], w[s])
+    #     plt.matshow(h[s].reshape(10,10),vmin=0,vmax=1,cmap="gray")
+        
+    # v[s] = np.dot(h[s], w[s].T)
+    h_full = np.dot(test_data[0], w_full)
+    v_full = np.dot(h_full.flatten(), w_full.T)
+
+    # get a matrix that has the right pattern but with oonly 1 and 0
+    where = np.where(w_full!=0)
+    w_patt = np.copy(w_full)
+    w_patt[where] = 1
+    plt.matshow(w_patt.T)
+    plt.matshow(w_patt[:,0:25].T)
+
+    # ax[s].matshow(v[s].reshape(28,28),cmap="gray")
+    v_full.reshape(28,28)[:,b-R:b+R]*=1/2.
+    v_full.reshape(28,28)[b-R:b+R,:]*=1/2.
+    plt.matshow(v_full.reshape(28,28),cmap="gray")
+
+    plt.matshow(h_full.reshape(10,10),vmin=0,vmax=1,cmap="gray")
+    plt.matshow(test_data[0].reshape(28,28),cmap="gray")
+
+    # test_img = test_data[1:1000]#np.round(rnd.random([3,784])*0.55)
+    # myplot(test_img[IMG_NUM])
+    
+    # test_img_new = split_image(test_img,N,R)
+    # print test_img_new.shape
+
+    # new_im_shape = int(sqrt(test_img_new.shape[1]))
+
+    # for i in range(N):
+    #     plt.matshow(test_img_new[IMG_NUM,:,i].reshape(new_im_shape,new_im_shape))
+    #     plt.plot([2,2],[0,28],"r")
     plt.show()
