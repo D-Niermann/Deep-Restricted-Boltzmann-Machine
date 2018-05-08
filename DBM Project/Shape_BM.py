@@ -241,8 +241,11 @@ class DBM_class(object):
 
 
 		self.train_time     = 0
-		self.epochs         = 0
-
+		self.epochs         = 0 	# epoch counter
+		self.recon_error_train = []
+		self.class_error_train = []
+		self.layer_diversity_ = []
+		self.update = 0 	# update counter
 
 
 		### save dictionary where time series data from test and train is stored
@@ -285,7 +288,7 @@ class DBM_class(object):
 			splitted_shape = int((sqrt(self.SHAPE[i]/N_SPLITS)+PX_OVERHANG)**2)
 
 			if i == 0 and len(self.RBMs)>1:
-				self.RBMs[i] = RBM(splitted_shape, self.SHAPE[i+1]/N_SPLITS, 1, 1, LEARNRATE_PRETRAIN, split = 1 , liveplot = 0)
+				self.RBMs[i] = RBM(splitted_shape, int(self.SHAPE[i+1]/N_SPLITS), 1, 1, LEARNRATE_PRETRAIN, split = 1 , liveplot = 0)
 				log.out("2, 1")
 
 			elif i==len(self.RBMs)-1 and len(self.RBMs)>1:
@@ -433,7 +436,7 @@ class DBM_class(object):
 				n_ = sd["Freerun_Steps"].values[[sd["Freerun_Steps"].notna()]]
 
 				freerun_steps = n_[-1]
-				temp = n_[-1]
+				temp = t_[-1]
 				learnrate = l_[-1]
 
 				log.info("l = ",learnrate)
@@ -567,13 +570,13 @@ class DBM_class(object):
 		w_patt_partial = np.zeros([4,self.SHAPE[0],self.SHAPE[1]])
 		w_full         = np.zeros([self.SHAPE[0],self.SHAPE[1]])
 		intervall      = self.SHAPE[1]/N
-		beg            = 0
-		end            = beg+intervall
+		beg            = int(0)
+		end            = int(beg+intervall)
 
 		for s in range(N):
 			w_patt_partial[s,ind[s],beg:end] = DBM.weights[0]
-			beg += intervall
-			end  = beg+intervall
+			beg += int(intervall)
+			end  = int(beg+intervall)
 
 		for i in range(N):
 		    w_full += w_patt_partial[i]
@@ -648,6 +651,7 @@ class DBM_class(object):
 		self.update_l_p        = [None]*self.n_layers # assign op. for calculated probs
 		self.layer_activities  = [None]*self.n_layers # calc for layer activieties (mean over batch)
 		self.layer_energy      = [None]*(self.n_layers-1)
+		self.layer_diversity   = [None]*self.n_layers # measure how diverse each layer is in the batch 
 
 		### layer vars 
 		for i in range(len(self.layer)):
@@ -691,6 +695,7 @@ class DBM_class(object):
 			self.layer_samp[i]       = self.sample(self.layer_prob[i])
 			self.update_l_p[i]       = self.layer[i].assign(self.layer_prob[i])
 			self.layer_activities[i] = tf.reduce_sum(self.layer[i])/(self.batchsize*self.SHAPE[i])*100
+			self.layer_diversity[i]  = tf.reduce_mean(tf.abs(self.layer[i] - tf.reduce_mean(self.layer[i], axis=0)))
 
 		for i in range(len(self.layer)-1):
 			self.layer_energy[i] = tf.matmul(self.layer[i], tf.matmul(self.w[i],self.layer[i+1],transpose_b=True))
@@ -705,7 +710,6 @@ class DBM_class(object):
 		self.class_error = tf.reduce_mean(tf.square(self.layer_ph[-1]-self.layer[-1]))
 
 		self.h1_sum    = tf.reduce_sum(self.layer[1])
-		# self.h2_sum    = tf.reduce_sum(self.layer[2])
 		self.label_sum = tf.reduce_sum(self.layer[-1])
 
 		self.free_energy = -tf.reduce_sum(tf.log(1+tf.exp(tf.matmul(self.layer[0],self.w[0])+self.bias[1])))
@@ -811,12 +815,12 @@ class DBM_class(object):
 		part_w = [None]*N_SPLITS
 		for start, end in zip( range(0, len(train_data), self.batchsize), range(self.batchsize, len(train_data), self.batchsize)):
 			# define a batch
-			self.batch  = train_data[start:end]
+			batch  = train_data[start:end]
 			batch_label = train_label[start:end]
 
 			#### Clamped Run 
-			# assign v and h2 to the self.batch data
-			sess.run(self.assign_l[0], { self.layer_ph[0]  : self.batch })
+			# assign v and h2 to the batch data
+			sess.run(self.assign_l[0], { self.layer_ph[0]  : batch })
 			if self.classification:
 				sess.run(self.assign_l[-1], {self.layer_ph[-1] : batch_label})
 
@@ -834,6 +838,7 @@ class DBM_class(object):
 			# update the positive gradients
 			sess.run(self.update_pos_grad)
 
+			self.layer_diversity_.append(sess.run(self.layer_diversity))
 
 
 			#### Free Running 
@@ -845,6 +850,12 @@ class DBM_class(object):
 			# calc he negatie gradients
 			sess.run(self.update_neg_grad)
 
+
+			### calc errors and stuff
+			self.recon_error_train.append(sess.run(self.error,{self.layer_ph[0] : batch}))
+			if self.classification:
+				self.class_error_train.append(sess.run(self.class_error,{self.layer_ph[-1] : batch_label}))
+			
 
 			#### run all parameter updates 
 			## update the CD matrix for W1 and average over the N_SPLIT partial weights
@@ -866,15 +877,9 @@ class DBM_class(object):
 			sess.run([self.update_w[1:], self.update_bias], {self.learnrate : learnrate})
 
 
-			#### calculate free energy for test and train data
-			# self.F.append(self.free_energy.eval({self.v:self.batch}))
-			# f_test_ = self.free_energy.eval({self.v:test_data[0:self.batchsize]})
-			# for i in range(1,10):
-			# 	f_test_ += self.free_energy.eval({self.v:test_data[i*self.batchsize:i*self.batchsize+self.batchsize]})
-			# f_test_*=1./10
-			# self.F_test.append(f_test_)
-
 			self.l_mean += sess.run(self.layer_activities)
+
+			self.update += 1
 
 			### liveplot
 			if self.liveplot and plt.fignum_exists(fig.number) and start%40==0:
@@ -889,9 +894,12 @@ class DBM_class(object):
 		
 		log.end() #ending the epoch
 
+		# average layer activities over epochs 
+		self.l_mean *= 1.0/num_batches
+
 		### write vars into savedict
 		self.update_savedict("training")
-		self.l_mean[:] = 0
+
 
 		# increase epoch counter
 		self.epochs += 1 
@@ -908,8 +916,7 @@ class DBM_class(object):
 		log.info("freerun_steps: ",freerun_steps)
 		freerun_steps = self.get_N(self.epochs)
 
-		# average layer activities over epochs 
-		self.l_mean *= 1.0/num_batches
+		self.l_mean[:] = 0
 
 		self.export()
 
@@ -1312,10 +1319,10 @@ class DBM_class(object):
 #### User Settings ###
 
 N_BATCHES_PRETRAIN = 500 			# how many batches per epoch for pretraining
-N_BATCHES_TRAIN    = 200 			# how many batches per epoch for complete DBM training
+N_BATCHES_TRAIN    = 500 			# how many batches per epoch for complete DBM training
 N_EPOCHS_PRETRAIN  = [0,0,0,0,0] 	# pretrain epochs for each RBM
-N_EPOCHS_TRAIN     = 4				# how often to iter through the test images
-TEST_EVERY_EPOCH   = 5 			    # how many epochs to train before testing on the test data
+N_EPOCHS_TRAIN     = 10				# how often to iter through the test images
+TEST_EVERY_EPOCH   = 2 			    # how many epochs to train before testing on the test data
 
 ### Shape BM Params
 N_SPLITS = 4
@@ -1332,19 +1339,19 @@ TEMP_SLOPE    = 90.0		# slope of dereasing temp bigger number -> smaller slope
 
 
 ### state vars 
-DO_PRETRAINING = 0		# if no pretrain then files are automatically loaded
+DO_PRETRAINING = 1		# if no pretrain then files are automatically loaded
 DO_TRAINING    = 1		# if to train the whole DBM
 DO_TESTING     = 1		# if testing the DBM with test data
 DO_SHOW_PLOTS  = 1		# if plots will show on display - either way they get saved into saveto_path
 
-DO_CONTEXT    = 0	 	# if to test the context
-DO_GEN_IMAGES = 0	 	# if to generate images (mode can be choosen at function call)
-DO_NOISE_STAB = 0	 	# if to make a noise stability test
+DO_CONTEXT    = 0		# if to test the context
+DO_GEN_IMAGES = 0		# if to generate images (mode can be choosen at function call)
+DO_NOISE_STAB = 0		# if to make a noise stability test
 
 
 ### saving and loading 
 DO_SAVE_TO_FILE       = 0 	# if to save plots and data to file
-DO_SAVE_PRETRAINED    = 1 	# if to save the pretrained weights seperately (for later use)
+DO_SAVE_PRETRAINED    = 0 	# if to save the pretrained weights seperately (for later use)
 DO_LOAD_FROM_FILE     = 0 	# if to load weights and biases from datadir + pathsuffix
 PATHSUFFIX            = "Sat_Apr_28_20-53-18_2018_[784, 400, 10]"
 PATHSUFFIX_PRETRAINED = "Mon_May__7_11-41-34_2018"
@@ -1352,11 +1359,12 @@ PATHSUFFIX_PRETRAINED = "Mon_May__7_11-41-34_2018"
 
 DBM_SHAPE = [	28*28,
 				10*10,
-				7*7]
+				10*10,
+				]
 ###########################################################################################################
 
 ### globals (to be set as DBM self values)
-freerun_steps = 2 					# global number of freerun steps for training
+freerun_steps = 5 					# global number of freerun steps for training
 learnrate     = LEARNRATE_START		# global learnrate
 temp          = TEMP_START			# global temp state
 
@@ -1664,6 +1672,24 @@ if DO_TRAINING:
 	plt.title("W %i"%0)
 	save_fig(saveto_path+"/weights_img.png", DO_SAVE_TO_FILE)
 
+	# plot layer diversity
+	plt.figure("Layer diversity")
+	for i in range(DBM.n_layers):
+		plt.plot(smooth(np.array(DBM.layer_diversity_)[::10,i],10),label="Layer %i"%i)
+		plt.legend()
+	plt.xlabel("Update Number")
+	plt.ylabel("Deviation")
+	save_fig(saveto_path+"/layer_diversity.png", DO_SAVE_TO_FILE)	
+
+	plt.figure("Train Errors")
+	plt.plot(DBM.recon_error_train[::10],"k-",label="Recon Error Train")
+	if DBM.classification:
+		plt.plot(DBM.class_error_train[::10],"k--",label="Class Error Train")
+	plt.legend()
+	plt.xlabel("Update Number")
+	plt.ylabel("Mean Square Error")
+	save_fig(saveto_path+"/train_errors.png", DO_SAVE_TO_FILE)
+
 
 	# plot all other weights as hists
 	n_weights=DBM.n_layers-1
@@ -1702,6 +1728,7 @@ if DO_TRAINING:
 		for i in range(DBM.n_layers):
 			plt.plot(DBM.layer_act[:,i],label="Layer %i"%i)
 		plt.legend()
+
 
 	# plot test errors 
 	plt.figure("test errors")

@@ -410,7 +410,7 @@ class DBM_class(object):
 				n_ = sd["Freerun_Steps"].values[[sd["Freerun_Steps"].notna()]]
 
 				freerun_steps = n_[-1]
-				temp = n_[-1]
+				temp = t_[-1]
 				learnrate = l_[-1]
 
 				log.info("l = ",learnrate)
