@@ -1337,7 +1337,7 @@ class DBM_class(object):
 N_BATCHES_PRETRAIN = 200			# how many batches per epoch for pretraining
 N_BATCHES_TRAIN    = 200			# how many batches per epoch for complete DBM training
 N_EPOCHS_PRETRAIN  = [0,0,0,0,0] 	# pretrain epochs for each RBM
-N_EPOCHS_TRAIN     = 3				# how often to iter through the test images
+N_EPOCHS_TRAIN     = 1				# how often to iter through the test images
 TEST_EVERY_EPOCH   = 2 			    # how many epochs to train before testing on the test data
 
 ### Shape BM Params
@@ -1366,9 +1366,9 @@ DO_NOISE_STAB = 0		# if to make a noise stability test
 
 
 ### saving and loading 
-DO_SAVE_TO_FILE       = 0 	# if to save plots and data to file
+DO_SAVE_TO_FILE       = 1 	# if to save plots and data to file
 DO_SAVE_PRETRAINED    = 0 	# if to save the pretrained weights seperately (for later use)
-DO_LOAD_FROM_FILE     = 1 	# if to load weights and biases from datadir + pathsuffix
+DO_LOAD_FROM_FILE     = 0 	# if to load weights and biases from datadir + pathsuffix
 PATHSUFFIX            = "Mon_May_14_09-33-58_2018_[784, 144, 49, 10]"
 PATHSUFFIX_PRETRAINED = "Mon_May__7_11-41-34_2018"
 
@@ -1689,7 +1689,7 @@ if DO_TRAINING:
 	plt.colorbar(map1)
 	plt.grid(False)
 	plt.title("W %i"%0)
-	save_fig(saveto_path+"/weights_img.png", DO_SAVE_TO_FILE)
+	save_fig(saveto_path+"/weights_img.pdf", DO_SAVE_TO_FILE)
 
 	# plot layer diversity
 	plt.figure("Layer diversity")
@@ -1698,7 +1698,7 @@ if DO_TRAINING:
 		plt.legend()
 	plt.xlabel("Update Number")
 	plt.ylabel("Deviation")
-	save_fig(saveto_path+"/layer_diversity.png", DO_SAVE_TO_FILE)	
+	save_fig(saveto_path+"/layer_diversity.pdf", DO_SAVE_TO_FILE)	
 
 	plt.figure("Errors")
 	## train errors
@@ -1715,7 +1715,7 @@ if DO_TRAINING:
 	plt.legend(loc="best")
 	plt.xlabel("Update Number")
 	plt.ylabel("Mean Square Error")
-	save_fig(saveto_path+"/errors.png", DO_SAVE_TO_FILE)
+	save_fig(saveto_path+"/errors.pdf", DO_SAVE_TO_FILE)
 
 
 	# plot all other weights as hists
@@ -1736,7 +1736,7 @@ if DO_TRAINING:
 		except:
 			pass
 	plt.tight_layout()
-	save_fig(saveto_path+"/weights_hist.png", DO_SAVE_TO_FILE)
+	save_fig(saveto_path+"/weights_hist.pdf", DO_SAVE_TO_FILE)
 
 
 	try:
@@ -1745,7 +1745,7 @@ if DO_TRAINING:
 		plt.matshow(tile(DBM.w_np[0]-DBM.w_np_old[0]),fignum=fig.number)
 		plt.colorbar()
 		plt.title("Change in W1")
-		save_fig(saveto_path+"/weights_change.png", DO_SAVE_TO_FILE)
+		save_fig(saveto_path+"/weights_change.pdf", DO_SAVE_TO_FILE)
 	except:
 		plt.close(fig)
 
@@ -1770,7 +1770,7 @@ if DO_TRAINING:
 	plt.subplots_adjust(left=None, bottom=None, right=0.73, top=None,
 	            wspace=None, hspace=None)
 	ax[1].set_xticks(range(0,DBM.epochs,2))
-	save_fig(saveto_path+"/learnr-temp.png", DO_SAVE_TO_FILE)
+	save_fig(saveto_path+"/learnr-temp.pdf", DO_SAVE_TO_FILE)
 
 
 plt.figure("Layer_activiations_test_run")
@@ -1812,7 +1812,7 @@ for i in range(13):
 	# ax3[5][i].matshow(DBM.rec_h1[i:i+1].reshape(int(sqrt(DBM.SHAPE[1])),int(sqrt(DBM.SHAPE[1]))))
 	# plt.matshow(random_recon.reshape(int(sqrt(DBM.SHAPE[0])),int(sqrt(DBM.SHAPE[0]))))
 plt.tight_layout(pad=0.0)
-save_fig(saveto_path+"/examples.png", DO_SAVE_TO_FILE)
+save_fig(saveto_path+"/examples.pdf", DO_SAVE_TO_FILE)
 
 
 #plot only one digit
