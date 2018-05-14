@@ -68,39 +68,49 @@ time_now = time_now.replace(":", "-")
 time_now = time_now.replace(" ", "_")
 
 #### Load T Data 
+LOAD_MNIST = 1
+LOAD_HORSES = 0
 if "train_data" not in globals():
-	log.out("Loading Data")
-	mnist = input_data.read_data_sets("MNIST_data/", one_hot=True)
-	train_data, train_label, test_data, test_label = mnist.train.images, mnist.train.labels, mnist.test.images, mnist.test.labels
-	#get test data of only one number class:
-	index_for_number_test  = np.zeros([10,1200])
-	where = np.zeros(10).astype(np.int)
-	index_for_number_train = []
-	for i in range(len(test_label)):
-		for digit in range(10):
-			d_array = np.zeros(10)
-			d_array[digit] = 1
-			if (test_label[i]==d_array).sum()==10:
-				index_for_number_test[digit][where[digit]]=i
-				where[digit]+=1
-	index_for_number_test = index_for_number_test.astype(np.int)
+	if LOAD_MNIST:
+		log.out("Loading MNIST Data")
+		mnist = input_data.read_data_sets("MNIST_data/", one_hot=True)
+		train_data, train_label, test_data, test_label = mnist.train.images, mnist.train.labels, mnist.test.images, mnist.test.labels
+		#get test data of only one number class:
+		index_for_number_test  = np.zeros([10,1200])
+		where = np.zeros(10).astype(np.int)
+		index_for_number_train = []
+		for i in range(len(test_label)):
+			for digit in range(10):
+				d_array = np.zeros(10)
+				d_array[digit] = 1
+				if (test_label[i]==d_array).sum()==10:
+					index_for_number_test[digit][where[digit]]=i
+					where[digit]+=1
+		index_for_number_test = index_for_number_test.astype(np.int)
 
-	for i in range(len(train_label)):
-		if (train_label[i]==[0,0,0,1,0,0,0,0,0,0]).sum()==10:
-			index_for_number_train.append(i)
+		for i in range(len(train_label)):
+			if (train_label[i]==[0,0,0,1,0,0,0,0,0,0]).sum()==10:
+				index_for_number_train.append(i)
 
-	# prepare  data for using on next RBM
-	if 0:
-		log.out("Making data for RBM")
-		# where the weights of the beforehand trained RBM are stored
-		bottom_w_file = "/Users/Niermann/Google Drive/Masterarbeit/Python/DBM Project/data/Sun_Apr__1_17-26-14_2018_[400, 100]/w0.txt"
-		# where the bias of the beforehand trained RBM are stored (h layer)
-		bottom_b_file = "/Users/Niermann/Google Drive/Masterarbeit/Python/DBM Project/data/Sun_Apr__1_17-26-14_2018_[400, 100]/bias1.txt"
-		w_of_bottom_rbm = np.loadtxt(bottom_w_file)
-		b_of_bottom_rbm = np.loadtxt(bottom_b_file)
-		train_data = sigmoid_np(np.dot(train_data, w_of_bottom_rbm)+b_of_bottom_rbm,0.05)
-		test_data = sigmoid_np(np.dot(test_data, w_of_bottom_rbm)+b_of_bottom_rbm,0.05)
-	
+	if LOAD_HORSES:
+		log.out("Loading HORSE Data")
+		data_dir   = "/Users/Niermann/Google Drive/Masterarbeit/Python/DBM Project/Horse_data_rescaled/"
+		files      = os.listdir(data_dir)
+		train_data = np.zeros([len(files)-50,64**2])
+		test_data  = np.zeros([50,64**2])
+
+		from PIL import Image
+		for i,f in enumerate(files):
+			if f[-4:]==".jpg":
+				img_data = np.array(Image.open(data_dir+f)).flatten()/255.
+				if i < train_data.shape[0]:
+					train_data[i] = img_data
+				else:
+					test_data[i-train_data.shape[0]] = img_data
+			else:
+				log.info("Skipped %s"%f)
+				
+
 
 #### Get the arguments list from terminal
 additional_args=sys.argv[1:]
@@ -261,6 +271,7 @@ class DBM_class(object):
 			self.save_dict["W_mean_%i"%i] = []
 		for i in range(self.n_layers):
 			self.save_dict["Layer_Activity_%i"%i] = []
+			self.save_dict["Layer_Diversity_%i"%i] = []
 
 		### log list where all constants are saved
 		self.log_list =	[["SHAPE",                self.SHAPE],
@@ -300,7 +311,7 @@ class DBM_class(object):
 					self.RBMs[i] = RBM(splitted_shape, self.SHAPE[i+1]/N_SPLITS, 1, 1, LEARNRATE_PRETRAIN, split = 1)
 					log.out("1, 1")
 				else:
-					self.RBMs[i] = RBM(self.SHAPE[i], self.SHAPE[i+1], 2, 2, LEARNRATE_PRETRAIN)
+					self.RBMs[i] = RBM(self.SHAPE[i], self.SHAPE[i+1], 1, 1, LEARNRATE_PRETRAIN)
 					log.out("2, 2")
 
 	def pretrain(self):
@@ -316,7 +327,7 @@ class DBM_class(object):
 					fig,ax=plt.subplots(1,1,figsize=(15,10))
 					break
 
-		batchsize_pretrain = int(55000/N_BATCHES_PRETRAIN)
+		batchsize_pretrain = int(len(train_data)/N_BATCHES_PRETRAIN)
 
 		with tf.Session() as sess:
 			# train session - v has batchsize length
@@ -346,6 +357,7 @@ class DBM_class(object):
 							
 							elif RBM.split == 1:
 								# go through all splitted parts of the img
+
 								for split in range(N_SPLITS):
 									## define splitted batch
 									batch = train_data_split[start:end,:,split]
@@ -402,7 +414,8 @@ class DBM_class(object):
 					self.biases = []
 					log.out("Loading from file")
 					for i in range(self.n_layers-1):
-						self.weights.append(np.loadtxt(data_dir+"/"+PATHSUFFIX+"/"+"w%i.txt"%(i)).astype(np.float32))
+						w_loaded = np.loadtxt(data_dir+"/"+PATHSUFFIX+"/"+"w%i.txt"%(i)).astype(np.float32)
+						self.weights.append(w_loaded)
 					for i in range(self.n_layers):
 						self.biases.append(np.loadtxt(data_dir+"/"+PATHSUFFIX+"/"+"bias%i.txt"%(i)).astype(np.float32))
 
@@ -505,7 +518,7 @@ class DBM_class(object):
 		return T
 
 	def get_N(self,epoch):
-		N=2
+		N = 5
 
 		return N
 
@@ -523,6 +536,7 @@ class DBM_class(object):
 
 			for i in range(self.n_layers):
 				self.save_dict["Layer_Activity_%i"%i].append(self.l_mean[i])
+				self.save_dict["Layer_Diversity_%i"%i].append(self.layer_diversity_[-1][i])
 
 		if mode == "testing":
 
@@ -764,7 +778,7 @@ class DBM_class(object):
 		num_batches :: how many batches
 		"""
 		######## init all vars for training
-		self.batchsize = int(55000/num_batches)
+		self.batchsize = int(len(train_data)/num_batches)
 		self.num_of_updates = N_EPOCHS_TRAIN*num_batches
 
 
@@ -807,7 +821,8 @@ class DBM_class(object):
 		log.out("Shuffling TrainData")
 		self.seed   = rnd.randint(len(train_data),size=(int(len(train_data)/10),2))
 		train_data  = shuffle(train_data, self.seed)
-		train_label = shuffle(train_label, self.seed)
+		if self.classification:
+			train_label = shuffle(train_label, self.seed)
 
 		log.out("Running Batch")
 		# log.info("++ Using Weight Decay! Not updating bias! ++")
@@ -816,7 +831,8 @@ class DBM_class(object):
 		for start, end in zip( range(0, len(train_data), self.batchsize), range(self.batchsize, len(train_data), self.batchsize)):
 			# define a batch
 			batch  = train_data[start:end]
-			batch_label = train_label[start:end]
+			if self.classification:
+				batch_label = train_label[start:end]
 
 			#### Clamped Run 
 			# assign v and h2 to the batch data
@@ -951,7 +967,7 @@ class DBM_class(object):
 		log.start("Testing DBM with %i images"%self.batchsize)
 
 		#### give input to v layer
-		sess.run(self.assign_l[0], {self.layer_ph[0] : my_test_data, self.temp_tf : temp})
+		sess.run(self.assign_l[0], {self.layer_ph[0] : my_test_data})
 
 		#### update hidden and label N times
 		log.out("Sampling hidden %i times "%N)
@@ -960,9 +976,9 @@ class DBM_class(object):
 		
 		for n in range(N):
 			self.layer_act[n,:] = sess.run(self.layer_activities, {self.temp_tf : temp})
-			self.hidden_save    = sess.run([self.update_l_p[i] for i in range(1,self.n_layers)], {self.temp_tf : temp})
-			sess.run(self.update_l_p[1:],{self.temp_tf : temp})
-			# self.save_h1.append(self.layer[1].eval()[0])
+			self.hidden_save    = sess.run(self.update_l_s[1:], {self.temp_tf : temp})
+		sess.run(self.update_l_p[1:],{self.temp_tf : temp})
+		# self.save_h1.append(self.layer[1].eval()[0])
 		
 
 		
@@ -1179,10 +1195,10 @@ class DBM_class(object):
 		
 		if mode=="freerunning":
 			sess.run(self.assign_l_rand)
-			rng  =  rnd.randint(100)
-			sess.run(self.assign_l[0], {self.layer_ph[0] : test_data[rng:rng+1]})
-			for i in range(10):
-				sess.run(self.update_l_s[1:],{self.temp_tf : temp})
+			# rng  =  rnd.randint(100)
+			# sess.run(self.assign_l[0], {self.layer_ph[0] : test_data[rng:rng+1]})
+			# for i in range(10):
+			# 	sess.run(self.update_l_s[1:],{self.temp_tf : temp})
 
 			for step in range(gibbs_steps):
 				
@@ -1318,15 +1334,15 @@ class DBM_class(object):
 ###########################################################################################################
 #### User Settings ###
 
-N_BATCHES_PRETRAIN = 500 			# how many batches per epoch for pretraining
-N_BATCHES_TRAIN    = 500 			# how many batches per epoch for complete DBM training
+N_BATCHES_PRETRAIN = 200			# how many batches per epoch for pretraining
+N_BATCHES_TRAIN    = 200			# how many batches per epoch for complete DBM training
 N_EPOCHS_PRETRAIN  = [0,0,0,0,0] 	# pretrain epochs for each RBM
-N_EPOCHS_TRAIN     = 10				# how often to iter through the test images
+N_EPOCHS_TRAIN     = 3				# how often to iter through the test images
 TEST_EVERY_EPOCH   = 2 			    # how many epochs to train before testing on the test data
 
 ### Shape BM Params
-N_SPLITS = 4
-PX_OVERHANG  = 2
+N_SPLITS    = 4
+PX_OVERHANG = 2
 
 ### learnrates 
 LEARNRATE_PRETRAIN = 0.05		# learnrate for pretraining
@@ -1352,14 +1368,15 @@ DO_NOISE_STAB = 0		# if to make a noise stability test
 ### saving and loading 
 DO_SAVE_TO_FILE       = 0 	# if to save plots and data to file
 DO_SAVE_PRETRAINED    = 0 	# if to save the pretrained weights seperately (for later use)
-DO_LOAD_FROM_FILE     = 0 	# if to load weights and biases from datadir + pathsuffix
-PATHSUFFIX            = "Sat_Apr_28_20-53-18_2018_[784, 400, 10]"
+DO_LOAD_FROM_FILE     = 1 	# if to load weights and biases from datadir + pathsuffix
+PATHSUFFIX            = "Mon_May_14_09-33-58_2018_[784, 144, 49, 10]"
 PATHSUFFIX_PRETRAINED = "Mon_May__7_11-41-34_2018"
 
 
-DBM_SHAPE = [	28*28,
-				10*10,
-				10*10,
+DBM_SHAPE = [	int(sqrt(test_data.shape[1]))*int(sqrt(test_data.shape[1])),
+				12*12,
+				7*7,
+				10
 				]
 ###########################################################################################################
 
@@ -1397,7 +1414,7 @@ test_data_split  = split_image(test_data,N_SPLITS,PX_OVERHANG)
 ######### DBM #############################################################################################
 DBM = DBM_class(	shape = DBM_SHAPE,
 					liveplot = 0, 
-					classification = 0)
+					classification = 1)
 
 ###########################################################################################################
 #### Sessions ####
@@ -1420,7 +1437,7 @@ if DO_TRAINING:
 
 			# start a train epoch 
 			DBM.train(	train_data  = train_data,
-						train_label = train_label,
+						train_label = train_label if LOAD_MNIST else None,
 						num_batches = N_BATCHES_TRAIN,
 						cont        = run)
 
@@ -1429,7 +1446,7 @@ if DO_TRAINING:
 				# wrong_classified_id = np.loadtxt("wrongs.txt").astype(np.int)
 				# DBM.test(train_data[:1000], train_label[:1000], 50, 10)
 
-				DBM.test(test_data, test_label,
+				DBM.test(test_data, test_label if LOAD_MNIST else None,
 						N = 10,  # sample ist aus random werten, also mindestens 2 sample machen 
 						M = 10,  # average v
 						create_conf_mat = 0)
@@ -1448,8 +1465,8 @@ if DO_TRAINING:
 # last test session
 if DO_TESTING:
 	with tf.Session() as sess:
-		DBM.test(test_data, test_label,
-				N = 40,  # sample ist aus random werten, also mindestens 2 sample machen 
+		DBM.test(test_data, test_label if LOAD_MNIST else None,
+				N = 100,  # sample ist aus random werten, also mindestens 2 sample machen 
 				M = 20,  # average v. 0->1 sample
 				create_conf_mat = 0)
 
@@ -1463,17 +1480,19 @@ if DO_GEN_IMAGES:
 		DBM.graph_init("gibbs")
 		DBM.import_()
 
+		## grid with nn^2 plots
+		NN = 1
 
-		nn=5 ## grid with nn^2 plots
-		fig,ax = plt.subplots(nn,nn)
+
+		fig,ax = plt.subplots(NN,NN)
 		m=0
-		for i in range(nn):
-			for j in range(nn):
-				generated_img = DBM.gibbs_sampling([[0,0,1.5,0,0,0,0,0,0,0]], 500, 0.1 , 0.1, 
+		for i in range(NN):
+			for j in range(NN):
+				generated_img = DBM.gibbs_sampling([[0,0,1.5,0,0,0,0,0,0,0]], 500, 0.1 , 0.01, 
 							mode     = "freerunning",
 							subspace = [],
-							liveplot = 0)
-				ax[i,j].matshow(generated_img.reshape(28, 28))
+							liveplot = 1)
+				ax[i,j].matshow(generated_img.reshape(int(sqrt(DBM.shape[0])), int(sqrt(DBM.shape[0]))))
 				ax[i,j].set_xticks([])
 				ax[i,j].set_yticks([])
 				ax[i,j].grid(False)
@@ -1675,20 +1694,28 @@ if DO_TRAINING:
 	# plot layer diversity
 	plt.figure("Layer diversity")
 	for i in range(DBM.n_layers):
-		plt.plot(smooth(np.array(DBM.layer_diversity_)[::10,i],10),label="Layer %i"%i)
+		plt.plot(smooth(np.array(DBM.layer_diversity_)[::2,i],10),label="Layer %i"%i)
 		plt.legend()
 	plt.xlabel("Update Number")
 	plt.ylabel("Deviation")
 	save_fig(saveto_path+"/layer_diversity.png", DO_SAVE_TO_FILE)	
 
-	plt.figure("Train Errors")
-	plt.plot(DBM.recon_error_train[::10],"k-",label="Recon Error Train")
+	plt.figure("Errors")
+	## train errors
+	plt.plot(DBM.recon_error_train[:],"-",label="Recon Error Train")
 	if DBM.classification:
-		plt.plot(DBM.class_error_train[::10],"k--",label="Class Error Train")
-	plt.legend()
+		plt.plot(DBM.class_error_train[:],"-",label="Class Error Train")
+	## test errors
+	# calc number of updates per epoch
+	n_u_p_e = len(DBM.recon_error_train) / DBM.epochs
+	x = np.array(DBM.save_dict["Test_Epoch"])*n_u_p_e
+	plt.plot(x,DBM.save_dict["Recon_Error"],"o--",label="Recon Error Test")
+	if DBM.classification:
+		plt.plot(x,DBM.save_dict["Class_Error"],"o--",label="Class Error Test")
+	plt.legend(loc="best")
 	plt.xlabel("Update Number")
 	plt.ylabel("Mean Square Error")
-	save_fig(saveto_path+"/train_errors.png", DO_SAVE_TO_FILE)
+	save_fig(saveto_path+"/errors.png", DO_SAVE_TO_FILE)
 
 
 	# plot all other weights as hists
@@ -1722,131 +1749,104 @@ if DO_TRAINING:
 	except:
 		plt.close(fig)
 
-	# plot the layer_act for 100 pictures
-	if DO_TESTING:
-		plt.figure("Layer_activiations_test_run")
-		for i in range(DBM.n_layers):
-			plt.plot(DBM.layer_act[:,i],label="Layer %i"%i)
-		plt.legend()
 
 
-	# plot test errors 
-	plt.figure("test errors")
-	plt.plot(DBM.save_dict["Test_Epoch"],DBM.save_dict["Recon_Error"],label="Recon Error")
-	if DBM.classification:
-		plt.plot(DBM.save_dict["Test_Epoch"],DBM.save_dict["Class_Error"],label="Class Error")
-	plt.ylabel("Squared Mean Error")
-	plt.xlabel("Epoch")
-	plt.legend()
-	save_fig(saveto_path+"/errors.png", DO_SAVE_TO_FILE)
+	fig,ax = plt.subplots(3,1,sharex="col")
+
+	ax[0].plot(DBM.save_dict["Temperature"],label="Temperature")
+	ax[0].legend(loc="center left",bbox_to_anchor = (1.0,0.5))
+
+	ax[0].set_ylabel("Temperature")
+
+	ax[1].plot(DBM.save_dict["Learnrate"],label="Learnrate")
+	ax[1].legend(loc="center left",bbox_to_anchor = (1.0,0.5))
+	ax[1].set_ylabel("Learnrate")
+
+	ax[2].set_ylabel("Weights Mean")
+	for i in range(len(DBM.SHAPE)-1):
+		ax[2].plot(DBM.save_dict["W_mean_%i"%i],label="Weight %i"%i)
+	ax[2].legend(loc="center left",bbox_to_anchor = (1.0,0.5))
+	ax[2].set_xlabel("Epoch")
+	plt.subplots_adjust(left=None, bottom=None, right=0.73, top=None,
+	            wspace=None, hspace=None)
+	ax[1].set_xticks(range(0,DBM.epochs,2))
+	save_fig(saveto_path+"/learnr-temp.png", DO_SAVE_TO_FILE)
 
 
-	# # timeline
-	# fig,ax=plt.subplots(2,len(DBM.image_timeline),figsize=(17,6))
-	# plt.tight_layout()
-	# for i in range(len(DBM.image_timeline)):
-	# 	ax[0][i].matshow((DBM.image_timeline[i]).reshape(int(sqrt(DBM.SHAPE[0])),int(sqrt(DBM.SHAPE[0]))))
-	# 	# ax[1][i].matshow((DBM.save_h1[i*2]).reshape(int(sqrt(DBM.SHAPE[1])),int(sqrt(DBM.SHAPE[1]))))
-	# 	ax[0][i].set_title(str(i))
-	# 	ax[0][i].set_xticks([])
-	# 	ax[0][i].set_yticks([])
-	# 	ax[1][i].set_xticks([])
-	# 	ax[1][i].set_yticks([])
-	# 	ax[0][i].grid(False)
+plt.figure("Layer_activiations_test_run")
+for i in range(DBM.n_layers):
+	plt.plot(DBM.layer_act[:,i],label="Layer %i"%i)
+plt.legend()
+
+#plot some samples from the testdata 
+fig3,ax3 = plt.subplots(len(DBM.SHAPE)+1,13,figsize=(16,4),sharey="row")
+for i in range(13):
+	# plot the input
+	ax3[0][i].matshow(test_data[i:i+1].reshape(int(sqrt(DBM.SHAPE[0])),int(sqrt(DBM.SHAPE[0]))))
+	ax3[0][i].set_yticks([])
+	ax3[0][i].set_xticks([])
+	# plot the reconstructed image		
+	ax3[1][i].matshow(DBM.probs[i:i+1].reshape(int(sqrt(DBM.SHAPE[0])),int(sqrt(DBM.SHAPE[0]))))
+	ax3[1][i].set_yticks([])
+	ax3[1][i].set_xticks([])
+	
+	#plot all layers that can get imaged
+	for layer in range(len(DBM.SHAPE)-1):
+		try:
+			ax3[layer+2][i].matshow(DBM.hidden_save[layer][i:i+1].reshape(int(sqrt(DBM.SHAPE[layer+1])),int(sqrt(DBM.SHAPE[layer+1]))))
+			ax3[layer+2][i].set_yticks([])
+			ax3[layer+2][i].set_xticks([])
+		except:
+			pass
+	# plot the last layer 	
+	if DBM.classification:	
+		ax3[-1][i].bar(range(DBM.SHAPE[-1]),DBM.last_layer_save[i])
+		ax3[-1][i].set_xticks(range(DBM.SHAPE[-1]))
+		ax3[-1][i].set_ylim(0,1)
+	else:
+		ax3[-1][i].matshow(DBM.last_layer_save[i].reshape(int(sqrt(DBM.SHAPE[-1])),int(sqrt(DBM.SHAPE[-1]))))
+		ax3[-1][i].set_xticks([])
+		ax3[-1][i].set_yticks([])
+
+	#plot the reconstructed layer h1
+	# ax3[5][i].matshow(DBM.rec_h1[i:i+1].reshape(int(sqrt(DBM.SHAPE[1])),int(sqrt(DBM.SHAPE[1]))))
+	# plt.matshow(random_recon.reshape(int(sqrt(DBM.SHAPE[0])),int(sqrt(DBM.SHAPE[0]))))
+plt.tight_layout(pad=0.0)
+save_fig(saveto_path+"/examples.png", DO_SAVE_TO_FILE)
 
 
-
-	if DO_TRAINING:
-		fig,ax = plt.subplots(3,1,sharex="col")
-
-		ax[0].plot(DBM.save_dict["Temperature"],label="Temperature")
-		ax[0].legend(loc="center left",bbox_to_anchor = (1.0,0.5))
-
-		ax[0].set_ylabel("Temperature")
-
-		ax[1].plot(DBM.save_dict["Learnrate"],label="Learnrate")
-		ax[1].legend(loc="center left",bbox_to_anchor = (1.0,0.5))
-		ax[1].set_ylabel("Learnrate")
-
-		ax[2].set_ylabel("Weights Mean")
-		for i in range(len(DBM.SHAPE)-1):
-			ax[2].plot(DBM.save_dict["W_mean_%i"%i],label="Weight %i"%i)
-		ax[2].legend(loc="center left",bbox_to_anchor = (1.0,0.5))
-		ax[2].set_xlabel("Epoch")
-		plt.subplots_adjust(left=None, bottom=None, right=0.73, top=None,
-		            wspace=None, hspace=None)
-		ax[1].set_xticks(range(0,DBM.epochs,2))
-		save_fig(saveto_path+"/learnr-temp.png", DO_SAVE_TO_FILE)
-
-
-	#plot some samples from the testdata 
-	fig3,ax3 = plt.subplots(len(DBM.SHAPE)+1,13,figsize=(16,4),sharey="row")
-	for i in range(13):
-		# plot the input
-		ax3[0][i].matshow(test_data[i:i+1].reshape(int(sqrt(DBM.SHAPE[0])),int(sqrt(DBM.SHAPE[0]))))
-		ax3[0][i].set_yticks([])
-		ax3[0][i].set_xticks([])
-		# plot the reconstructed image		
-		ax3[1][i].matshow(DBM.probs[i:i+1].reshape(int(sqrt(DBM.SHAPE[0])),int(sqrt(DBM.SHAPE[0]))))
-		ax3[1][i].set_yticks([])
-		ax3[1][i].set_xticks([])
-		
-		#plot all layers that can get imaged
-		for layer in range(len(DBM.SHAPE)-1):
-			try:
-				ax3[layer+2][i].matshow(DBM.hidden_save[layer][i:i+1].reshape(int(sqrt(DBM.SHAPE[layer+1])),int(sqrt(DBM.SHAPE[layer+1]))))
-				ax3[layer+2][i].set_yticks([])
-				ax3[layer+2][i].set_xticks([])
-			except:
-				pass
-		# plot the last layer 	
-		if DBM.classification:	
-			ax3[-1][i].bar(range(DBM.SHAPE[-1]),DBM.last_layer_save[i])
-			ax3[-1][i].set_xticks(range(DBM.SHAPE[-1]))
-			ax3[-1][i].set_ylim(0,1)
-		else:
-			ax3[-1][i].matshow(DBM.last_layer_save[i].reshape(int(sqrt(DBM.SHAPE[-1])),int(sqrt(DBM.SHAPE[-1]))))
-			ax3[-1][i].set_xticks([])
-			ax3[-1][i].set_yticks([])
-
-		#plot the reconstructed layer h1
-		# ax3[5][i].matshow(DBM.rec_h1[i:i+1].reshape(int(sqrt(DBM.SHAPE[1])),int(sqrt(DBM.SHAPE[1]))))
-		# plt.matshow(random_recon.reshape(int(sqrt(DBM.SHAPE[0])),int(sqrt(DBM.SHAPE[0]))))
-	plt.tight_layout(pad=0.0)
-	save_fig(saveto_path+"/examples.png", DO_SAVE_TO_FILE)
-
-
-	#plot only one digit
-	fig3,ax3 = plt.subplots(len(DBM.SHAPE)+1,10,figsize=(16,4),sharey="row")
-	m=0
-	for i in index_for_number_test.astype(np.int)[8][0:10]:
-		# plot the input
-		ax3[0][m].matshow(test_data[i:i+1].reshape(int(sqrt(DBM.SHAPE[0])),int(sqrt(DBM.SHAPE[0]))))
-		ax3[0][m].set_yticks([])
-		ax3[0][m].set_xticks([])
-		# plot the reconstructed image		
-		ax3[1][m].matshow(DBM.probs[i:i+1].reshape(int(sqrt(DBM.SHAPE[0])),int(sqrt(DBM.SHAPE[0]))))
-		ax3[1][m].set_yticks([])
-		ax3[1][m].set_xticks([])
-		
-		#plot all layers that can get imaged
-		for layer in range(len(DBM.SHAPE)-1):
-			try:
-				ax3[layer+2][m].matshow(DBM.hidden_save[layer][i:i+1].reshape(int(sqrt(DBM.SHAPE[layer+1])),int(sqrt(DBM.SHAPE[layer+1]))))
-				ax3[layer+2][m].set_yticks([])
-				ax3[layer+2][m].set_xticks([])
-			except:
-				pass
-		# plot the last layer 		
-		if DBM.classification:
-			ax3[-1][m].bar(range(DBM.SHAPE[-1]),DBM.last_layer_save[i])
-			ax3[-1][m].set_xticks(range(DBM.SHAPE[-1]))
-			ax3[-1][m].set_ylim(0,1)
-		#plot the reconstructed layer h1
-		# ax4[5][m].matshow(DBM.rec_h1[i:i+1].reshape(int(sqrt(DBM.SHAPE[1])),int(sqrt(DBM.SHAPE[1]))))
-		# plt.matshow(random_recon.reshape(int(sqrt(DBM.SHAPE[0])),int(sqrt(DBM.SHAPE[0]))))
-		m+=1
-	plt.tight_layout(pad=0.0)
+#plot only one digit
+if LOAD_MNIST:
+		fig3,ax3 = plt.subplots(len(DBM.SHAPE)+1,10,figsize=(16,4),sharey="row")
+		m=0
+		for i in index_for_number_test.astype(np.int)[8][0:10]:
+			# plot the input
+			ax3[0][m].matshow(test_data[i:i+1].reshape(int(sqrt(DBM.SHAPE[0])),int(sqrt(DBM.SHAPE[0]))))
+			ax3[0][m].set_yticks([])
+			ax3[0][m].set_xticks([])
+			# plot the reconstructed image		
+			ax3[1][m].matshow(DBM.probs[i:i+1].reshape(int(sqrt(DBM.SHAPE[0])),int(sqrt(DBM.SHAPE[0]))))
+			ax3[1][m].set_yticks([])
+			ax3[1][m].set_xticks([])
+			
+			#plot all layers that can get imaged
+			for layer in range(len(DBM.SHAPE)-1):
+				try:
+					ax3[layer+2][m].matshow(DBM.hidden_save[layer][i:i+1].reshape(int(sqrt(DBM.SHAPE[layer+1])),int(sqrt(DBM.SHAPE[layer+1]))))
+					ax3[layer+2][m].set_yticks([])
+					ax3[layer+2][m].set_xticks([])
+				except:
+					pass
+			# plot the last layer 		
+			if DBM.classification:
+				ax3[-1][m].bar(range(DBM.SHAPE[-1]),DBM.last_layer_save[i])
+				ax3[-1][m].set_xticks(range(DBM.SHAPE[-1]))
+				ax3[-1][m].set_ylim(0,1)
+			#plot the reconstructed layer h1
+			# ax4[5][m].matshow(DBM.rec_h1[i:i+1].reshape(int(sqrt(DBM.SHAPE[1])),int(sqrt(DBM.SHAPE[1]))))
+			# plt.matshow(random_recon.reshape(int(sqrt(DBM.SHAPE[0])),int(sqrt(DBM.SHAPE[0]))))
+			m+=1
+		plt.tight_layout(pad=0.0)
 
 
 
