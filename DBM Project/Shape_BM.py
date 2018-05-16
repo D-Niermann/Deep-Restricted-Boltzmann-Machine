@@ -15,7 +15,7 @@ if True:
 		workdir="/home/dario/Dokumente/DBM Project"
 		os.chdir(workdir)
 		mpl.use("Agg") #use this to not display plots but save them
-		import_seaborn = False
+		import_seaborn = True
 
 	data_dir=workdir+"/data"
 
@@ -94,15 +94,15 @@ if "train_data" not in globals():
 
 	if LOAD_HORSES:
 		log.out("Loading HORSE Data")
-		data_dir   = "/Users/Niermann/Google Drive/Masterarbeit/Python/DBM Project/Horse_data_rescaled/"
-		files      = os.listdir(data_dir)
+		horse_data_dir   = workdir+ "/Horse_data_rescaled/"
+		files      = os.listdir(horse_data_dir)
 		train_data = np.zeros([len(files)-50,64**2])
 		test_data  = np.zeros([50,64**2])
 
 		from PIL import Image
 		for i,f in enumerate(files):
 			if f[-4:]==".jpg":
-				img_data = np.array(Image.open(data_dir+f)).flatten()/255.
+				img_data = np.array(Image.open(horse_data_dir+f)).flatten()/255.
 				if i < train_data.shape[0]:
 					train_data[i] = img_data
 				else:
@@ -1769,7 +1769,6 @@ if DO_TRAINING:
 	ax[2].set_xlabel("Epoch")
 	plt.subplots_adjust(left=None, bottom=None, right=0.73, top=None,
 	            wspace=None, hspace=None)
-	ax[1].set_xticks(range(0,DBM.epochs,2))
 	save_fig(saveto_path+"/learnr-temp.pdf", DO_SAVE_TO_FILE)
 
 

@@ -15,7 +15,7 @@ if True:
 		workdir="/home/dario/Dokumente/DBM Project"
 		os.chdir(workdir)
 		mpl.use("Agg") #use this to not display plots but save them
-		import_seaborn = False
+		import_seaborn = True
 
 	data_dir=workdir+"/data"
 
@@ -130,15 +130,15 @@ if "train_data" not in globals():
 
 	if LOAD_HORSES:
 		log.out("Loading HORSE Data")
-		data_dir   = "/Users/Niermann/Google Drive/Masterarbeit/Python/DBM Project/Horse_data_rescaled/"
-		files      = os.listdir(data_dir)
+		horse_data_dir   = workdir+"/Horse_data_rescaled/"
+		files      = os.listdir(horse_data_dir)
 		train_data = np.zeros([len(files)-50,64**2])
 		test_data  = np.zeros([50,64**2])
 
 		from PIL import Image
 		for i,f in enumerate(files):
 			if f[-4:]==".jpg":
-				img_data = np.array(Image.open(data_dir+f)).flatten()/255.
+				img_data = np.array(Image.open(horse_data_dir+f)).flatten()/255.
 				if i < train_data.shape[0]:
 					train_data[i] = img_data
 				else:
@@ -1248,8 +1248,8 @@ class DBM_class(object):
 
 N_BATCHES_PRETRAIN = 30 			# how many batches per epoch for pretraining
 N_BATCHES_TRAIN    = 30 			# how many batches per epoch for complete DBM training
-N_EPOCHS_PRETRAIN  = [0,0,0,0,0] 	# pretrain epochs for each RBM
-N_EPOCHS_TRAIN     = 200				# how often to iter through the test images
+N_EPOCHS_PRETRAIN  = [10,10,0,0,0] 	# pretrain epochs for each RBM
+N_EPOCHS_TRAIN     = 6				# how often to iter through the test images
 TEST_EVERY_EPOCH   = 20 				# how many epochs to train before testing on the test data
 
 ### learnrates 
@@ -1274,7 +1274,7 @@ DO_NOISE_STAB = 0	 	# if to make a noise stability test
 
 
 ### saving and loading 
-DO_SAVE_TO_FILE       = 0 	# if to save plots and data to file
+DO_SAVE_TO_FILE       = 1 	# if to save plots and data to file
 DO_SAVE_PRETRAINED    = 0 	# if to save the pretrained weights seperately (for later use)
 DO_LOAD_FROM_FILE     = 0 	# if to load weights and biases from datadir + pathsuffix
 PATHSUFFIX            = "Sun_Apr_29_16-51-36_2018_[784, 10]"
