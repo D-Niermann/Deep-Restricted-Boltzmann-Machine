@@ -453,7 +453,7 @@ class DBM_class(object):
 				temp          = t_[-1]
 				learnrate     = l_[-1]
 				self.epochs   = train_epoch_[-1]
-				
+
 				log.info("Epoch = ",self.epochs)
 				log.info("l = ",learnrate)
 				log.info("T = ",temp)
@@ -534,7 +534,7 @@ class DBM_class(object):
 			self.save_dict["Freerun_Steps"].append(freerun_steps)
 			
 			for i in range(self.n_layers-1):
-				w_mean = np.mean( np.abs( self.w[i].eval() ) )
+				w_mean = sess.run(self.mean_w)
 				self.save_dict["W_mean_%i"%i].append(w_mean)
 
 			for i in range(self.n_layers):
@@ -617,26 +617,18 @@ class DBM_class(object):
 		log.out("Initializing graph")
 		
 
-		# self.v  = tf.placeholder(tf.float32,[self.batchsize,self.SHAPE[0]],name="Visible-Layer") 
-
 		if graph_mode=="training":
 			# stuff
-			# self.m_tf      = tf.placeholder(tf.int32,[],name="running_array_index")
 			self.learnrate = tf.placeholder(tf.float32,[],name="Learnrate")
 
-			# arrays for saving progress
-			# self.h1_activity_ = tf.Variable(tf.zeros([N_EPOCHS_TRAIN]))
-			# self.h2_activity_ = tf.Variable(tf.zeros([N_EPOCHS_TRAIN]))
-			# self.train_error_ = tf.Variable(tf.zeros([N_EPOCHS_TRAIN]))
-			# self.train_class_error_ = tf.Variable(tf.zeros([N_EPOCHS_TRAIN]))
-			
+
 		#### placeholders
 		self.temp_tf = tf.placeholder(tf.float32,[],name="Temperature")
 		self.split_i = tf.placeholder(tf.int32,[],name="Which_Split")
-		self.w_0_ph = tf.placeholder(tf.float32,name="Weight0_ph")
+		self.w_0_ph  = tf.placeholder(tf.float32,name="Weight0_ph")
 
 		### init all Parameters like weights , biases , layers and their updates
-		# weights
+		## weights
 		self.w               = [None]*(self.n_layers-1)
 		self.pos_grad        = [None]*(self.n_layers-1)
 		self.neg_grad        = [None]*(self.n_layers-1)
@@ -644,7 +636,8 @@ class DBM_class(object):
 		self.update_pos_grad = [None]*(self.n_layers-1)
 		self.update_neg_grad = [None]*(self.n_layers-1)
 		self.update_w        = [None]*(self.n_layers-1)
-		self.w_mean_ 	     = [None]*(self.n_layers-1) # variable to store means
+		self.do_norm_w       = [None]*(self.n_layers-1)
+		self.w_mean_         = [None]*(self.n_layers-1) # variable to store means
 		self.mean_w          = [None]*(self.n_layers-1) # calc of mean for each w
 
 
@@ -680,7 +673,7 @@ class DBM_class(object):
 		for i in range(len(self.w)):
 			if i==0:
 				w, self.w_patt, self.w_patt_partial = self.merge_weights()
-				self.w[i] = tf.Variable(w,name="Weights%i"%i,dtype=tf.float32)
+				self.w[i] = tf.Variable(w, name="Weights%i"%i,dtype=tf.float32)
 			else:
 				self.w[i] = tf.Variable(self.weights[i],name="Weights%i"%i,dtype=tf.float32)
 			if graph_mode=="training":
@@ -689,12 +682,14 @@ class DBM_class(object):
 				self.update_pos_grad[i] = self.pos_grad[i].assign(tf.matmul(self.layer[i], self.layer[i+1],transpose_a=True))
 				self.update_neg_grad[i] = self.neg_grad[i].assign(tf.matmul(self.layer[i], self.layer[i+1],transpose_a=True))
 				if i == 0:
-					self.update_w[i]    = self.learnrate*self.w_patt*(self.pos_grad[i] - self.neg_grad[i])/self.batchsize
+					self.update_w[i] = self.learnrate*self.w_patt*(self.pos_grad[i] - self.neg_grad[i])/self.batchsize
 				else:	
 					self.update_w[i] = self.w[i].assign_add(self.learnrate*(self.pos_grad[i] - self.neg_grad[i])/self.batchsize)
 				
-				self.w_mean_[i] = tf.Variable(tf.zeros([N_EPOCHS_TRAIN]))
-				self.mean_w[i]  = tf.reduce_mean(tf.square(self.w[i]))
+				self.w_mean_[i]   = tf.Variable(tf.zeros([N_EPOCHS_TRAIN]))
+				self.mean_w[i]    = tf.sqrt(tf.reduce_sum(tf.square(self.w[i])))
+				self.do_norm_w[i] = self.w[i].assign(self.w[i]/tf.sqrt(tf.reduce_sum(tf.square(self.w[i]))))
+
 		self.assign_w_0 = self.w[0].assign_add(self.w_0_ph)
 
 		### bias calculations and assignments
@@ -894,7 +889,10 @@ class DBM_class(object):
 
 			## run the other updates
 			sess.run([self.update_w[1:], self.update_bias], {self.learnrate : learnrate})
-
+			# norm the weights
+			# for i in range(self.n_layers-1):
+			# 	if sess.run(self.mean_w[i])>1:
+			sess.run(self.do_norm_w)
 
 			self.l_mean += sess.run(self.layer_activities)
 
@@ -1339,7 +1337,7 @@ class DBM_class(object):
 
 N_BATCHES_PRETRAIN = 200			# how many batches per epoch for pretraining
 N_BATCHES_TRAIN    = 200			# how many batches per epoch for complete DBM training
-N_EPOCHS_PRETRAIN  = [0,0,0,0,0] 	# pretrain epochs for each RBM
+N_EPOCHS_PRETRAIN  = [10,10,10,0,0] 	# pretrain epochs for each RBM
 N_EPOCHS_TRAIN     = 10				# how often to iter through the test images
 TEST_EVERY_EPOCH   = 5 			    # how many epochs to train before testing on the test data
 
@@ -1353,7 +1351,7 @@ LEARNRATE_START    = 0.01		# starting learnrates
 LEARNRATE_SLOPE    = 5.0		# bigger number -> smaller slope
 
 ### temperature
-TEMP_START    = 0.1 		# starting temp
+TEMP_START    = 0.01 		# starting temp
 TEMP_SLOPE    = 90.0		# slope of dereasing temp bigger number -> smaller slope
 
 
@@ -1369,17 +1367,17 @@ DO_NOISE_STAB = 0		# if to make a noise stability test
 
 
 ### saving and loading 
-DO_SAVE_TO_FILE       = 1 	# if to save plots and data to file
+DO_SAVE_TO_FILE       = 0 	# if to save plots and data to file
 DO_SAVE_PRETRAINED    = 0 	# if to save the pretrained weights seperately (for later use)
-DO_LOAD_FROM_FILE     = 1 	# if to load weights and biases from datadir + pathsuffix
+DO_LOAD_FROM_FILE     = 0 	# if to load weights and biases from datadir + pathsuffix
 PATHSUFFIX            = "Thu_May_17_08-33-42_2018_[784, 144, 64, 25, 10]"
 PATHSUFFIX_PRETRAINED = "Mon_May__7_11-41-34_2018"
 
 
 DBM_SHAPE = [	int(sqrt(test_data.shape[1]))*int(sqrt(test_data.shape[1])),
 				12*12,
-				8*8,
-				5*5,
+				10*10,
+				6*6,
 				10
 				]
 ###########################################################################################################
@@ -1429,7 +1427,7 @@ log.info(time_now)
 DBM.pretrain()
 
 if DO_TRAINING:
-	log.start("DBM Train Session")
+	log.start("ShapeBM Train Session")
 	
 
 	with tf.Session() as sess:
@@ -1771,7 +1769,7 @@ if DO_TRAINING:
 		ax[2].plot(DBM.save_dict["W_mean_%i"%i],label="Weight %i"%i)
 	ax[2].legend(loc="center left",bbox_to_anchor = (1.0,0.5))
 	ax[2].set_xlabel("Epoch")
-	plt.subplots_adjust(left=None, bottom=None, right=0.73, top=None,
+	plt.subplots_adjust(bottom=None, right=0.73, top=None,
 	            wspace=None, hspace=None)
 	save_fig(saveto_path+"/learnr-temp.pdf", DO_SAVE_TO_FILE)
 

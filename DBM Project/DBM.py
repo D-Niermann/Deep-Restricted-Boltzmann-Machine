@@ -521,7 +521,7 @@ class DBM_class(object):
 			self.save_dict["Freerun_Steps"].append(freerun_steps)
 			
 			for i in range(self.n_layers-1):
-				w_mean = np.mean( np.abs( self.w[i].eval() ) )
+				w_mean = sess.run(self.mean_w)
 				self.save_dict["W_mean_%i"%i].append(w_mean)
 
 			for i in range(self.n_layers):
@@ -572,9 +572,9 @@ class DBM_class(object):
 		self.update_pos_grad = [None]*(self.n_layers-1)
 		self.update_neg_grad = [None]*(self.n_layers-1)
 		self.update_w        = [None]*(self.n_layers-1)
-		self.w_mean_ 	   = [None]*(self.n_layers-1) # variable to store means
+		self.w_mean_         = [None]*(self.n_layers-1) # variable to store means
 		self.mean_w          = [None]*(self.n_layers-1) # calc of mean for each w
-
+		self.do_norm_w       = [None]*(self.n_layers-1)
 		# bias
 		self.bias        = [None]*self.n_layers
 		self.update_bias = [None]*self.n_layers
@@ -611,7 +611,9 @@ class DBM_class(object):
 				self.update_neg_grad[i] = self.neg_grad[i].assign(tf.matmul(self.layer[i], self.layer[i+1],transpose_a=True))
 				self.update_w[i]        = self.w[i].assign_add(self.learnrate*(self.pos_grad[i] - self.neg_grad[i])/self.batchsize)
 				self.w_mean_[i]         = tf.Variable(tf.zeros([N_EPOCHS_TRAIN]))
-				self.mean_w[i]          = tf.reduce_mean(tf.square(self.w[i]))
+				self.mean_w[i]          = tf.sqrt(tf.reduce_sum(tf.square(self.w[i])))
+				self.do_norm_w[i]       = self.w[i].assign(self.w[i]/tf.sqrt(tf.reduce_sum(tf.square(self.w[i]))))
+
 
 		### bias calculations and assignments
 		for i in range(len(self.bias)):
@@ -814,7 +816,8 @@ class DBM_class(object):
 
 			#### run all parameter updates 
 			sess.run([self.update_w, self.update_bias], {self.learnrate : learnrate})
-
+			## norm the weights
+			sess.run(self.do_norm_w)
 
 			### calc errors 
 			self.recon_error_train.append(sess.run(self.error,{self.layer_ph[0] : batch}))
@@ -1275,7 +1278,7 @@ class DBM_class(object):
 
 N_BATCHES_PRETRAIN = 300 			# how many batches per epoch for pretraining
 N_BATCHES_TRAIN    = 300 			# how many batches per epoch for complete DBM training
-N_EPOCHS_PRETRAIN  = [0,0,0,0,0,0] 	# pretrain epochs for each RBM
+N_EPOCHS_PRETRAIN  = [10,0,0,0,0,0] 	# pretrain epochs for each RBM
 N_EPOCHS_TRAIN     = 4				# how often to iter through the test images
 TEST_EVERY_EPOCH   = 5  			# how many epochs to train before testing on the test data
 
@@ -1303,15 +1306,13 @@ DO_NOISE_STAB = 0	 	# if to make a noise stability test
 ### saving and loading 
 DO_SAVE_TO_FILE       = 0 	# if to save plots and data to file
 DO_SAVE_PRETRAINED    = 0 	# if to save the pretrained weights seperately (for later use)
-DO_LOAD_FROM_FILE     = 1 	# if to load weights and biases from datadir + pathsuffix
+DO_LOAD_FROM_FILE     = 0 	# if to load weights and biases from datadir + pathsuffix
 PATHSUFFIX            = "Wed_May_16_18-56-19_2018_[784, 144, 100, 25, 10]"
 PATHSUFFIX_PRETRAINED = "Fri_Mar__9_16-46-01_2018"
 
 
 DBM_SHAPE = [	int(sqrt(len(train_data[0])))*int(sqrt(len(train_data[0]))),
 				12*12,
-				10*10,
-				5*5,
 				10]
 ###########################################################################################################
 
@@ -1693,7 +1694,7 @@ if DO_TRAINING:
 		ax[2].plot(DBM.save_dict["W_mean_%i"%i],label="Weight %i"%i)
 	ax[2].legend(loc="center left",bbox_to_anchor = (1.0,0.5))
 	ax[2].set_xlabel("Epoch")
-	plt.subplots_adjust(left=None, bottom=None, right=0.73, top=None,
+	plt.subplots_adjust(bottom=None, right=0.73, top=None,
 	            wspace=None, hspace=None)
 	save_fig(saveto_path+"/learnr-temp.pdf", DO_SAVE_TO_FILE)
 
