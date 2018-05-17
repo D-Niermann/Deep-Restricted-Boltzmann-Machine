@@ -68,8 +68,8 @@ time_now = time_now.replace(":", "-")
 time_now = time_now.replace(" ", "_")
 
 #### Load T Data 
-LOAD_MNIST = 0
-LOAD_HORSES = 1
+LOAD_MNIST = 1
+LOAD_HORSES = 0
 if "train_data" not in globals():
 	if LOAD_MNIST:
 		log.out("Loading Data")
@@ -176,7 +176,8 @@ class RBM(object):
 		################################################################################################################################################
 		#shape definitions are wired here-normally one would define [rows,columns] but here it is reversed with [columns,rows]? """
 
-		self.v       = tf.placeholder(tf.float32,[None,self.visible_units],name="Visible-Layer") # has shape [number of images per batch,number of visible units]
+		self.v       = tf.placeholder(tf.float32,[None,self.visible_units],name="Visible-Layer") 
+		# has shape [number of images per batch,number of visible units]
 
 		self.w       = tf.Variable(tf.random_uniform([self.visible_units,self.hidden_units],minval=-1e-6,maxval=1e-6),name="Weights")
 		self.bias_v  = tf.Variable(tf.zeros([self.visible_units]),name="Visible-Bias")
@@ -213,7 +214,8 @@ class RBM(object):
 		# [] = [784,batchsize]-transposed v * [batchsize,500] -> [784,500] - like w 
 		self.pos_grad  = tf.matmul(self.v,self.h_prob,transpose_a=True)
 		self.neg_grad  = tf.matmul(self.v_recon,self.h_gibbs,transpose_a=True)
-		self.numpoints = tf.cast(tf.shape(self.v)[0],tf.float32) #number of train inputs per batch (for averaging the CD matrix -> see practical paper by hinton)
+		self.numpoints = tf.cast(tf.shape(self.v)[0],tf.float32) 
+		#number of train inputs per batch (for averaging the CD matrix -> see practical paper by hinton)
 		# contrastive divergence
 		self.CD        = (self.pos_grad - self.neg_grad)/self.numpoints
 		
@@ -269,6 +271,10 @@ class DBM_class(object):
 
 		self.train_time     = 0
 		self.epochs         = 0
+		self.recon_error_train = []
+		self.class_error_train = []
+		self.layer_diversity_ = []
+		self.update = 0 	# update counter
 
 
 
@@ -285,6 +291,7 @@ class DBM_class(object):
 			self.save_dict["W_mean_%i"%i] = []
 		for i in range(self.n_layers):
 			self.save_dict["Layer_Activity_%i"%i] = []
+			self.save_dict["Layer_Diversity_%i"%i] = []
 
 		### log list where all constants are saved
 		self.log_list =	[["SHAPE",                self.SHAPE],
@@ -317,7 +324,7 @@ class DBM_class(object):
 					self.RBMs[i] = RBM(self.SHAPE[i],self.SHAPE[i+1], forw_mult= 1, back_mult = 1, learnrate = LEARNRATE_PRETRAIN, liveplot=0)
 					log.out("1,1")
 				else:
-					self.RBMs[i] = RBM(self.SHAPE[i],self.SHAPE[i+1], forw_mult= 2, back_mult = 2, learnrate = LEARNRATE_PRETRAIN, liveplot=0)
+					self.RBMs[i] = RBM(self.SHAPE[i],self.SHAPE[i+1], forw_mult= 1, back_mult = 1, learnrate = LEARNRATE_PRETRAIN, liveplot=0)
 					log.out("2,2")
 				
 		# self.RBMs[1] = RBM(self.SHAPE[1],self.SHAPE[2], forw_mult= 1, back_mult = 1, learnrate = LEARNRATE_PRETRAIN, liveplot=0)
@@ -426,14 +433,17 @@ class DBM_class(object):
 				log.out("Overriding Values from save")
 				#
 				sd = read_csv("save_dict.csv")
-				l_ = sd["Learnrate"].values[[sd["Learnrate"].notna()]]
-				t_ = sd["Temperature"].values[[sd["Temperature"].notna()]]
-				n_ = sd["Freerun_Steps"].values[[sd["Freerun_Steps"].notna()]]
+				l_ = sd["Learnrate"].values[[sd["Learnrate"].notnull()]]
+				t_ = sd["Temperature"].values[[sd["Temperature"].notnull()]]
+				n_ = sd["Freerun_Steps"].values[[sd["Freerun_Steps"].notnull()]]
+				train_epoch_ = sd["Train_Epoch"].values[[sd["Train_Epoch"].notnull()]]
 
 				freerun_steps = n_[-1]
-				temp = t_[-1]
-				learnrate = l_[-1]
+				temp          = t_[-1]
+				learnrate     = l_[-1]
+				self.epochs   = train_epoch_[-1]
 
+				log.info("Epoch = ",self.epochs)
 				log.info("l = ",learnrate)
 				log.info("T = ",temp)
 				log.info("N = ",freerun_steps)
@@ -499,8 +509,7 @@ class DBM_class(object):
 		return T
 
 	def get_N(self,epoch):
-		N=2
-
+		N = 2
 		return N
 
 	def update_savedict(self,mode):
@@ -517,11 +526,13 @@ class DBM_class(object):
 
 			for i in range(self.n_layers):
 				self.save_dict["Layer_Activity_%i"%i].append(self.l_mean[i])
+				self.save_dict["Layer_Diversity_%i"%i].append(self.layer_diversity_[-1][i])
+
 
 		if mode == "testing":
 
 			if self.classification:
-				self.save_dict["Class_Error"].append(self.class_error)
+				self.save_dict["Class_Error"].append(self.class_error_test)
 
 			self.save_dict["Recon_Error"].append(self.recon_error)
 			self.save_dict["Test_Epoch"].append(self.epochs)
@@ -581,6 +592,8 @@ class DBM_class(object):
 		self.update_l_p        = [None]*self.n_layers # assign op. for calculated probs
 		self.layer_activities  = [None]*self.n_layers # calc for layer activieties (mean over batch)
 		self.layer_energy      = [None]*(self.n_layers-1)
+		self.layer_diversity   = [None]*self.n_layers # measure how diverse each layer is in the batch 
+
 
 		### layer vars 
 		for i in range(len(self.layer)):
@@ -615,6 +628,7 @@ class DBM_class(object):
 			self.layer_samp[i]       = self.sample(self.layer_prob[i])
 			self.update_l_p[i]       = self.layer[i].assign(self.layer_prob[i])
 			self.layer_activities[i] = tf.reduce_sum(self.layer[i])/(self.batchsize*self.SHAPE[i])*100
+			self.layer_diversity[i]  = tf.reduce_mean(tf.abs(self.layer[i] - tf.reduce_mean(self.layer[i], axis=0)))
 
 		for i in range(len(self.layer)-1):
 			self.layer_energy[i] = tf.matmul(self.layer[i], tf.matmul(self.w[i],self.layer[i+1],transpose_b=True))
@@ -756,13 +770,13 @@ class DBM_class(object):
 
 		for start, end in zip( range(0, len(train_data), self.batchsize), range(self.batchsize, len(train_data), self.batchsize)):
 			# define a batch
-			self.batch = train_data[start:end]
+			batch = train_data[start:end]
 			if self.classification:
 				batch_label = train_label[start:end]
 
 			#### Clamped Run 
-			# assign v and h2 to the self.batch data
-			sess.run(self.assign_l[0], { self.layer_ph[0]  : self.batch })
+			# assign v and h2 to the batch data
+			sess.run(self.assign_l[0], { self.layer_ph[0]  : batch })
 			if self.classification:
 				sess.run(self.assign_l[-1], {self.layer_ph[-1] : batch_label})
 
@@ -780,6 +794,7 @@ class DBM_class(object):
 			# update the positive gradients
 			sess.run(self.update_pos_grad)
 
+			
 
 
 			#### Free Running 
@@ -792,9 +807,19 @@ class DBM_class(object):
 			sess.run(self.update_neg_grad)
 
 
+
+			self.layer_diversity_.append(sess.run(self.layer_diversity))
+
+
+
 			#### run all parameter updates 
 			sess.run([self.update_w, self.update_bias], {self.learnrate : learnrate})
 
+
+			### calc errors 
+			self.recon_error_train.append(sess.run(self.error,{self.layer_ph[0] : batch}))
+			if self.classification:
+				self.class_error_train.append(sess.run(self.class_error,{self.layer_ph[-1] : batch_label}))
 
 			#### calculate free energy for test and train data
 			# self.F.append(self.free_energy.eval({self.v:self.batch}))
@@ -805,6 +830,8 @@ class DBM_class(object):
 			# self.F_test.append(f_test_)
 
 			self.l_mean += sess.run(self.layer_activities)
+
+			self.update += 1
 
 			### liveplot
 			if self.liveplot and plt.fignum_exists(fig.number) and start%40==0:
@@ -921,8 +948,8 @@ class DBM_class(object):
 		
 
 		if self.classification:
-			# error of classifivation labels
-			# self.class_error=np.mean(np.abs(self.last_layer_save-my_test_label[:,:10]))		
+			## error of classifivation labels
+			self.class_error_test=np.mean(np.abs(self.last_layer_save-my_test_label[:,:10]))		
 			
 			for i in range(len(self.last_layer_save)):
 				digit   = np.where(my_test_label[i]==1)[0][0]
@@ -949,11 +976,11 @@ class DBM_class(object):
 				w = np.zeros([10,10])
 				for digit in range(10):
 					w[digit]  = np.round(np.mean(np.array(DBM.conf_data[digit]),axis=0),3)
-				seaborn.heatmap(w*100,vmax=10,annot=True)
+				seaborn.heatmap(w*100,annot=True)
 				plt.ylabel("Desired Label in %")
 				plt.xlabel("Predicted Label in %")
 								
-			self.class_error = float(n_wrongs)/self.batchsize
+		self.class_error_test = float(n_wrongs)/self.batchsize
 
 			# self.class_error_.append(float(n_wrongs)/self.batchsize)
 			# self.test_epochs.append(self.epochs)
@@ -969,7 +996,7 @@ class DBM_class(object):
 		log.info("Reconstr. error normal: ",np.round(self.recon_error,5))
 		if self.n_layers==2: log.info("Reconstr. error reverse: ",np.round(self.recon_error_reverse,5)) 
 		if self.classification:
-			log.info("Class error: ",np.round(self.class_error, 5))
+			log.info("Class error: ",np.round(self.class_error_test, 5))
 			log.info("Wrong Digits: ",n_wrongs," with average: ",round(np.mean(wrong_maxis),3))
 			log.info("Correct Digits: ",len(right_maxis)," with average: ",round(np.mean(right_maxis),3))
 		log.reset()
@@ -1246,16 +1273,16 @@ class DBM_class(object):
 ###########################################################################################################
 #### User Settings ###
 
-N_BATCHES_PRETRAIN = 30 			# how many batches per epoch for pretraining
-N_BATCHES_TRAIN    = 30 			# how many batches per epoch for complete DBM training
-N_EPOCHS_PRETRAIN  = [10,10,0,0,0] 	# pretrain epochs for each RBM
-N_EPOCHS_TRAIN     = 6				# how often to iter through the test images
-TEST_EVERY_EPOCH   = 20 				# how many epochs to train before testing on the test data
+N_BATCHES_PRETRAIN = 300 			# how many batches per epoch for pretraining
+N_BATCHES_TRAIN    = 300 			# how many batches per epoch for complete DBM training
+N_EPOCHS_PRETRAIN  = [0,0,0,0,0,0] 	# pretrain epochs for each RBM
+N_EPOCHS_TRAIN     = 4				# how often to iter through the test images
+TEST_EVERY_EPOCH   = 5  			# how many epochs to train before testing on the test data
 
 ### learnrates 
-LEARNRATE_PRETRAIN = 0.1		# learnrate for pretraining
+LEARNRATE_PRETRAIN = 0.01		# learnrate for pretraining
 LEARNRATE_START    = 0.01		# starting learnrates
-LEARNRATE_SLOPE    = 5.0		# bigger number -> smaller slope
+LEARNRATE_SLOPE    = 0.1		# bigger number -> smaller slope
 
 ### temperature
 TEMP_START    = 0.1 		# starting temp
@@ -1274,15 +1301,18 @@ DO_NOISE_STAB = 0	 	# if to make a noise stability test
 
 
 ### saving and loading 
-DO_SAVE_TO_FILE       = 1 	# if to save plots and data to file
+DO_SAVE_TO_FILE       = 0 	# if to save plots and data to file
 DO_SAVE_PRETRAINED    = 0 	# if to save the pretrained weights seperately (for later use)
-DO_LOAD_FROM_FILE     = 0 	# if to load weights and biases from datadir + pathsuffix
-PATHSUFFIX            = "Sun_Apr_29_16-51-36_2018_[784, 10]"
+DO_LOAD_FROM_FILE     = 1 	# if to load weights and biases from datadir + pathsuffix
+PATHSUFFIX            = "Wed_May_16_18-56-19_2018_[784, 144, 100, 25, 10]"
 PATHSUFFIX_PRETRAINED = "Fri_Mar__9_16-46-01_2018"
 
 
 DBM_SHAPE = [	int(sqrt(len(train_data[0])))*int(sqrt(len(train_data[0]))),
-				500]
+				12*12,
+				10*10,
+				5*5,
+				10]
 ###########################################################################################################
 
 ### globals (to be set as DBM self values)
@@ -1311,7 +1341,7 @@ if DO_TRAINING and DO_SAVE_TO_FILE:
 ######### DBM #############################################################################################
 DBM = DBM_class(	shape = DBM_SHAPE,
 					liveplot = 0, 
-					classification = 0,
+					classification = 1,
 			)
 
 ###########################################################################################################
@@ -1585,7 +1615,33 @@ if DO_TRAINING:
 	plt.colorbar(map1)
 	plt.grid(False)
 	plt.title("W %i"%0)
-	save_fig(saveto_path+"/weights_img.png", DO_SAVE_TO_FILE)
+	save_fig(saveto_path+"/weights_img.pdf", DO_SAVE_TO_FILE)
+
+	# plot layer diversity
+	plt.figure("Layer diversity")
+	for i in range(DBM.n_layers):
+		plt.plot(smooth(np.array(DBM.layer_diversity_)[::2,i],10),label="Layer %i"%i)
+		plt.legend()
+	plt.xlabel("Update Number")
+	plt.ylabel("Deviation")
+	save_fig(saveto_path+"/layer_diversity.pdf", DO_SAVE_TO_FILE)	
+
+	plt.figure("Errors")
+	## train errors
+	plt.plot(DBM.recon_error_train[:],"-",label="Recon Error Train")
+	if DBM.classification:
+		plt.plot(DBM.class_error_train[:],"-",label="Class Error Train")
+	## test errors
+	# calc number of updates per epoch
+	n_u_p_e = len(DBM.recon_error_train) / DBM.epochs
+	x = np.array(DBM.save_dict["Test_Epoch"])*n_u_p_e
+	plt.plot(x,DBM.save_dict["Recon_Error"],"o--",label="Recon Error Test")
+	if DBM.classification:
+		plt.plot(x,DBM.save_dict["Class_Error"],"o--",label="Class Error Test")
+	plt.legend(loc="best")
+	plt.xlabel("Update Number")
+	plt.ylabel("Mean Square Error")
+	save_fig(saveto_path+"/errors.pdf", DO_SAVE_TO_FILE)
 
 
 	# plot all other weights as hists
@@ -1606,7 +1662,7 @@ if DO_TRAINING:
 		except:
 			pass
 	plt.tight_layout()
-	save_fig(saveto_path+"/weights_hist.png", DO_SAVE_TO_FILE)
+	save_fig(saveto_path+"/weights_hist.pdf", DO_SAVE_TO_FILE)
 
 
 	try:
@@ -1615,66 +1671,41 @@ if DO_TRAINING:
 		plt.matshow(tile(DBM.w_np[0]-DBM.w_np_old[0]),fignum=fig.number)
 		plt.colorbar()
 		plt.title("Change in W1")
-		save_fig(saveto_path+"/weights_change.png", DO_SAVE_TO_FILE)
+		save_fig(saveto_path+"/weights_change.pdf", DO_SAVE_TO_FILE)
 	except:
 		plt.close(fig)
 
-	# plot the layer_act for 100 pictures
-	if DO_TESTING:
-		plt.figure("Layer_activiations_test_run")
-		for i in range(DBM.n_layers):
-			plt.plot(DBM.layer_act[:,i],label="Layer %i"%i)
-		plt.legend()
 
-	# plot test errors 
-	plt.figure("test errors")
-	plt.plot(DBM.save_dict["Test_Epoch"],DBM.save_dict["Recon_Error"],label="Recon Error")
-	if DBM.classification:
-		plt.plot(DBM.save_dict["Test_Epoch"],DBM.save_dict["Class_Error"],label="Class Error")
-	plt.ylabel("Squared Mean Error")
-	plt.xlabel("Epoch")
+
+	fig,ax = plt.subplots(3,1,sharex="col")
+
+	ax[0].plot(DBM.save_dict["Temperature"],label="Temperature")
+	ax[0].legend(loc="center left",bbox_to_anchor = (1.0,0.5))
+
+	ax[0].set_ylabel("Temperature")
+
+	ax[1].plot(DBM.save_dict["Learnrate"],label="Learnrate")
+	ax[1].legend(loc="center left",bbox_to_anchor = (1.0,0.5))
+	ax[1].set_ylabel("Learnrate")
+
+	ax[2].set_ylabel("Weights Mean")
+	for i in range(len(DBM.SHAPE)-1):
+		ax[2].plot(DBM.save_dict["W_mean_%i"%i],label="Weight %i"%i)
+	ax[2].legend(loc="center left",bbox_to_anchor = (1.0,0.5))
+	ax[2].set_xlabel("Epoch")
+	plt.subplots_adjust(left=None, bottom=None, right=0.73, top=None,
+	            wspace=None, hspace=None)
+	save_fig(saveto_path+"/learnr-temp.pdf", DO_SAVE_TO_FILE)
+
+
+	plt.figure("Layer_activiations_test_run")
+	for i in range(DBM.n_layers):
+		plt.plot(DBM.layer_act[:,i],label="Layer %i"%i)
 	plt.legend()
-	save_fig(saveto_path+"/errors.png", DO_SAVE_TO_FILE)
 
 
-	# # timeline
-	# fig,ax=plt.subplots(2,len(DBM.image_timeline),figsize=(17,6))
-	# plt.tight_layout()
-	# for i in range(len(DBM.image_timeline)):
-	# 	ax[0][i].matshow((DBM.image_timeline[i]).reshape(int(sqrt(DBM.SHAPE[0])),int(sqrt(DBM.SHAPE[0]))))
-	# 	# ax[1][i].matshow((DBM.save_h1[i*2]).reshape(int(sqrt(DBM.SHAPE[1])),int(sqrt(DBM.SHAPE[1]))))
-	# 	ax[0][i].set_title(str(i))
-	# 	ax[0][i].set_xticks([])
-	# 	ax[0][i].set_yticks([])
-	# 	ax[1][i].set_xticks([])
-	# 	ax[1][i].set_yticks([])
-	# 	ax[0][i].grid(False)
-
-
-
-	if DO_TRAINING:
-		fig,ax = plt.subplots(3,1,sharex="col")
-
-		ax[0].plot(DBM.save_dict["Temperature"],label="Temperature")
-		ax[0].legend(loc="center left",bbox_to_anchor = (1.0,0.5))
-
-		ax[0].set_ylabel("Temperature")
-
-		ax[1].plot(DBM.save_dict["Learnrate"],label="Learnrate")
-		ax[1].legend(loc="center left",bbox_to_anchor = (1.0,0.5))
-		ax[1].set_ylabel("Learnrate")
-
-		ax[2].set_ylabel("Weights Mean")
-		for i in range(len(DBM.SHAPE)-1):
-			ax[2].plot(DBM.save_dict["W_mean_%i"%i],label="Weight %i"%i)
-		ax[2].legend(loc="center left",bbox_to_anchor = (1.0,0.5))
-		ax[2].set_xlabel("Epoch")
-		plt.subplots_adjust(left=None, bottom=None, right=0.73, top=None,
-		            wspace=None, hspace=None)
-		ax[1].set_xticks(range(0,DBM.epochs,2))
-		save_fig(saveto_path+"/learnr-temp.png", DO_SAVE_TO_FILE)
-
-
+#plot only one digit
+if LOAD_MNIST:
 	#plot some samples from the testdata 
 	fig3,ax3 = plt.subplots(len(DBM.SHAPE)+1,13,figsize=(16,4),sharey="row")
 	for i in range(13):
@@ -1700,46 +1731,48 @@ if DO_TRAINING:
 			ax3[-1][i].bar(range(DBM.SHAPE[-1]),DBM.last_layer_save[i])
 			ax3[-1][i].set_xticks(range(DBM.SHAPE[-1]))
 			ax3[-1][i].set_ylim(0,1)
+		else:
+			ax3[-1][i].matshow(DBM.last_layer_save[i].reshape(int(sqrt(DBM.SHAPE[-1])),int(sqrt(DBM.SHAPE[-1]))))
+			ax3[-1][i].set_xticks([])
+			ax3[-1][i].set_yticks([])
 
 		#plot the reconstructed layer h1
 		# ax3[5][i].matshow(DBM.rec_h1[i:i+1].reshape(int(sqrt(DBM.SHAPE[1])),int(sqrt(DBM.SHAPE[1]))))
 		# plt.matshow(random_recon.reshape(int(sqrt(DBM.SHAPE[0])),int(sqrt(DBM.SHAPE[0]))))
 	plt.tight_layout(pad=0.0)
-	save_fig(saveto_path+"/examples.png", DO_SAVE_TO_FILE)
+	save_fig(saveto_path+"/examples.pdf", DO_SAVE_TO_FILE)
 
 
-	#plot only one digit
-	if LOAD_MNIST:
-		fig3,ax3 = plt.subplots(len(DBM.SHAPE)+1,10,figsize=(16,4),sharey="row")
-		m=0
-		for i in index_for_number_test.astype(np.int)[8][0:10]:
-			# plot the input
-			ax3[0][m].matshow(test_data[i:i+1].reshape(int(sqrt(DBM.SHAPE[0])),int(sqrt(DBM.SHAPE[0]))))
-			ax3[0][m].set_yticks([])
-			ax3[0][m].set_xticks([])
-			# plot the reconstructed image		
-			ax3[1][m].matshow(DBM.probs[i:i+1].reshape(int(sqrt(DBM.SHAPE[0])),int(sqrt(DBM.SHAPE[0]))))
-			ax3[1][m].set_yticks([])
-			ax3[1][m].set_xticks([])
-			
-			#plot all layers that can get imaged
-			for layer in range(len(DBM.SHAPE)-1):
-				try:
-					ax3[layer+2][m].matshow(DBM.hidden_save[layer][i:i+1].reshape(int(sqrt(DBM.SHAPE[layer+1])),int(sqrt(DBM.SHAPE[layer+1]))))
-					ax3[layer+2][m].set_yticks([])
-					ax3[layer+2][m].set_xticks([])
-				except:
-					pass
-			# plot the last layer 		
-			if DBM.classification:
-				ax3[-1][m].bar(range(DBM.SHAPE[-1]),DBM.last_layer_save[i])
-				ax3[-1][m].set_xticks(range(DBM.SHAPE[-1]))
-				ax3[-1][m].set_ylim(0,1)
-			#plot the reconstructed layer h1
-			# ax4[5][m].matshow(DBM.rec_h1[i:i+1].reshape(int(sqrt(DBM.SHAPE[1])),int(sqrt(DBM.SHAPE[1]))))
-			# plt.matshow(random_recon.reshape(int(sqrt(DBM.SHAPE[0])),int(sqrt(DBM.SHAPE[0]))))
-			m+=1
-		plt.tight_layout(pad=0.0)
+	fig3,ax3 = plt.subplots(len(DBM.SHAPE)+1,10,figsize=(16,4),sharey="row")
+	m=0
+	for i in index_for_number_test.astype(np.int)[8][0:10]:
+		# plot the input
+		ax3[0][m].matshow(test_data[i:i+1].reshape(int(sqrt(DBM.SHAPE[0])),int(sqrt(DBM.SHAPE[0]))))
+		ax3[0][m].set_yticks([])
+		ax3[0][m].set_xticks([])
+		# plot the reconstructed image		
+		ax3[1][m].matshow(DBM.probs[i:i+1].reshape(int(sqrt(DBM.SHAPE[0])),int(sqrt(DBM.SHAPE[0]))))
+		ax3[1][m].set_yticks([])
+		ax3[1][m].set_xticks([])
+		
+		#plot all layers that can get imaged
+		for layer in range(len(DBM.SHAPE)-1):
+			try:
+				ax3[layer+2][m].matshow(DBM.hidden_save[layer][i:i+1].reshape(int(sqrt(DBM.SHAPE[layer+1])),int(sqrt(DBM.SHAPE[layer+1]))))
+				ax3[layer+2][m].set_yticks([])
+				ax3[layer+2][m].set_xticks([])
+			except:
+				pass
+		# plot the last layer 		
+		if DBM.classification:
+			ax3[-1][m].bar(range(DBM.SHAPE[-1]),DBM.last_layer_save[i])
+			ax3[-1][m].set_xticks(range(DBM.SHAPE[-1]))
+			ax3[-1][m].set_ylim(0,1)
+		#plot the reconstructed layer h1
+		# ax4[5][m].matshow(DBM.rec_h1[i:i+1].reshape(int(sqrt(DBM.SHAPE[1])),int(sqrt(DBM.SHAPE[1]))))
+		# plt.matshow(random_recon.reshape(int(sqrt(DBM.SHAPE[0])),int(sqrt(DBM.SHAPE[0]))))
+		m+=1
+	plt.tight_layout(pad=0.0)
 
 
 

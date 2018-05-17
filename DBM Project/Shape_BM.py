@@ -444,14 +444,17 @@ class DBM_class(object):
 				log.out("Overriding Values from save")
 				#
 				sd = read_csv("save_dict.csv")
-				l_ = sd["Learnrate"].values[[sd["Learnrate"].notna()]]
-				t_ = sd["Temperature"].values[[sd["Temperature"].notna()]]
-				n_ = sd["Freerun_Steps"].values[[sd["Freerun_Steps"].notna()]]
+				l_ = sd["Learnrate"].values[[sd["Learnrate"].notnull()]]
+				t_ = sd["Temperature"].values[[sd["Temperature"].notnull()]]
+				n_ = sd["Freerun_Steps"].values[[sd["Freerun_Steps"].notnull()]]
+				train_epoch_ = sd["Train_Epoch"].values[[sd["Train_Epoch"].notnull()]]
 
 				freerun_steps = n_[-1]
-				temp = t_[-1]
-				learnrate = l_[-1]
-
+				temp          = t_[-1]
+				learnrate     = l_[-1]
+				self.epochs   = train_epoch_[-1]
+				
+				log.info("Epoch = ",self.epochs)
 				log.info("l = ",learnrate)
 				log.info("T = ",temp)
 				log.info("N = ",freerun_steps)
@@ -1337,15 +1340,15 @@ class DBM_class(object):
 N_BATCHES_PRETRAIN = 200			# how many batches per epoch for pretraining
 N_BATCHES_TRAIN    = 200			# how many batches per epoch for complete DBM training
 N_EPOCHS_PRETRAIN  = [0,0,0,0,0] 	# pretrain epochs for each RBM
-N_EPOCHS_TRAIN     = 1				# how often to iter through the test images
-TEST_EVERY_EPOCH   = 2 			    # how many epochs to train before testing on the test data
+N_EPOCHS_TRAIN     = 10				# how often to iter through the test images
+TEST_EVERY_EPOCH   = 5 			    # how many epochs to train before testing on the test data
 
 ### Shape BM Params
 N_SPLITS    = 4
 PX_OVERHANG = 2
 
 ### learnrates 
-LEARNRATE_PRETRAIN = 0.05		# learnrate for pretraining
+LEARNRATE_PRETRAIN = 0.01		# learnrate for pretraining
 LEARNRATE_START    = 0.01		# starting learnrates
 LEARNRATE_SLOPE    = 5.0		# bigger number -> smaller slope
 
@@ -1368,14 +1371,15 @@ DO_NOISE_STAB = 0		# if to make a noise stability test
 ### saving and loading 
 DO_SAVE_TO_FILE       = 1 	# if to save plots and data to file
 DO_SAVE_PRETRAINED    = 0 	# if to save the pretrained weights seperately (for later use)
-DO_LOAD_FROM_FILE     = 0 	# if to load weights and biases from datadir + pathsuffix
-PATHSUFFIX            = "Mon_May_14_09-33-58_2018_[784, 144, 49, 10]"
+DO_LOAD_FROM_FILE     = 1 	# if to load weights and biases from datadir + pathsuffix
+PATHSUFFIX            = "Thu_May_17_08-33-42_2018_[784, 144, 64, 25, 10]"
 PATHSUFFIX_PRETRAINED = "Mon_May__7_11-41-34_2018"
 
 
 DBM_SHAPE = [	int(sqrt(test_data.shape[1]))*int(sqrt(test_data.shape[1])),
 				12*12,
-				7*7,
+				8*8,
+				5*5,
 				10
 				]
 ###########################################################################################################
@@ -1772,80 +1776,80 @@ if DO_TRAINING:
 	save_fig(saveto_path+"/learnr-temp.pdf", DO_SAVE_TO_FILE)
 
 
-plt.figure("Layer_activiations_test_run")
-for i in range(DBM.n_layers):
-	plt.plot(DBM.layer_act[:,i],label="Layer %i"%i)
-plt.legend()
+	plt.figure("Layer_activiations_test_run")
+	for i in range(DBM.n_layers):
+		plt.plot(DBM.layer_act[:,i],label="Layer %i"%i)
+	plt.legend()
 
-#plot some samples from the testdata 
-fig3,ax3 = plt.subplots(len(DBM.SHAPE)+1,13,figsize=(16,4),sharey="row")
-for i in range(13):
-	# plot the input
-	ax3[0][i].matshow(test_data[i:i+1].reshape(int(sqrt(DBM.SHAPE[0])),int(sqrt(DBM.SHAPE[0]))))
-	ax3[0][i].set_yticks([])
-	ax3[0][i].set_xticks([])
-	# plot the reconstructed image		
-	ax3[1][i].matshow(DBM.probs[i:i+1].reshape(int(sqrt(DBM.SHAPE[0])),int(sqrt(DBM.SHAPE[0]))))
-	ax3[1][i].set_yticks([])
-	ax3[1][i].set_xticks([])
-	
-	#plot all layers that can get imaged
-	for layer in range(len(DBM.SHAPE)-1):
-		try:
-			ax3[layer+2][i].matshow(DBM.hidden_save[layer][i:i+1].reshape(int(sqrt(DBM.SHAPE[layer+1])),int(sqrt(DBM.SHAPE[layer+1]))))
-			ax3[layer+2][i].set_yticks([])
-			ax3[layer+2][i].set_xticks([])
-		except:
-			pass
-	# plot the last layer 	
-	if DBM.classification:	
-		ax3[-1][i].bar(range(DBM.SHAPE[-1]),DBM.last_layer_save[i])
-		ax3[-1][i].set_xticks(range(DBM.SHAPE[-1]))
-		ax3[-1][i].set_ylim(0,1)
-	else:
-		ax3[-1][i].matshow(DBM.last_layer_save[i].reshape(int(sqrt(DBM.SHAPE[-1])),int(sqrt(DBM.SHAPE[-1]))))
-		ax3[-1][i].set_xticks([])
-		ax3[-1][i].set_yticks([])
+	#plot some samples from the testdata 
+	fig3,ax3 = plt.subplots(len(DBM.SHAPE)+1,13,figsize=(16,4),sharey="row")
+	for i in range(13):
+		# plot the input
+		ax3[0][i].matshow(test_data[i:i+1].reshape(int(sqrt(DBM.SHAPE[0])),int(sqrt(DBM.SHAPE[0]))))
+		ax3[0][i].set_yticks([])
+		ax3[0][i].set_xticks([])
+		# plot the reconstructed image		
+		ax3[1][i].matshow(DBM.probs[i:i+1].reshape(int(sqrt(DBM.SHAPE[0])),int(sqrt(DBM.SHAPE[0]))))
+		ax3[1][i].set_yticks([])
+		ax3[1][i].set_xticks([])
+		
+		#plot all layers that can get imaged
+		for layer in range(len(DBM.SHAPE)-1):
+			try:
+				ax3[layer+2][i].matshow(DBM.hidden_save[layer][i:i+1].reshape(int(sqrt(DBM.SHAPE[layer+1])),int(sqrt(DBM.SHAPE[layer+1]))))
+				ax3[layer+2][i].set_yticks([])
+				ax3[layer+2][i].set_xticks([])
+			except:
+				pass
+		# plot the last layer 	
+		if DBM.classification:	
+			ax3[-1][i].bar(range(DBM.SHAPE[-1]),DBM.last_layer_save[i])
+			ax3[-1][i].set_xticks(range(DBM.SHAPE[-1]))
+			ax3[-1][i].set_ylim(0,1)
+		else:
+			ax3[-1][i].matshow(DBM.last_layer_save[i].reshape(int(sqrt(DBM.SHAPE[-1])),int(sqrt(DBM.SHAPE[-1]))))
+			ax3[-1][i].set_xticks([])
+			ax3[-1][i].set_yticks([])
 
-	#plot the reconstructed layer h1
-	# ax3[5][i].matshow(DBM.rec_h1[i:i+1].reshape(int(sqrt(DBM.SHAPE[1])),int(sqrt(DBM.SHAPE[1]))))
-	# plt.matshow(random_recon.reshape(int(sqrt(DBM.SHAPE[0])),int(sqrt(DBM.SHAPE[0]))))
-plt.tight_layout(pad=0.0)
-save_fig(saveto_path+"/examples.pdf", DO_SAVE_TO_FILE)
+		#plot the reconstructed layer h1
+		# ax3[5][i].matshow(DBM.rec_h1[i:i+1].reshape(int(sqrt(DBM.SHAPE[1])),int(sqrt(DBM.SHAPE[1]))))
+		# plt.matshow(random_recon.reshape(int(sqrt(DBM.SHAPE[0])),int(sqrt(DBM.SHAPE[0]))))
+	plt.tight_layout(pad=0.0)
+	save_fig(saveto_path+"/examples.pdf", DO_SAVE_TO_FILE)
 
 
 #plot only one digit
 if LOAD_MNIST:
-		fig3,ax3 = plt.subplots(len(DBM.SHAPE)+1,10,figsize=(16,4),sharey="row")
-		m=0
-		for i in index_for_number_test.astype(np.int)[8][0:10]:
-			# plot the input
-			ax3[0][m].matshow(test_data[i:i+1].reshape(int(sqrt(DBM.SHAPE[0])),int(sqrt(DBM.SHAPE[0]))))
-			ax3[0][m].set_yticks([])
-			ax3[0][m].set_xticks([])
-			# plot the reconstructed image		
-			ax3[1][m].matshow(DBM.probs[i:i+1].reshape(int(sqrt(DBM.SHAPE[0])),int(sqrt(DBM.SHAPE[0]))))
-			ax3[1][m].set_yticks([])
-			ax3[1][m].set_xticks([])
-			
-			#plot all layers that can get imaged
-			for layer in range(len(DBM.SHAPE)-1):
-				try:
-					ax3[layer+2][m].matshow(DBM.hidden_save[layer][i:i+1].reshape(int(sqrt(DBM.SHAPE[layer+1])),int(sqrt(DBM.SHAPE[layer+1]))))
-					ax3[layer+2][m].set_yticks([])
-					ax3[layer+2][m].set_xticks([])
-				except:
-					pass
-			# plot the last layer 		
-			if DBM.classification:
-				ax3[-1][m].bar(range(DBM.SHAPE[-1]),DBM.last_layer_save[i])
-				ax3[-1][m].set_xticks(range(DBM.SHAPE[-1]))
-				ax3[-1][m].set_ylim(0,1)
-			#plot the reconstructed layer h1
-			# ax4[5][m].matshow(DBM.rec_h1[i:i+1].reshape(int(sqrt(DBM.SHAPE[1])),int(sqrt(DBM.SHAPE[1]))))
-			# plt.matshow(random_recon.reshape(int(sqrt(DBM.SHAPE[0])),int(sqrt(DBM.SHAPE[0]))))
-			m+=1
-		plt.tight_layout(pad=0.0)
+	fig3,ax3 = plt.subplots(len(DBM.SHAPE)+1,10,figsize=(16,4),sharey="row")
+	m=0
+	for i in index_for_number_test.astype(np.int)[8][0:10]:
+		# plot the input
+		ax3[0][m].matshow(test_data[i:i+1].reshape(int(sqrt(DBM.SHAPE[0])),int(sqrt(DBM.SHAPE[0]))))
+		ax3[0][m].set_yticks([])
+		ax3[0][m].set_xticks([])
+		# plot the reconstructed image		
+		ax3[1][m].matshow(DBM.probs[i:i+1].reshape(int(sqrt(DBM.SHAPE[0])),int(sqrt(DBM.SHAPE[0]))))
+		ax3[1][m].set_yticks([])
+		ax3[1][m].set_xticks([])
+		
+		#plot all layers that can get imaged
+		for layer in range(len(DBM.SHAPE)-1):
+			try:
+				ax3[layer+2][m].matshow(DBM.hidden_save[layer][i:i+1].reshape(int(sqrt(DBM.SHAPE[layer+1])),int(sqrt(DBM.SHAPE[layer+1]))))
+				ax3[layer+2][m].set_yticks([])
+				ax3[layer+2][m].set_xticks([])
+			except:
+				pass
+		# plot the last layer 		
+		if DBM.classification:
+			ax3[-1][m].bar(range(DBM.SHAPE[-1]),DBM.last_layer_save[i])
+			ax3[-1][m].set_xticks(range(DBM.SHAPE[-1]))
+			ax3[-1][m].set_ylim(0,1)
+		#plot the reconstructed layer h1
+		# ax4[5][m].matshow(DBM.rec_h1[i:i+1].reshape(int(sqrt(DBM.SHAPE[1])),int(sqrt(DBM.SHAPE[1]))))
+		# plt.matshow(random_recon.reshape(int(sqrt(DBM.SHAPE[0])),int(sqrt(DBM.SHAPE[0]))))
+		m+=1
+	plt.tight_layout(pad=0.0)
 
 
 
