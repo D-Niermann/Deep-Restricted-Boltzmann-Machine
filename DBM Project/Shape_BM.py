@@ -534,7 +534,7 @@ class DBM_class(object):
 			self.save_dict["Freerun_Steps"].append(freerun_steps)
 			
 			for i in range(self.n_layers-1):
-				w_mean = sess.run(self.mean_w)
+				w_mean = sess.run(self.mean_w[i])
 				self.save_dict["W_mean_%i"%i].append(w_mean)
 
 			for i in range(self.n_layers):
@@ -644,6 +644,8 @@ class DBM_class(object):
 		# bias
 		self.bias        = [None]*self.n_layers
 		self.update_bias = [None]*self.n_layers
+		self.mean_bias   = [None]*self.n_layers
+		self.do_norm_b   = [None]*self.n_layers
 
 		# layer
 		self.layer             = [None]*self.n_layers # layer variable 
@@ -695,8 +697,12 @@ class DBM_class(object):
 		### bias calculations and assignments
 		for i in range(len(self.bias)):
 			self.bias[i] = tf.Variable(tf.zeros([self.SHAPE[i]]),name="Bias%i"%i)
+			self.bias[i] = tf.Variable(tf.zeros([self.SHAPE[i]]),name="Bias%i"%i)
 			if graph_mode == "training": 
 				self.update_bias[i] = self.bias[i].assign_add(self.learnrate*tf.reduce_mean(tf.subtract(self.layer_save[i],self.layer[i]),0))
+				self.mean_bias[i]   = tf.sqrt(tf.reduce_sum(tf.square(self.bias[i])))
+				self.do_norm_b[i]   = self.bias[i].assign(self.bias[i]/tf.sqrt(tf.reduce_sum(tf.square(self.bias[i]))))
+
 
 		### layer calculations and assignments
 		for i in range(len(self.layer)):
@@ -852,8 +858,6 @@ class DBM_class(object):
 			# update the positive gradients
 			sess.run(self.update_pos_grad)
 
-			self.layer_diversity_.append(sess.run(self.layer_diversity))
-
 
 			#### Free Running 
 			# update all layers N times (Gibbs sampling) 
@@ -869,7 +873,7 @@ class DBM_class(object):
 			self.recon_error_train.append(sess.run(self.error,{self.layer_ph[0] : batch}))
 			if self.classification:
 				self.class_error_train.append(sess.run(self.class_error,{self.layer_ph[-1] : batch_label}))
-			
+			self.layer_diversity_.append(sess.run(self.layer_diversity))
 
 			#### run all parameter updates 
 			## update the CD matrix for W1 and average over the N_SPLIT partial weights
@@ -889,10 +893,14 @@ class DBM_class(object):
 
 			## run the other updates
 			sess.run([self.update_w[1:], self.update_bias], {self.learnrate : learnrate})
-			# norm the weights
-			# for i in range(self.n_layers-1):
-			# 	if sess.run(self.mean_w[i])>1:
-			sess.run(self.do_norm_w)
+			# norm the weights and biases
+			for i in range(self.n_layers):
+				## weights 
+				if i<(self.n_layers-1) and sess.run(self.mean_w[i]) > 1:
+					sess.run(self.do_norm_w[i])
+				## bias 
+				if sess.run(self.mean_bias[i]) > 1:
+					sess.run(self.do_norm_b[i])
 
 			self.l_mean += sess.run(self.layer_activities)
 
@@ -1335,10 +1343,10 @@ class DBM_class(object):
 ###########################################################################################################
 #### User Settings ###
 
-N_BATCHES_PRETRAIN = 200			# how many batches per epoch for pretraining
-N_BATCHES_TRAIN    = 200			# how many batches per epoch for complete DBM training
-N_EPOCHS_PRETRAIN  = [10,10,10,0,0] 	# pretrain epochs for each RBM
-N_EPOCHS_TRAIN     = 10				# how often to iter through the test images
+N_BATCHES_PRETRAIN = 500			# how many batches per epoch for pretraining
+N_BATCHES_TRAIN    = 500			# how many batches per epoch for complete DBM training
+N_EPOCHS_PRETRAIN  = [0,0,0,0,0] 	# pretrain epochs for each RBM
+N_EPOCHS_TRAIN     = 2				# how often to iter through the test images
 TEST_EVERY_EPOCH   = 5 			    # how many epochs to train before testing on the test data
 
 ### Shape BM Params
@@ -1351,7 +1359,7 @@ LEARNRATE_START    = 0.01		# starting learnrates
 LEARNRATE_SLOPE    = 5.0		# bigger number -> smaller slope
 
 ### temperature
-TEMP_START    = 0.01 		# starting temp
+TEMP_START    = 1 			# starting temp
 TEMP_SLOPE    = 90.0		# slope of dereasing temp bigger number -> smaller slope
 
 
@@ -1376,8 +1384,6 @@ PATHSUFFIX_PRETRAINED = "Mon_May__7_11-41-34_2018"
 
 DBM_SHAPE = [	int(sqrt(test_data.shape[1]))*int(sqrt(test_data.shape[1])),
 				12*12,
-				10*10,
-				6*6,
 				10
 				]
 ###########################################################################################################
@@ -1696,7 +1702,7 @@ if DO_TRAINING:
 	# plot layer diversity
 	plt.figure("Layer diversity")
 	for i in range(DBM.n_layers):
-		plt.plot(smooth(np.array(DBM.layer_diversity_)[::2,i],10),label="Layer %i"%i)
+		plt.plot(smooth(np.array(DBM.layer_diversity_)[::2,i],10),label="Layer %i"%i,alpha=0.8)
 		plt.legend()
 	plt.xlabel("Update Number")
 	plt.ylabel("Deviation")

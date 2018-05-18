@@ -521,7 +521,7 @@ class DBM_class(object):
 			self.save_dict["Freerun_Steps"].append(freerun_steps)
 			
 			for i in range(self.n_layers-1):
-				w_mean = sess.run(self.mean_w)
+				w_mean = sess.run(self.mean_w[i])
 				self.save_dict["W_mean_%i"%i].append(w_mean)
 
 			for i in range(self.n_layers):
@@ -578,6 +578,8 @@ class DBM_class(object):
 		# bias
 		self.bias        = [None]*self.n_layers
 		self.update_bias = [None]*self.n_layers
+		self.mean_bias   = [None]*self.n_layers
+		self.do_norm_b   = [None]*self.n_layers
 
 		# layer
 		self.layer             = [None]*self.n_layers # layer variable 
@@ -620,6 +622,8 @@ class DBM_class(object):
 			self.bias[i] = tf.Variable(tf.zeros([self.SHAPE[i]]),name="Bias%i"%i)
 			if graph_mode == "training":
 				self.update_bias[i] = self.bias[i].assign_add(self.learnrate*tf.reduce_mean(tf.subtract(self.layer_save[i],self.layer[i]),0))
+				self.mean_bias[i]   = tf.sqrt(tf.reduce_sum(tf.square(self.bias[i])))
+				self.do_norm_b[i]   = self.bias[i].assign(self.bias[i]/tf.sqrt(tf.reduce_sum(tf.square(self.bias[i]))))
 
 		### layer calculations and assignments
 		for i in range(len(self.layer)):
@@ -796,8 +800,6 @@ class DBM_class(object):
 			# update the positive gradients
 			sess.run(self.update_pos_grad)
 
-			
-
 
 			#### Free Running 
 			# update all layers N times (Gibbs sampling) 
@@ -809,20 +811,24 @@ class DBM_class(object):
 			sess.run(self.update_neg_grad)
 
 
-
-			self.layer_diversity_.append(sess.run(self.layer_diversity))
-
-
-
 			#### run all parameter updates 
 			sess.run([self.update_w, self.update_bias], {self.learnrate : learnrate})
 			## norm the weights
-			sess.run(self.do_norm_w)
+			for i in range(self.n_layers):
+				## weights 
+				if i<(self.n_layers-1) and sess.run(self.mean_w[i]) > 1:
+					sess.run(self.do_norm_w[i])
+				## bias 
+				if sess.run(self.mean_bias[i]) > 1:
+					sess.run(self.do_norm_b[i])
+
 
 			### calc errors 
 			self.recon_error_train.append(sess.run(self.error,{self.layer_ph[0] : batch}))
 			if self.classification:
 				self.class_error_train.append(sess.run(self.class_error,{self.layer_ph[-1] : batch_label}))
+			self.layer_diversity_.append(sess.run(self.layer_diversity))
+
 
 			#### calculate free energy for test and train data
 			# self.F.append(self.free_energy.eval({self.v:self.batch}))
@@ -1276,20 +1282,20 @@ class DBM_class(object):
 ###########################################################################################################
 #### User Settings ###
 
-N_BATCHES_PRETRAIN = 300 			# how many batches per epoch for pretraining
-N_BATCHES_TRAIN    = 300 			# how many batches per epoch for complete DBM training
-N_EPOCHS_PRETRAIN  = [10,0,0,0,0,0] 	# pretrain epochs for each RBM
-N_EPOCHS_TRAIN     = 4				# how often to iter through the test images
+N_BATCHES_PRETRAIN = 500 			# how many batches per epoch for pretraining
+N_BATCHES_TRAIN    = 500 			# how many batches per epoch for complete DBM training
+N_EPOCHS_PRETRAIN  = [1,0,0,0,0,0] 	# pretrain epochs for each RBM
+N_EPOCHS_TRAIN     = 5				# how often to iter through the test images
 TEST_EVERY_EPOCH   = 5  			# how many epochs to train before testing on the test data
 
 ### learnrates 
-LEARNRATE_PRETRAIN = 0.01		# learnrate for pretraining
-LEARNRATE_START    = 0.01		# starting learnrates
-LEARNRATE_SLOPE    = 0.1		# bigger number -> smaller slope
+LEARNRATE_PRETRAIN = 0.001		# learnrate for pretraining
+LEARNRATE_START    = 0.001		# starting learnrates
+LEARNRATE_SLOPE    = 10		# bigger number -> smaller slope
 
 ### temperature
-TEMP_START    = 0.1 		# starting temp
-TEMP_SLOPE    = 5000.0		# slope of dereasing temp bigger number -> smaller slope
+TEMP_START    = 0.01 		# starting temp
+TEMP_SLOPE    = 50		# slope of dereasing temp bigger number -> smaller slope
 
 
 ### state vars 
@@ -1621,7 +1627,7 @@ if DO_TRAINING:
 	# plot layer diversity
 	plt.figure("Layer diversity")
 	for i in range(DBM.n_layers):
-		plt.plot(smooth(np.array(DBM.layer_diversity_)[::2,i],10),label="Layer %i"%i)
+		plt.plot(smooth(np.array(DBM.layer_diversity_)[::2,i],10),label="Layer %i"%i,alpha=0.8)
 		plt.legend()
 	plt.xlabel("Update Number")
 	plt.ylabel("Deviation")
@@ -1691,6 +1697,7 @@ if DO_TRAINING:
 
 	ax[2].set_ylabel("Weights Mean")
 	for i in range(len(DBM.SHAPE)-1):
+		log.out(i)
 		ax[2].plot(DBM.save_dict["W_mean_%i"%i],label="Weight %i"%i)
 	ax[2].legend(loc="center left",bbox_to_anchor = (1.0,0.5))
 	ax[2].set_xlabel("Epoch")
