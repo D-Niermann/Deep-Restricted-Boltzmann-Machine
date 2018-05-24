@@ -1285,7 +1285,7 @@ class DBM_class(object):
 N_BATCHES_PRETRAIN = 500 			# how many batches per epoch for pretraining
 N_BATCHES_TRAIN    = 500 			# how many batches per epoch for complete DBM training
 N_EPOCHS_PRETRAIN  = [1,0,0,0,0,0] 	# pretrain epochs for each RBM
-N_EPOCHS_TRAIN     = 5				# how often to iter through the test images
+N_EPOCHS_TRAIN     = 1				# how often to iter through the test images
 TEST_EVERY_EPOCH   = 5  			# how many epochs to train before testing on the test data
 
 ### learnrates 
@@ -1684,25 +1684,26 @@ if DO_TRAINING:
 
 
 
-	fig,ax = plt.subplots(3,1,sharex="col")
+fig,ax = plt.subplots(3,1,sharex="col")
 
-	ax[0].plot(DBM.save_dict["Temperature"],label="Temperature")
-	ax[0].legend(loc="center left",bbox_to_anchor = (1.0,0.5))
+ax[0].plot(DBM.save_dict["Temperature"],label="Temperature")
+ax[0].legend(loc="center left",bbox_to_anchor = (1.0,0.5))
 
-	ax[0].set_ylabel("Temperature")
+ax[0].set_ylabel("Temperature")
 
-	ax[1].plot(DBM.save_dict["Learnrate"],label="Learnrate")
-	ax[1].legend(loc="center left",bbox_to_anchor = (1.0,0.5))
-	ax[1].set_ylabel("Learnrate")
+ax[1].plot(DBM.save_dict["Learnrate"],label="Learnrate")
+ax[1].legend(loc="center left",bbox_to_anchor = (1.0,0.5))
+ax[1].set_ylabel("Learnrate")
 
-	ax[2].set_ylabel("Weights Mean")
-	for i in range(len(DBM.SHAPE)-1):
-		log.out(i)
-		ax[2].plot(DBM.save_dict["W_mean_%i"%i],label="Weight %i"%i)
-	ax[2].legend(loc="center left",bbox_to_anchor = (1.0,0.5))
-	ax[2].set_xlabel("Epoch")
-	plt.subplots_adjust(bottom=None, right=0.73, top=None,
-	            wspace=None, hspace=None)
+ax[2].set_ylabel("Weights Mean")
+for i in range(len(DBM.SHAPE)-1):
+	log.out(i)
+	ax[2].plot(DBM.save_dict["W_mean_%i"%i],label="Weight %i"%i)
+ax[2].legend(loc="center left",bbox_to_anchor = (1.0,0.5))
+ax[2].set_xlabel("Epoch")
+plt.subplots_adjust(bottom=None, right=0.73, left=0.2, top=None,
+            wspace=None, hspace=None)
+plt.show()
 	save_fig(saveto_path+"/learnr-temp.pdf", DO_SAVE_TO_FILE)
 
 

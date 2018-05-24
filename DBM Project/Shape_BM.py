@@ -549,7 +549,7 @@ class DBM_class(object):
 			self.save_dict["Recon_Error"].append(self.recon_error)
 			self.save_dict["Test_Epoch"].append(self.epochs)
 
-	def merge_weights(self):
+	def merge_weights(self,loaded_from_file):
 		""" merge the weight matrix w from pretraining into N_SPLITs 
 		matrixes that get the w at correct indices and all other indices
 		are filled with zeros.
@@ -590,10 +590,16 @@ class DBM_class(object):
 		beg            = int(0)
 		end            = int(beg+intervall)
 
-		for s in range(N):
-			w_patt_partial[s,ind[s],beg:end] = DBM.weights[0]
-			beg += int(intervall)
-			end  = int(beg+intervall)
+		if not loaded_from_file:
+			for s in range(N):
+				w_patt_partial[s,ind[s],beg:end] = DBM.weights[0]
+				beg += int(intervall)
+				end  = int(beg+intervall)
+		else:
+			for s in range(N):
+				w_patt_partial[s,ind[s],beg:end] = DBM.weights[0][ind[s],beg:end]
+				beg += int(intervall)
+				end  = int(beg+intervall)
 
 		for i in range(N):
 		    w_full += w_patt_partial[i]
@@ -674,7 +680,7 @@ class DBM_class(object):
 		### weight calculations and assignments
 		for i in range(len(self.w)):
 			if i==0:
-				w, self.w_patt, self.w_patt_partial = self.merge_weights()
+				w, self.w_patt, self.w_patt_partial = self.merge_weights(DO_LOAD_FROM_FILE)
 				self.w[i] = tf.Variable(w, name="Weights%i"%i,dtype=tf.float32)
 			else:
 				self.w[i] = tf.Variable(self.weights[i],name="Weights%i"%i,dtype=tf.float32)
@@ -1355,7 +1361,7 @@ PX_OVERHANG = 2
 
 ### learnrates 
 LEARNRATE_PRETRAIN = 0.01		# learnrate for pretraining
-LEARNRATE_START    = 0.01		# starting learnrates
+LEARNRATE_START    = 0.01		# starting learnratesk
 LEARNRATE_SLOPE    = 5.0		# bigger number -> smaller slope
 
 ### temperature
@@ -1364,10 +1370,10 @@ TEMP_SLOPE    = 90.0		# slope of dereasing temp bigger number -> smaller slope
 
 
 ### state vars 
-DO_PRETRAINING = 1		# if no pretrain then files are automatically loaded
-DO_TRAINING    = 1		# if to train the whole DBM
+DO_PRETRAINING = 0		# if no pretrain then files are automatically loaded
+DO_TRAINING    = 0		# if to train the whole DBM
 DO_TESTING     = 1		# if testing the DBM with test data
-DO_SHOW_PLOTS  = 1		# if plots will show on display - either way they get saved into saveto_path
+DO_SHOW_PLOTS  = 0		# if plots will show on display - either way they get saved into saveto_path
 
 DO_CONTEXT    = 0		# if to test the context
 DO_GEN_IMAGES = 0		# if to generate images (mode can be choosen at function call)
@@ -1377,13 +1383,14 @@ DO_NOISE_STAB = 0		# if to make a noise stability test
 ### saving and loading 
 DO_SAVE_TO_FILE       = 0 	# if to save plots and data to file
 DO_SAVE_PRETRAINED    = 0 	# if to save the pretrained weights seperately (for later use)
-DO_LOAD_FROM_FILE     = 0 	# if to load weights and biases from datadir + pathsuffix
-PATHSUFFIX            = "Thu_May_17_08-33-42_2018_[784, 144, 64, 25, 10]"
+DO_LOAD_FROM_FILE     = 1 	# if to load weights and biases from datadir + pathsuffix
+PATHSUFFIX            = "Mon_May_14_09-33-58_2018_[784, 144, 49, 10]"
 PATHSUFFIX_PRETRAINED = "Mon_May__7_11-41-34_2018"
 
 
 DBM_SHAPE = [	int(sqrt(test_data.shape[1]))*int(sqrt(test_data.shape[1])),
 				12*12,
+				7*7,
 				10
 				]
 ###########################################################################################################
@@ -1489,18 +1496,18 @@ if DO_GEN_IMAGES:
 		DBM.import_()
 
 		## grid with nn^2 plots
-		NN = 1
+		NN = 5
 
 
 		fig,ax = plt.subplots(NN,NN)
 		m=0
 		for i in range(NN):
 			for j in range(NN):
-				generated_img = DBM.gibbs_sampling([[0,0,1.5,0,0,0,0,0,0,0]], 500, 0.1 , 0.01, 
+				generated_img = DBM.gibbs_sampling([[0,0,1.5,0,0,0,0,0,0,0]], 500, 0.001 , 0.001, 
 							mode     = "freerunning",
 							subspace = [],
-							liveplot = 1)
-				ax[i,j].matshow(generated_img.reshape(int(sqrt(DBM.shape[0])), int(sqrt(DBM.shape[0]))))
+							liveplot = 0)
+				ax[i,j].matshow(generated_img.reshape(int(sqrt(DBM.SHAPE[0])), int(sqrt(DBM.SHAPE[0]))))
 				ax[i,j].set_xticks([])
 				ax[i,j].set_yticks([])
 				ax[i,j].grid(False)
@@ -1527,7 +1534,7 @@ if DO_CONTEXT:
 
 		# loop through images from all wrong classsified images and find al images that are <5 
 		index_for_number_gibbs=[]
-		for i in range(18,19):
+		for i in range(1000):
 			## find the digit that was presented
 			digit=np.where(test_label[i])[0][0] 		
 			## set desired digit range
@@ -1702,7 +1709,7 @@ if DO_TRAINING:
 	# plot layer diversity
 	plt.figure("Layer diversity")
 	for i in range(DBM.n_layers):
-		plt.plot(smooth(np.array(DBM.layer_diversity_)[::2,i],10),label="Layer %i"%i,alpha=0.8)
+		plt.plot(smooth(np.array(DBM.layer_diversity_)[::2,i],10),label="Layer %i"%i,alpha=0.9)
 		plt.legend()
 	plt.xlabel("Update Number")
 	plt.ylabel("Deviation")
@@ -1710,9 +1717,9 @@ if DO_TRAINING:
 
 	plt.figure("Errors")
 	## train errors
-	plt.plot(DBM.recon_error_train[:],"-",label="Recon Error Train")
+	plt.plot(DBM.recon_error_train[:],"-",label="Recon Error Train",alpha=0.9)
 	if DBM.classification:
-		plt.plot(DBM.class_error_train[:],"-",label="Class Error Train")
+		plt.plot(DBM.class_error_train[:],"-",label="Class Error Train",alpha=0.9)
 	## test errors
 	# calc number of updates per epoch
 	n_u_p_e = len(DBM.recon_error_train) / DBM.epochs
@@ -1775,7 +1782,7 @@ if DO_TRAINING:
 		ax[2].plot(DBM.save_dict["W_mean_%i"%i],label="Weight %i"%i)
 	ax[2].legend(loc="center left",bbox_to_anchor = (1.0,0.5))
 	ax[2].set_xlabel("Epoch")
-	plt.subplots_adjust(bottom=None, right=0.73, top=None,
+	plt.subplots_adjust(bottom=None, left = 0.2, right=0.73, top=None,
 	            wspace=None, hspace=None)
 	save_fig(saveto_path+"/learnr-temp.pdf", DO_SAVE_TO_FILE)
 
@@ -1823,7 +1830,7 @@ if DO_TRAINING:
 
 
 #plot only one digit
-if LOAD_MNIST:
+if LOAD_MNIST and DO_TESTING:
 	fig3,ax3 = plt.subplots(len(DBM.SHAPE)+1,10,figsize=(16,4),sharey="row")
 	m=0
 	for i in index_for_number_test.astype(np.int)[8][0:10]:
