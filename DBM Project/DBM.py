@@ -794,7 +794,7 @@ class DBM_class(object):
 					sess.run(self.update_l_s[1:],{self.temp_tf : temp})
 
 			# last run calc only the probs to reduce noise
-			sess.run(self.update_l_p[1:-1],{self.temp_tf : temp})
+			# sess.run(self.update_l_p[1:-1],{self.temp_tf : temp})
 			# save all layer for bias update
 			sess.run(self.assign_save_layer)
 			# update the positive gradients
@@ -806,7 +806,8 @@ class DBM_class(object):
 			for n in range(freerun_steps):
 				# using sampling
 				sess.run(self.update_l_s,{self.temp_tf : temp})
-			sess.run(self.update_l_p,{self.temp_tf : temp})
+			# calc probs for noise calcel
+			# sess.run(self.update_l_p,{self.temp_tf : temp})
 			# calc he negatie gradients
 			sess.run(self.update_neg_grad)
 
