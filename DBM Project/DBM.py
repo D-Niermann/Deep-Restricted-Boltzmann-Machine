@@ -466,16 +466,28 @@ class DBM_class(object):
 		returns :: input for the layer - which are the probabilites
 		"""
 		if layer_i == 0:
-			_input_ = sigmoid(tf.matmul(self.layer[layer_i+1], self.w[layer_i],transpose_b=True) + self.bias[layer_i], self.temp_tf)			
+			w = self.w[layer_i];
+			if USE_DROPOUT:
+				w *= self.dropout_matrix[layer_i]
+			_input_ = sigmoid(tf.matmul(self.layer[layer_i+1], w,transpose_b=True) + self.bias[layer_i], self.temp_tf)			
 
 		elif layer_i == self.n_layers-1:
-			_input_ = sigmoid(tf.matmul(self.layer[layer_i-1],self.w[layer_i-1]) + self.bias[layer_i], self.temp_tf)
+			w = self.w[layer_i-1];
+			if USE_DROPOUT:
+				w *= self.dropout_matrix[layer_i-1]
+			_input_ = sigmoid(tf.matmul(self.layer[layer_i-1],w) + self.bias[layer_i], self.temp_tf)
 		
 		else:
-			_input_ = sigmoid(tf.matmul(self.layer[layer_i-1],self.w[layer_i-1]) 
-					+ tf.matmul(self.layer[layer_i+1],self.w[layer_i],transpose_b=True) 
-					+ self.bias[layer_i], 
-					self.temp_tf)
+			w0 = self.w[layer_i-1];
+			w1 = self.w[layer_i];
+			if USE_DROPOUT:
+				w0 *= self.dropout_matrix[layer_i-1]
+				w1 *= self.dropout_matrix[layer_i]
+			_input_ = sigmoid(tf.matmul(self.layer[layer_i-1],w0) 
+								+ tf.matmul(self.layer[layer_i+1],w1,transpose_b=True) 
+								+ self.bias[layer_i], 
+						       self.temp_tf
+							  )
 		return _input_
 
 	def sample(self,x):
@@ -575,6 +587,10 @@ class DBM_class(object):
 		self.w_mean_         = [None]*(self.n_layers-1) # variable to store means
 		self.mean_w          = [None]*(self.n_layers-1) # calc of mean for each w
 		self.do_norm_w       = [None]*(self.n_layers-1)
+		self.dropout_matrix  = [None]*(self.n_layers-1) # store 0 and 1 randomly for each neuron connection
+
+
+
 		# bias
 		self.bias        = [None]*self.n_layers
 		self.update_bias = [None]*self.n_layers
@@ -615,7 +631,9 @@ class DBM_class(object):
 				self.w_mean_[i]         = tf.Variable(tf.zeros([N_EPOCHS_TRAIN]))
 				self.mean_w[i]          = tf.sqrt(tf.reduce_sum(tf.square(self.w[i])))
 				self.do_norm_w[i]       = self.w[i].assign(self.w[i]/tf.sqrt(tf.reduce_sum(tf.square(self.w[i]))))
-
+				self.dropout_matrix[i]  = tf.round(tf.clip_by_value(tf.random_uniform(tf.shape(self.w[i]))*DROPOUT_RATE,0,1))
+			else:
+				self.dropout_matrix[i] = tf.ones(tf.shape(self.w[i]))
 
 		### bias calculations and assignments
 		for i in range(len(self.bias)):
@@ -1309,6 +1327,9 @@ DO_CONTEXT    = 0	 	# if to test the context
 DO_GEN_IMAGES = 0	 	# if to generate images (mode can be choosen at function call)
 DO_NOISE_STAB = 0	 	# if to make a noise stability test
 
+USE_DROPOUT  = 1
+DROPOUT_RATE = 1
+
 
 ### saving and loading 
 DO_SAVE_TO_FILE       = 0 	# if to save plots and data to file
@@ -1685,26 +1706,25 @@ if DO_TRAINING:
 
 
 
-fig,ax = plt.subplots(3,1,sharex="col")
+	fig,ax = plt.subplots(3,1,sharex="col")
 
-ax[0].plot(DBM.save_dict["Temperature"],label="Temperature")
-ax[0].legend(loc="center left",bbox_to_anchor = (1.0,0.5))
+	ax[0].plot(DBM.save_dict["Temperature"],label="Temperature")
+	ax[0].legend(loc="center left",bbox_to_anchor = (1.0,0.5))
 
-ax[0].set_ylabel("Temperature")
+	ax[0].set_ylabel("Temperature")
 
-ax[1].plot(DBM.save_dict["Learnrate"],label="Learnrate")
-ax[1].legend(loc="center left",bbox_to_anchor = (1.0,0.5))
-ax[1].set_ylabel("Learnrate")
+	ax[1].plot(DBM.save_dict["Learnrate"],label="Learnrate")
+	ax[1].legend(loc="center left",bbox_to_anchor = (1.0,0.5))
+	ax[1].set_ylabel("Learnrate")
 
-ax[2].set_ylabel("Weights Mean")
-for i in range(len(DBM.SHAPE)-1):
-	log.out(i)
-	ax[2].plot(DBM.save_dict["W_mean_%i"%i],label="Weight %i"%i)
-ax[2].legend(loc="center left",bbox_to_anchor = (1.0,0.5))
-ax[2].set_xlabel("Epoch")
-plt.subplots_adjust(bottom=None, right=0.73, left=0.2, top=None,
-            wspace=None, hspace=None)
-plt.show()
+	ax[2].set_ylabel("Weights Mean")
+	for i in range(len(DBM.SHAPE)-1):
+		log.out(i)
+		ax[2].plot(DBM.save_dict["W_mean_%i"%i],label="Weight %i"%i)
+	ax[2].legend(loc="center left",bbox_to_anchor = (1.0,0.5))
+	ax[2].set_xlabel("Epoch")
+	plt.subplots_adjust(bottom=None, right=0.73, left=0.2, top=None,
+	            wspace=None, hspace=None)
 	save_fig(saveto_path+"/learnr-temp.pdf", DO_SAVE_TO_FILE)
 
 
@@ -1783,6 +1803,7 @@ if LOAD_MNIST:
 		# plt.matshow(random_recon.reshape(int(sqrt(DBM.SHAPE[0])),int(sqrt(DBM.SHAPE[0]))))
 		m+=1
 	plt.tight_layout(pad=0.0)
+	save_fig(saveto_path+"/examples_one_digit.pdf", DO_SAVE_TO_FILE)
 
 
 

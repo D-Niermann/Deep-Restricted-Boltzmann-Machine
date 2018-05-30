@@ -471,20 +471,31 @@ class DBM_class(object):
 		for i in range(self.n_layers):
 			sess.run(self.bias[i].assign(self.bias_np[i]))
 
-	def layer_input(self, layer_i):
+	def layer_input(self, layer_i, USE_DROPOUT):
 		""" calculate input of layer layer_i
 		layer_i :: for which layer
 		returns :: input for the layer - which are the probabilites
 		"""
 		if layer_i == 0:
-			_input_ = sigmoid(tf.matmul(self.layer[layer_i+1], self.w[layer_i],transpose_b=True) + self.bias[layer_i], self.temp_tf)			
+			w = self.w[layer_i];
+			if USE_DROPOUT:
+				w *= self.dropout_matrix[layer_i]
+			_input_ = sigmoid(tf.matmul(self.layer[layer_i+1], w,transpose_b=True) + self.bias[layer_i], self.temp_tf)			
 
 		elif layer_i == self.n_layers-1:
-			_input_ = sigmoid(tf.matmul(self.layer[layer_i-1],self.w[layer_i-1]) + self.bias[layer_i], self.temp_tf)
+			w = self.w[layer_i-1];
+			if USE_DROPOUT:
+				w *= self.dropout_matrix[layer_i-1]
+			_input_ = sigmoid(tf.matmul(self.layer[layer_i-1],w) + self.bias[layer_i], self.temp_tf)
 		
 		else:
-			_input_ = sigmoid(tf.matmul(self.layer[layer_i-1],self.w[layer_i-1]) 
-								+ tf.matmul(self.layer[layer_i+1],self.w[layer_i],transpose_b=True) 
+			w0 = self.w[layer_i-1];
+			w1 = self.w[layer_i];
+			if USE_DROPOUT:
+				w0 *= self.dropout_matrix[layer_i-1]
+				w1 *= self.dropout_matrix[layer_i]
+			_input_ = sigmoid(tf.matmul(self.layer[layer_i-1],w0) 
+								+ tf.matmul(self.layer[layer_i+1],w1,transpose_b=True) 
 								+ self.bias[layer_i], 
 						       self.temp_tf
 							  )
@@ -645,7 +656,7 @@ class DBM_class(object):
 		self.do_norm_w       = [None]*(self.n_layers-1)
 		self.w_mean_         = [None]*(self.n_layers-1) # variable to store means
 		self.mean_w          = [None]*(self.n_layers-1) # calc of mean for each w
-
+		self.dropout_matrix  = [None]*(self.n_layers-1) # store 0 and 1 randomly for each neuron connection
 
 		# bias
 		self.bias        = [None]*self.n_layers
@@ -697,6 +708,9 @@ class DBM_class(object):
 				self.w_mean_[i]   = tf.Variable(tf.zeros([N_EPOCHS_TRAIN]))
 				self.mean_w[i]    = tf.sqrt(tf.reduce_sum(tf.square(self.w[i])))
 				self.do_norm_w[i] = self.w[i].assign(self.w[i]/tf.sqrt(tf.reduce_sum(tf.square(self.w[i]))))
+				self.dropout_matrix[i] = tf.round(tf.clip_by_value(tf.random_uniform(tf.shape(self.w[i]))*DROPOUT_RATE,0,1))
+			else:
+				self.dropout_matrix[i] = tf.ones(tf.shape(self.w[i]))
 
 		self.assign_w_0 = self.w[0].assign_add(self.w_0_ph)
 
@@ -715,7 +729,7 @@ class DBM_class(object):
 			self.assign_save_layer[i] = self.layer_save[i].assign(self.layer[i])
 			self.assign_l[i]         = self.layer[i].assign(self.layer_ph[i])
 			self.assign_l_rand[i]    = self.layer[i].assign(tf.random_uniform([self.batchsize,self.SHAPE[i]]))
-			self.layer_prob[i]       = self.layer_input(i)
+			self.layer_prob[i]       = self.layer_input(i,USE_DROPOUT)
 			self.layer_samp[i]       = self.sample(self.layer_prob[i])
 			self.update_l_p[i]       = self.layer[i].assign(self.layer_prob[i])
 			self.layer_activities[i] = tf.reduce_sum(self.layer[i])/(self.batchsize*self.SHAPE[i])*100
@@ -1353,7 +1367,7 @@ class DBM_class(object):
 N_BATCHES_PRETRAIN = 500			# how many batches per epoch for pretraining
 N_BATCHES_TRAIN    = 500			# how many batches per epoch for complete DBM training
 N_EPOCHS_PRETRAIN  = [0,0,0,0,0] 	# pretrain epochs for each RBM
-N_EPOCHS_TRAIN     = 2				# how often to iter through the test images
+N_EPOCHS_TRAIN     = 5				# how often to iter through the test images
 TEST_EVERY_EPOCH   = 5 			    # how many epochs to train before testing on the test data
 
 ### Shape BM Params
@@ -1361,37 +1375,38 @@ N_SPLITS    = 4
 PX_OVERHANG = 2
 
 ### learnrates 
-LEARNRATE_PRETRAIN = 0.01		# learnrate for pretraining
-LEARNRATE_START    = 0.01		# starting learnratesk
+LEARNRATE_PRETRAIN = 0.001		# learnrate for pretraining
+LEARNRATE_START    = 0.001		# starting learnratesk
 LEARNRATE_SLOPE    = 5.0		# bigger number -> smaller slope
 
 ### temperature
-TEMP_START    = 1 			# starting temp
+TEMP_START    = 0.05 			# starting temp
 TEMP_SLOPE    = 90.0		# slope of dereasing temp bigger number -> smaller slope
 
 
 ### state vars 
-DO_PRETRAINING = 0		# if no pretrain then files are automatically loaded
-DO_TRAINING    = 0		# if to train the whole DBM
+DO_PRETRAINING = 1		# if no pretrain then files are automatically loaded
+DO_TRAINING    = 1		# if to train the whole DBM
 DO_TESTING     = 1		# if testing the DBM with test data
-DO_SHOW_PLOTS  = 0		# if plots will show on display - either way they get saved into saveto_path
+DO_SHOW_PLOTS  = 1		# if plots will show on display - either way they get saved into saveto_path
 
 DO_CONTEXT    = 0		# if to test the context
 DO_GEN_IMAGES = 0		# if to generate images (mode can be choosen at function call)
 DO_NOISE_STAB = 0		# if to make a noise stability test
 
+USE_DROPOUT  = 1
+DROPOUT_RATE = 1
 
 ### saving and loading 
-DO_SAVE_TO_FILE       = 0 	# if to save plots and data to file
+DO_SAVE_TO_FILE       = 1 	# if to save plots and data to file
 DO_SAVE_PRETRAINED    = 0 	# if to save the pretrained weights seperately (for later use)
-DO_LOAD_FROM_FILE     = 1 	# if to load weights and biases from datadir + pathsuffix
+DO_LOAD_FROM_FILE     = 0 	# if to load weights and biases from datadir + pathsuffix
 PATHSUFFIX            = "Mon_May_14_09-33-58_2018_[784, 144, 49, 10]"
 PATHSUFFIX_PRETRAINED = "Mon_May__7_11-41-34_2018"
 
 
 DBM_SHAPE = [	int(sqrt(test_data.shape[1]))*int(sqrt(test_data.shape[1])),
 				12*12,
-				7*7,
 				10
 				]
 ###########################################################################################################
@@ -1862,6 +1877,7 @@ if LOAD_MNIST and DO_TESTING:
 		# plt.matshow(random_recon.reshape(int(sqrt(DBM.SHAPE[0])),int(sqrt(DBM.SHAPE[0]))))
 		m+=1
 	plt.tight_layout(pad=0.0)
+	save_fig(saveto_path+"/examples_one_digit.pdf", DO_SAVE_TO_FILE)
 
 
 
