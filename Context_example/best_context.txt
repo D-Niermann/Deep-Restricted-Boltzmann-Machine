@@ -1,0 +1,17 @@
+Info     	Found 5139 Images 
+4.      	Initializing graph
+5.      	loading numpy vars into graph
+6.--v   	Sampling data
+7.---v  		Gibbs Sampling
+Info     			: Mode: context | Steps: 80 
+7.---^  		Gibbs Sampling (took 49.642 sek)
+8.---v  		Gibbs Sampling
+Info     			: Mode: context | Steps: 80 
+9.      			Setting Weights to 0
+8.---^  		Gibbs Sampling (took 49.552 sek)
+Info     		Inorrect Context: 276 / 5.37 % 
+Info     		Inorrect No Context: 446 / 8.68 % 
+Info     		Diff:      170 
+Info     		Outside subspace (c/nc): 0 , 317 
+10.      		Means: Correct // Wrong (c/nc): 
+ 	 	  0.9732 0.9468 // 0.4935 0.2693

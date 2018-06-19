@@ -211,7 +211,7 @@ def load_data(path,max_pics):
 	return np.array(data)
 
 def train(w):
-	global v,h,image_vector,numpoints,_v,bias_v,bias_h
+	global v,h,image,numpoints,_v,bias_v,bias_h
 
 	### set up v and h ###
 	h=stochastic_fire(forward_pass(v))
@@ -219,7 +219,7 @@ def train(w):
 	v=stochastic_fire(_v)
 
 	#positive gradient
-	pos_grad=np.outer(h, image_vector)
+	pos_grad=np.outer(h, image)
 	
 	# this is the fire prob of h (gibbs sampling)
 	h_prob=forward_pass(v) 
@@ -232,7 +232,7 @@ def train(w):
 	CD=(pos_grad-neg_grad)/numpoints
 
 	#update biases
-	bias_v+=learnrate*((image_vector-v))
+	bias_v+=learnrate*((image-v))
 	bias_h+=learnrate*((h-h_prob))
 
 	return CD
@@ -308,17 +308,17 @@ def liveplot(lp,interval,i):
 ### init all variables ###
 v               = np.ones(28*28) #visible layer
 h               = np.zeros(500) #hidden layer
-w,bias_v,bias_h = init_pretrained(1,1,1)
-# w             = rnd.random([h.size,v.size])/100000. #weights
-# bias_v        = np.zeros(v.size) #bias of visible layer
-# bias_h        = np.zeros(h.size) #bias of hidden layer
+# w,bias_v,bias_h = init_pretrained(1,1,1)
+w             = rnd.random([h.size,v.size])/100000. #weights
+bias_v        = np.zeros(v.size) #bias of visible layer
+bias_h        = np.zeros(h.size) #bias of hidden layer
 temp            = float(3) # 0.001 for heavyside function , 1 for completely random
 end_temp        = 0.1 #temperature at end of epoch
 learnrate       = 1.
-epochs          = 2  # number of training steps“
+epochs          = 1  # number of training steps“
 lp              = False #if plotting while traingin is on
 files_to_load   = 1000 #files per type of class
-batch_size	    = 10 #how many images will be batched and averaged
+batch_size	    = 100 #how many images will be batched and averaged
 ########################################################################
 ########################################################################
 
@@ -340,16 +340,16 @@ m=0
 switch=0
 start_temp=temp
 
-path_to_traindata="/Users/Niermann/Downloads/MNIST/training/"
-data=load_data(path_to_traindata, files_to_load)
-rnd.shuffle(data)
-len_data=float(len(data))
-numpoints=data[0].shape[0]*data[0].shape[0]
-temp_step=(start_temp-end_temp)/(len_data*epochs)
-batch_start=0
-batch_end=batch_size
-batches=len_data/batch_size
-if int(batches)!=batches:
+path_to_traindata = "/Users/Niermann/Downloads/MNIST/training/"
+# train_data              = load_data(path_to_traindata, files_to_load)
+# rnd.shuffle(train_data)
+len_data         = float(len(train_data))
+numpoints        = train_data[0].shape[0]*train_data[0].shape[0]
+temp_step        = (start_temp-end_temp)/(len_data*epochs)
+batch_start      = 0
+batch_end        = batch_size
+batches          = len_data/batch_size
+if int(batches) != batches:
 	raise TypeError("Error with batch size")
 batches=int(batches)
 
@@ -365,12 +365,12 @@ for i in range(epochs):
 		CD_=np.zeros([batches,w.shape[0],w.shape[1]])
 		# print "batch",batch_start,"-",batch_end
 	
-		for j,image in enumerate(data[batch_start:batch_end]):
+		for j,image in enumerate(train_data[batch_start:batch_end]):
 			#vectorize image 
-			image_vector=reshape_image(image)
+			# image_vector=reshape_image(image)
 
 			### set the input ###
-			my_input = image_vector
+			my_input = image
 			v        = my_input
 
 			#training (append CD matrix to list and update bias v and bias h online)
@@ -380,7 +380,7 @@ for i in range(epochs):
 			# append variables to lists
 			CD_[batch,:,:]=CD
 			energy_.append(energy())
-			error_.append((np.mean(image_vector-v)**2)*1000)
+			error_.append((np.mean(image-v)**2)*1000)
 
 			#anneal the temp
 			temp-=temp_step
@@ -401,7 +401,7 @@ for i in range(epochs):
 				liveplot(lp,0.0001,j)
 
 		#update Weights
-		w+=learnrate*np.mean(CD_)
+		w+=learnrate*np.mean(CD_,0)
 		batch_start += batch_size
 		batch_end   += batch_size
 
