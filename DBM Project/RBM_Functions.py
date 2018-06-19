@@ -16,10 +16,24 @@ def scale_to_unit_interval(ndar, eps=1e-8):
     return ndar
 
 
+def vec_len_np(array,axis):
+    return np.sqrt(np.sum(np.square(array),axis=axis))
+
+def vec_len(tensor,axis):
+    return tf.sqrt(tf.reduce_sum(tf.square(tensor),axis=axis))
+
+def abs_norm(tensor,axis):
+    return tf.reduce_sum(tf.abs(tensor),axis=axis)
+
+def abs_norm_np(array,axis):
+    return np.sum(np.abs(array),axis=axis)
+
+
 def save_fig(path,save_to_file):
     if save_to_file:
         return savefig(path)
     else:
+        log.out("Could not save figure!")
         return None
 
 
