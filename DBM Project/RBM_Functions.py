@@ -31,9 +31,8 @@ def abs_norm_np(array,axis):
 
 def save_fig(path,save_to_file):
     if save_to_file:
-        return savefig(path)
+        return savefig(path,dpi=200)
     else:
-        log.out("Could not save figure!")
         return None
 
 
@@ -213,7 +212,7 @@ def init_pretrained(name_extension="0.0651765",w=None,bias_v=None,bias_h=None):
     return m
 
 def sigmoid(x,T):
-    return 1./tf.add(1.,tf.exp(-tf.multiply(1./T,x)))
+    return 1.0/tf.add(1.,tf.exp(-tf.multiply(1./T,x)))
 
 
 def sigmoid_np(x,T):
