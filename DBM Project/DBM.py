@@ -536,14 +536,20 @@ class DBM_class(object):
 					)
 				)
 
-	def glauber_step(self, clamp = "visible"):
+	def glauber_step(self, clamp, temp, droprate, save_array, step):
 		""" 
 		Updates layer asynchronously (glauber dynamic), some layers can be set to be clamped 
+		
+		temp :: temperature 
 		
 		clamp :: string type. weather to clamp visible layer ("visible","v") or 
 				label layer ("label","l") or visible and label ("visible+label","v+l") 
 				for clamped train run or No clamp ("None") for the train free run
 		
+		save_array :: "None" or array of shape [layer,batchsize,timestep,n_units] to save every step in
+		
+		step :: current timestep
+
 		returns :: list of resulting unit states as numpy arrays
 		"""
 		layer = [None]*self.n_layers
@@ -561,20 +567,23 @@ class DBM_class(object):
 		rnd.shuffle(rnd_order)
 
 		# run the updates in that random order
-		for i in rnd_order:
-			layer[i] = sess.run(self.update_l_s[i], {self.temp_tf : temp})
+		for layer in rnd_order:
+			if save_array == "None":
+				sess.run(self.update_l_s[layer], {self.temp_tf : temp, self.droprate_tf : droprate})
+			else:
+				save_array[layer][step] = sess.run(self.update_l_s[layer], {self.temp_tf : temp, self.droprate_tf : droprate})
 		
 		# delete empty layer elements
-		if clamp == "visible" or clamp == "v":
-			layer.pop(0)
-		elif clamp == "label" or clamp == "l":
-			layer.pop(-1)
-		elif clamp == "visible+label" or clamp == "v+l":
-			layer.pop(-1)
-			layer.pop(0)
+		# if clamp == "visible" or clamp == "v":
+		# 	layer.pop(0)
+		# elif clamp == "label" or clamp == "l":
+		# 	layer.pop(-1)
+		# elif clamp == "visible+label" or clamp == "v+l":
+		# 	layer.pop(-1)
+		# 	layer.pop(0)
 
 
-		return layer
+		# return layer
 				
 	def get_learnrate(self,epoch,a,y_off):
 		""" calculate the learnrate dependend on parameters
@@ -672,11 +681,12 @@ class DBM_class(object):
 			self.learnrate = tf.placeholder(tf.float32,[self.n_layers-1],name="Learnrate")
 
 		#### temperature
-		self.temp_tf = tf.placeholder(tf.float32,[],name="Temperature")
+		self.temp_tf = tf.placeholder(tf.float32, [], name="Temperature")
+		self.droprate_tf = tf.placeholder(tf.float32, [], name="DropoutRate")
 
 
 		### init all Parameters like weights , biases , layers and their updates
-		# weights
+		## weights
 		self.w               = [None]*(self.n_layers-1)
 		self.pos_grad        = [None]*(self.n_layers-1)
 		self.neg_grad        = [None]*(self.n_layers-1)
@@ -756,10 +766,12 @@ class DBM_class(object):
 				# else:
 				# 	length2 = abs_norm( self.w[i] ,0) # shape of h[-1]
 				# 	self.do_norm_w[i]   = self.w[i].assign( self.w[i]/ tf.where(length2<1, tf.ones_like(length2), length2))
-				
+
+				# droprate is constant- used for training
 				self.dropout_matrix[i]  = tf.round(tf.clip_by_value(tf.random_uniform(tf.shape(self.w[i]))*DROPOUT_RATE,0,1))
 			else:
-				self.dropout_matrix[i] = tf.ones(tf.shape(self.w[i]))
+				# droprate is variable and can be decreased over time
+				self.dropout_matrix[i] = tf.round(tf.clip_by_value(tf.random_uniform(tf.shape(self.w[i]))*self.droprate_tf,0,1))
 
 		### bias calculations and assignments
 		for i in range(len(self.bias)):
@@ -921,9 +933,9 @@ class DBM_class(object):
 			# calc hidden layer samples (not the visible & label layer)
 			for hidden in range(M):
 				if self.classification:
-					sess.run(self.update_l_s[1:-1],{self.temp_tf : temp})#self.glauber_step(clamp="v+l") #sess.run(self.update_l_s[1:-1],{self.temp_tf : temp})
+					sess.run(self.update_l_s[1:-1],{self.temp_tf : temp})#self.glauber_step(clamp="v+l",temp=temp) #sess.run(self.update_l_s[1:-1],{self.temp_tf : temp})
 				else:
-					sess.run(self.update_l_s[1:],{self.temp_tf : temp})#self.glauber_step(clamp="v") #sess.run(self.update_l_s[1:],{self.temp_tf : temp})
+					sess.run(self.update_l_s[1:],{self.temp_tf : temp})#self.glauber_step(clamp="v",temp=temp) #sess.run(self.update_l_s[1:],{self.temp_tf : temp})
 
 			# last run calc only the probs to reduce noise
 			sess.run(self.update_l_p[1:-1],{self.temp_tf : temp})
@@ -945,7 +957,7 @@ class DBM_class(object):
 					# 	sess.run(self.assign_l[-1],{self.layer_ph[-1]  : batch_label})
 						
 			for n in range(freerun_steps):
-				sess.run(self.update_l_s,{self.temp_tf : temp})#self.glauber_step(clamp = "None") #sess.run(self.update_l_s,{self.temp_tf : temp})
+				sess.run(self.update_l_s,{self.temp_tf : temp})#self.glauber_step(clamp = "None",temp=temp) #sess.run(self.update_l_s,{self.temp_tf : temp})
 			
 			# calc probs for noise cancel				
 			sess.run(self.update_l_p,{self.temp_tf : temp})
@@ -1045,13 +1057,16 @@ class DBM_class(object):
 		self.batchsize       = len(my_test_data)
 		self.learnrate       = LEARNRATE_START
 		
-		self.layer_save_test = [[None] for i in range(N)]   # save layers while N hidden updates
+		self.layer_save_test = [[None] for i in range(self.n_layers)]   # save layers while N hidden updates
+		for layer in range(len(self.layer_save_test)):
+			self.layer_save_test[layer] = np.zeros([N, self.batchsize, self.SHAPE[layer]])
 		self.layer_act_test  = np.zeros([N,self.n_layers])  # layer activities while N hidden updates
 
 		#temp decrease
 		temp                 = temp_start
 		temp_delta           = (temp_end-temp_start)/float(N)
 
+		droprate = 100
 
 		### init the graph 
 		if DO_LOAD_FROM_FILE and not DO_TRAINING:
@@ -1071,7 +1086,7 @@ class DBM_class(object):
 		
 		for n in range(N):
 			self.layer_act_test[n,:] = sess.run(self.layer_activities, {self.temp_tf : temp})
-			self.layer_save_test[n] = self.glauber_step(clamp = "visible")#sess.run(self.update_l_s[1:], {self.temp_tf : temp})
+			self.glauber_step("visible", temp, droprate, self.layer_save_test, n)#sess.run(self.update_l_s[1:], {self.temp_tf : temp})
 
 			temp+=temp_delta
 		
@@ -1092,7 +1107,7 @@ class DBM_class(object):
 		self.probs = self.layer[0].eval()
 		self.image_timeline = []
 		for i in range(M):
-			self.probs += sess.run(self.update_l_s[0],{self.temp_tf : temp})
+			self.probs += sess.run(self.update_l_s[0],{self.temp_tf : temp, self.droprate_tf: droprate})
 			self.image_timeline.append(self.layer[0].eval()[0])
 		self.probs *= 1./(M+1)
 
@@ -1171,15 +1186,16 @@ class DBM_class(object):
 		log.reset()
 		return wrong_classified_ind
 
-	def gibbs_sampling(self,v_input,gibbs_steps,TEMP_START,temp_end,subspace,mode,liveplot=1):
+	def gibbs_sampling(self, v_input, gibbs_steps, TEMP_START, temp_end, droprate_start, droprate_end, subspace, mode, liveplot=1):
 		""" Repeatedly samples v and label , where label can be modified by the user with the multiplication
 		by the modification array - clamping the labels to certain numbers.
 		v_input :: starting with an image as input can also be a batch of images
 		
 		temp_end, TEMP_START :: temperature will decrease or increase to temp_end and start at TEMP_START 
 		
-		mode 	:: "sampling" calculates h2 and v back and forth usign previous steps
-			:: "context" clamps v and only calculates h1 based on previous h2
+		mode 	:: "generate"  clamps label
+				:: "freerunnning" clamps nothing
+				:: "context" clamps v and only calculates h1 based on previous h2
 		
 		subspace :: {"all", array} if "all" do nothing, if array: set the weights to 0 for all indices not marked by subspace
 		 		used with "context" mode for clamping certain labels to 0
@@ -1188,12 +1204,21 @@ class DBM_class(object):
 		self.layer_save = []
 		for i in range(self.n_layers):
 			self.layer_save.append(np.zeros([gibbs_steps,self.batchsize,self.SHAPE[i]]))
-
+	
+		layer = [None]*self.n_layers
+		for l in range(len(layer)):
+			layer[l] = np.zeros([1,self.batchsize,self.SHAPE[l]])
+		
 		temp_          = np.zeros([gibbs_steps])
+
 		self.energy_   = []
 		self.mean_h1   = []
+
 		temp           = TEMP_START
 		temp_delta     = (temp_end-TEMP_START)/gibbs_steps
+
+		droprate   = droprate_start
+		drop_delta = (droprate_end-droprate_start)/gibbs_steps 
 
 		self.num_of_updates = 1000 #just needs to be defined because it will make a train graph with tf.arrays where this number is needed
 
@@ -1204,8 +1229,9 @@ class DBM_class(object):
 			# plt.tight_layout()
 
 		log.start("Gibbs Sampling")
-		log.info(": Mode: %s | Steps: %i"%(mode,gibbs_steps))
-		log.info("Temp_range:",TEMP_START,"->",temp_end)
+		log.info("Mode: %s | Steps: %i"%(mode,gibbs_steps))
+		log.info("Temp_range:",round(TEMP_START,5),"->",round(temp_end,5))
+		log.info("Dropout_range:",round(droprate_start,5),"->",round(droprate_end,5))
 
 		if mode=="context":
 			sess.run(self.assign_l[0],{self.layer_ph[0] : v_input})
@@ -1252,8 +1278,8 @@ class DBM_class(object):
 			### gibbs steps
 			for step in range(gibbs_steps):
 
-				# update all layer except first one
-				layer = self.glauber_step(clamp = "visible") #sess.run(self.update_l_s[1:], {self.temp_tf : temp})
+				# update all layer except first one (set step = 0 because time series is not saved)
+				self.glauber_step("visible", temp, droprate, layer, step = 0) #sess.run(self.update_l_s[1:], {self.temp_tf : temp})
 				
 				
 				if subspace == "all":
@@ -1315,13 +1341,17 @@ class DBM_class(object):
 			sess.run(self.assign_l_rand)
 			sess.run(self.layer[-1].assign(v_input))
 
-			self.layer_save_generate = [[None] for i in range(gibbs_steps)]
+
+			## init save arrays for every layer and every gibbs step
+			self.layer_save_generate = [[None] for i in range(self.n_layers)]
+			for layer in range(len(self.layer_save_generate)):
+				self.layer_save_generate[layer] = np.zeros( [gibbs_steps, self.batchsize, self.SHAPE[layer]] )
 			self.energy_generate = np.zeros([gibbs_steps,self.batchsize])
 
 			for step in range(gibbs_steps):
 				# update all layer except the last one (labels) 
-				self.layer_save_generate[step] = self.glauber_step(clamp="label") #sess.run(self.update_l_s[:-1], {self.temp_tf : temp})
-				self.energy_generate[step]     = sess.run(self.energy)
+				self.glauber_step("label",temp, droprate, self.layer_save_generate, step) #sess.run(self.update_l_s[:-1], {self.temp_tf : temp})
+				self.energy_generate[step] = sess.run(self.energy)
 
 				# save layers 
 				if liveplot:
@@ -1336,6 +1366,7 @@ class DBM_class(object):
 
 				# assign new temp
 				temp += temp_delta 
+				droprate+=drop_delta
 		
 		if mode=="freerunning":
 			sess.run(self.assign_l_rand)
@@ -1343,13 +1374,20 @@ class DBM_class(object):
 			# sess.run(self.assign_l[0], {self.layer_ph[0] : test_data[rng:rng+1]})
 			# for i in range(10):
 			# 	sess.run(self.update_l_s[1:],{self.temp_tf : temp})
+			
+			## init save arrays for every layer and every gibbs step
+			self.layer_save_generate = [[None] for i in range(gibbs_steps)]
+			# for i in range(len(self.layer_save_generate)):
+			# 	self.layer_save_generate[i] = np.zeros([gibbs_steps,DBM.SHAPE[i]])
+			self.energy_generate = np.zeros([gibbs_steps,self.batchsize])
+			
 
 			for step in range(gibbs_steps):
 				
 				# update all layer 
-				# layer = [None]*self.n_layers
-				layer=sess.run(self.update_l_s, {self.temp_tf : temp}) 
-				# layer[1:]=sess.run(self.update_l_s[1:], {self.temp_tf : temp})
+				
+				self.glauber_step("None", temp, droprate, self.layer_save_generate, step) #sess.run(self.update_l_s, {self.temp_tf : temp}) 
+				self.energy_generate[step] = sess.run(self.energy)
 				
 				
 				if liveplot:
@@ -1410,12 +1448,13 @@ class DBM_class(object):
 		log.end()
 		if mode=="freerunning" or mode=="generate":
 			# return the last images that got generated 
-			v_layer = sess.run(self.update_l_p[0], {self.temp_tf : temp})
-			return v_layer
+			return np.mean(self.layer_save_generate[0][-40:],0)
+			# v_layer = sess.run(self.update_l_p[0], {self.temp_tf : temp})
+			# return v_layer
 
 		else:
 			# return the mean of the last 20 gibbs samples for all images
-			return np.mean(self.layer_save[-1][-20:,:],axis=0)
+			return np.mean(self.layer_save[-1][-100:,:],axis=0)
 
 	def export(self):
 		# convert weights and biases to numpy arrays
@@ -1440,32 +1479,35 @@ class DBM_class(object):
 		log.info("Saved Weights and Biases as NumPy Arrays.")
 
 	def write_to_file(self):
-		if self.exported!=1:
-			self.export()
 		new_path = saveto_path
 		if not os.path.isdir(saveto_path):
 			os.makedirs(new_path)
 		os.chdir(new_path)
+
+		if DO_TRAINING:
+			if self.exported!=1:
+				self.export()
+
+			# save weights 
+			for i in range(self.n_layers-1):
+				np.savetxt("w%i.txt"%i, self.w_np[i])
+			
+			##  save bias
+			for i in range(self.n_layers):
+				np.savetxt("bias%i.txt"%i, self.bias_np[i])
+			
+			## save save_dict
+			try:
+				save_df = DataFrame(dict([ (k,Series(v)) for k,v in self.save_dict.iteritems() ]))
+			except:
+				log.out("using dataframe items conversion for python 3.x")
+				save_df = DataFrame(dict([ (k,Series(v)) for k,v in self.save_dict.items() ]))
+			save_df.to_csv("save_dict.csv")
 		
-		# save weights 
-		for i in range(self.n_layers-1):
-			np.savetxt("w%i.txt"%i, self.w_np[i])
-		
-		##  save bias
-		for i in range(self.n_layers):
-			np.savetxt("bias%i.txt"%i, self.bias_np[i])
-		
+
 		## save log
 		self.log_list.append(["train_time",self.train_time])
 		self.log_list.append(["Epochs",self.epochs])
-		
-		## save save_dict
-		try:
-			save_df = DataFrame(dict([ (k,Series(v)) for k,v in self.save_dict.iteritems() ]))
-		except:
-			log.out("using dataframe items conversion for python 3.x")
-			save_df = DataFrame(dict([ (k,Series(v)) for k,v in self.save_dict.items() ]))
-		save_df.to_csv("save_dict.csv")
 
 		## logfile
 		with open("logfile.txt","w") as log_file:
@@ -1484,12 +1526,13 @@ class DBM_class(object):
 N_BATCHES_PRETRAIN = 500 				# how many batches per epoch for pretraining
 N_BATCHES_TRAIN    = 500 				# how many batches per epoch for complete DBM training
 N_EPOCHS_PRETRAIN  = [1,1,1,1,0,0] 		# pretrain epochs for each RBM
-N_EPOCHS_TRAIN     = 1  				# how often to iter through the test images
+N_EPOCHS_TRAIN     = 10  				# how often to iter through the test images
 TEST_EVERY_EPOCH   = N_EPOCHS_TRAIN/10	# how many epochs to train before testing on the test data
 
 ### learnrates 
 LEARNRATE_PRETRAIN = 0.01				# learnrate for pretraining
 LEARNRATE_START    = [	0.01,
+						0.01,
 						0.01,
 						0.01,
 						]				# starting learnrates for each weight. Biases always use the [0] entry
@@ -1507,12 +1550,12 @@ TEMP_SLOPE    = 7e-7					# linear decrease slope higher number -> fast cooling
 TEMP_MIN      = 0.01
 
 ### state vars 
-DO_PRETRAINING = 1		# if no pretrain then files are automatically loaded
-DO_TRAINING    = 1		# if to train the whole DBM
-DO_TESTING     = 1		# if testing the DBM with test data
+DO_PRETRAINING = 0		# if no pretrain then files are automatically loaded
+DO_TRAINING    = 0		# if to train the whole DBM
+DO_TESTING     = 0		# if testing the DBM with test data
 DO_SHOW_PLOTS  = 1		# if plots will show on display - either way they get saved into saveto_path
 
-DO_CONTEXT    = 1		# if to test the context
+DO_CONTEXT    = 0		# if to test the context
 DO_GEN_IMAGES = 1		# if to generate images (mode can be choosen at function call)
 DO_NOISE_STAB = 0		# if to make a noise stability test
 
@@ -1524,14 +1567,16 @@ DO_NORM_W    = 1		# if to norm the weights and biases to 1 while training
 ### saving and loading
 DO_SAVE_TO_FILE       = 1 	# if to save plots and data to file
 DO_SAVE_PRETRAINED    = 0 	# if to save the pretrained weights seperately (for later use)
-DO_LOAD_FROM_FILE     =	0	# if to load weights and biases from datadir + pathsuffix
-PATHSUFFIX            = "Vgl. -Norm -dropout -ohne alles/Mon_Jul__9_15-41-34_2018_[784, 400, 100, 64, 10] - ['test -long pretrain -normed -dropout2']"#"Thu_Jun__7_16-21-28_2018_[784, 225, 225, 225, 10] - ['15cont4']"
+DO_LOAD_FROM_FILE     =	1	# if to load weights and biases from datadir + pathsuffix
+PATHSUFFIX            = "Thu_Jun__7_16-21-28_2018_[784, 225, 225, 225, 10] - ['15cont4']"
+							#"Thu_Jun__7_16-21-28_2018_[784, 225, 225, 225, 10] - ['15cont4']"
 PATHSUFFIX_PRETRAINED = "Thu_Jun__7_13-49-25_2018"
 
 
 DBM_SHAPE = [	int(sqrt(len(train_data[0])))*int(sqrt(len(train_data[0]))),
-				20*20,
-				20*20,
+				15*15,
+				15*15,
+				15*15,
 				10]
 ###########################################################################################################
 if len(LEARNRATE_START)!= len(DBM_SHAPE)-1 and not DO_LOAD_FROM_FILE:
@@ -1609,9 +1654,6 @@ if DO_TRAINING:
 
 
 
-
-
-
 			# DBM.test(test_data_noise) 
 
 			log.end()
@@ -1626,7 +1668,7 @@ if DO_TESTING:
 				N               = 100,  # sample ist aus random werten, also mindestens 2 sample machen 
 				M               = 20,  # average v. 0->1 sample
 				create_conf_mat = 1,
-				temp_start      = temp,
+				temp_start      = temp*2,
 				temp_end        = temp)
 
 if DO_GEN_IMAGES:
@@ -1635,19 +1677,22 @@ if DO_GEN_IMAGES:
 
 		if DO_LOAD_FROM_FILE and not DO_TRAINING:
 			DBM.load_from_file(workdir+"/data/"+PATHSUFFIX,override_params=1)		
+
+		nn                = 10		# grid with nn^2 plots (has to stay 10 for now)
+		DBM.batchsize     = nn**2
 		
-
-
-
-		nn=6 ## grid with nn^2 plots
-		digit_to_generate = 4
-		DBM.batchsize = nn**2
 		DBM.graph_init("gibbs")
 		DBM.import_()
-		label_clamp = np.zeros([DBM.batchsize,10])
-		label_clamp[:,digit_to_generate] = 1
 
-		generated_img = DBM.gibbs_sampling(label_clamp, 1000, temp*20, temp, 
+		label_clamp = np.zeros([DBM.batchsize,10])
+		# set the correct label value
+		for j in range(10):
+			label_clamp[10*j:10*j+10,j] = 1
+
+		generated_img = DBM.gibbs_sampling(label_clamp, 
+							1000, 
+							temp*2, temp, 
+							1, 5,
 							mode     = "generate",
 							subspace = [],
 							liveplot = 0)
@@ -1655,7 +1700,7 @@ if DO_GEN_IMAGES:
 
 		## plot the images (visible layers)
 		fig,ax = plt.subplots(nn,nn)
-		m=0
+		m = 0
 		for i in range(nn):
 			for j in range(nn):			
 				ax[i,j].matshow(generated_img[m].reshape(28, 28))
@@ -1719,13 +1764,17 @@ if DO_CONTEXT:
 
 		# calculte h2 firerates over all gibbs_steps 
 		log.start("Sampling data")
-		h2_no_context = DBM.gibbs_sampling(test_data[index_for_number_gibbs[:]], 100, temp , temp, 
+		h2_no_context = DBM.gibbs_sampling(test_data[index_for_number_gibbs[:]], 200, 
+							temp , temp, 
+							2, 100,
 							mode     = "context",
 							subspace = "all",
 							liveplot = 0)
 
 		# # with context
-		h2_context = DBM.gibbs_sampling(test_data[index_for_number_gibbs[:]], 100, temp , temp, 
+		h2_context = DBM.gibbs_sampling(test_data[index_for_number_gibbs[:]], 200, 
+							temp , temp, 
+							2, 100,
 							mode     = "context",
 							subspace = subspace,
 							liveplot = 0)
@@ -1895,7 +1944,7 @@ if DO_NOISE_STAB:
 		plt.tight_layout(pad=0.0)
 
 
-if DO_TRAINING and DO_SAVE_TO_FILE:
+if DO_SAVE_TO_FILE:
 	DBM.write_to_file()
 
 
@@ -2113,15 +2162,15 @@ if LOAD_MNIST and DO_TESTING:
 			timeseries_average.append(np.mean(DBM.layer_save_test[i][layer],0))
 		# plot for image k
 
-		plt.matshow(timeseries)	
-		plt.ylabel("Time "+r"$t$")
-		plt.xlabel("Unit "+r"$i$")
+		plt.matshow(timeseries)
+		plt.xlabel("Time "+r"$t$")
+		plt.ylabel("Unit "+r"$i$")
 		save_fig(saveto_path+"/timeseries_testrun/timeseries_1image_layer_%i.png"%(layer+1),DO_SAVE_TO_FILE)
 		
 		# plt the average over all test images
 		plt.matshow(timeseries_average)
-		plt.ylabel("Time "+r"$t$")
-		plt.xlabel("Unit "+r"$i$")
+		plt.xlabel("Time "+r"$t$")
+		plt.ylabel("Unit "+r"$i$")
 		
 		save_fig(saveto_path+"/timeseries_testrun/timeseries_av_layer_%i.png"%(layer+1),DO_SAVE_TO_FILE)
 
@@ -2229,7 +2278,7 @@ if DO_CONTEXT:
 	save_fig(saveto_path+filename, DO_SAVE_TO_FILE)
 
 
-		# plot input  hist for context und no context	
+	# plot input  hist for context und no context	
 	for mode in range(2):
 		fig,ax = plt.subplots(DBM.n_layers,1,figsize=(8,10))
 		for i in range(DBM.n_layers):
@@ -2285,20 +2334,21 @@ if DO_GEN_IMAGES:
 	if not os.path.isdir(saveto_path+"/timeseries_generated"):
 		os.makedirs(saveto_path+"/timeseries_generated")
 	for layer in range(DBM.n_layers-1):
-		timeseries = []
-		timeseries_average = []
-		for i in range(len(DBM.layer_save_generate)):
-			timeseries.append(DBM.layer_save_generate[i][layer][k])
-			timeseries_average.append(np.mean(DBM.layer_save_generate[i][layer],0))
-		# plot for image k
+		# timeseries = []
+		# timeseries_average = []
+		# for i in range(len(DBM.layer_save_generate)):
+		# 	timeseries.append(DBM.layer_save_generate[i][layer][k])
+		# 	timeseries_average.append(np.mean(DBM.layer_save_generate[i][layer],0))
+		
 
-		plt.matshow(timeseries)	
+		# plot for image k
+		plt.matshow(DBM.layer_save_generate[layer][:,k])	
 		plt.ylabel("Time "+r"$t$")
 		plt.xlabel("Unit "+r"$i$")
 		save_fig(saveto_path+"/timeseries_generated/timeseries_1image_layer_%i.png"%(layer+1),DO_SAVE_TO_FILE)
 		
 		# plt the average over all test images
-		plt.matshow(timeseries_average)
+		plt.matshow(np.mean(DBM.layer_save_generate[layer][:,:],1))
 		plt.ylabel("Time "+r"$t$")
 		plt.xlabel("Unit "+r"$i$")
 		
