@@ -1,0 +1,138 @@
+2.      Creating RBMs
+3.      2,1
+4.      2,2
+5.      2,2
+6.      1,2
+------------------------------------------------
+Info     Fri_Jul_13_14-29-22_2018 
+
+1.-v    Pretrain Session
+2.      	Loading from file
+1.-^    Pretrain Session (took 0.276 sek)
+------------------------------------------------
+
+1.-v    DBM Train Session
+2.--v   	Run 0
+3.      		Loading data from: ... ] - ['original'] 15%
+4.      		Overriding Values from save
+Info     		No key 'update' in logfile found. 
+Info     		Epoch =  99 
+Info     		l =  [9.099e-05 9.099e-05 9.099e-05 9.099e-05] 
+Info     		T =  0.01 
+Info     		N =  4 
+5.      		Initializing graph
+6.      		loading numpy vars into graph
+Info     		Batchsize: 110 N_Updates 1500 
+7.---v  		Deep BM Epoch: 100 / 3
+8.      			Shuffling TrainData
+9.      			Running Epoch
+Info     			Now Sampling label layer instead of only taking probs 
+7.---^  		Deep BM Epoch: 100 / 3 (took 44.326 sek)
+Info     		Learnrate:  [9.1e-05 9.1e-05 9.1e-05 9.1e-05] 
+Info     		Temp:  0.01 
+Info     		freerun_steps:  4 
+Info     		Saved Weights and Biases as NumPy Arrays. 
+------------------------------------------------
+
+1.      		Initializing graph
+2.      		loading numpy vars into graph
+3.---v  		Testing DBM with 10000 images
+4.----v 			Sampling hidden 30 times  temp: 0.010000 -> 0.010000
+4.----^ 			Sampling hidden 30 times  temp: 0.010000 -> 0.010000 (took 4.371 sek)
+5.      			Taking only the maximum
+3.---^  		Testing DBM with 10000 images (took 9.525 sek)
+Info     		------------- Test Log ------------- 
+Info     		Reconstr. error normal:  0.04254 
+Info     		Class error:  0.1832 
+Info     		Wrong Digits:  1832  with average:  0.835 
+Info     		Correct Digits:  8168  with average:  1.0 
+------------------------------------------------
+2.--^   	Run 0 (took 55.703 sek)
+
+1.--v   	Run 1
+2.      		Initializing graph
+3.      		loading numpy vars into graph
+Info     		Batchsize: 110 N_Updates 1500 
+4.---v  		Deep BM Epoch: 101 / 3
+5.      			Shuffling TrainData
+6.      			Running Epoch
+Info     			Now Sampling label layer instead of only taking probs 
+4.---^  		Deep BM Epoch: 101 / 3 (took 46.736 sek)
+Info     		Learnrate:  [0.001 0.001 0.001 0.001] 
+Info     		Temp:  0.01 
+Info     		freerun_steps:  5 
+Info     		Saved Weights and Biases as NumPy Arrays. 
+------------------------------------------------
+1.--^   	Run 1 (took 47.994 sek)
+
+1.--v   	Run 2
+Info     		Batchsize: 110 N_Updates 1500 
+2.---v  		Deep BM Epoch: 102 / 3
+3.      			Shuffling TrainData
+4.      			Running Epoch
+Info     			Now Sampling label layer instead of only taking probs 
+2.---^  		Deep BM Epoch: 102 / 3 (took 47.15 sek)
+Info     		Learnrate:  [0.001 0.001 0.001 0.001] 
+Info     		Temp:  0.01 
+Info     		freerun_steps:  5 
+Info     		Saved Weights and Biases as NumPy Arrays. 
+------------------------------------------------
+1.--^   	Run 2 (took 47.198 sek)
+1.-^    DBM Train Session (took 150.899 sek)
+------------------------------------------------
+
+1.      Initializing graph
+2.      loading numpy vars into graph
+3.-v    Testing DBM with 10000 images
+4.--v   	Sampling hidden 100 times  temp: 0.010000 -> 0.010000
+4.--^   	Sampling hidden 100 times  temp: 0.010000 -> 0.010000 (took 14.372 sek)
+5.      	Taking only the maximum
+6.      	Making Confusion Matrix
+3.-^    Testing DBM with 10000 images (took 29.992 sek)
+Info     ------------- Test Log ------------- 
+Info     Reconstr. error normal:  0.04257 
+Info     Class error:  0.1623 
+Info     Wrong Digits:  1623  with average:  0.979 
+Info     Correct Digits:  8377  with average:  1.0 
+------------------------------------------------
+
+1.-v    Generation Session
+2.      	Initializing graph
+3.      	loading numpy vars into graph
+4.--v   	Gibbs Sampling
+Info     		Mode: generate | Steps: 1000 
+Info     		Temp_range: 0.01 -> 0.01 
+Info     		Dropout_range: 100 -> 100 
+4.--^   	Gibbs Sampling (took 8.456 sek)
+1.-^    Generation Session (took 19.289 sek)
+5.-v    Context Session
+Info     	Found 5139 Images 
+6.      	Initializing graph
+7.      	loading numpy vars into graph
+8.--v   	Sampling data
+9.---v  		Gibbs Sampling
+Info     			Mode: context | Steps: 200 
+Info     			Temp_range: 0.01 -> 0.01 
+Info     			Dropout_range: 100 -> 100 
+9.---^  		Gibbs Sampling (took 33.683 sek)
+10.---v  		Gibbs Sampling
+Info     			Mode: context | Steps: 200 
+Info     			Temp_range: 0.01 -> 0.01 
+Info     			Dropout_range: 2 -> 100 
+11.      			Setting Weights to 0
+10.---^  		Gibbs Sampling (took 33.578 sek)
+Info     		Inorrect Context: 227 / 4.42 % 
+Info     		Inorrect No Context: 633 / 12.32 % 
+Info     		Diff:      406 
+Info     		Outside subspace (c/nc): 0 , 502 
+12.      		Means: Correct // Wrong (c/nc): 
+ 	 	  0.9531 0.9905 // 0.5533 0.1989
+8.--^   	Sampling data (took 70.292 sek)
+13.      	using dataframe items conversion for python 3.x
+Info     	Saved data and log to: /home/dario/Dokumente/DBM Project/data/Fri_Jul_13_14-29-22_2018_[784, 225, 225, 225, 10] - ['best test'] 
+14.      	Plotting...
+15.      	Plotting Weights histograms
+16.      	0
+17.      	1
+18.      	2
+19.      	3

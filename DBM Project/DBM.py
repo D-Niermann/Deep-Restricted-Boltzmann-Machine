@@ -1540,9 +1540,6 @@ LEARNRATE_SLOPE    = 0.8					# bigger number -> smaller slope
 
 
 lambda_learn = 0.00000 # test param for sparsness, gets added to weight update
-"""		
-learnrate now multiplied with temp in update of w and b
-"""
 
 ### temperature
 TEMP_START    = 0.02						# starting temp

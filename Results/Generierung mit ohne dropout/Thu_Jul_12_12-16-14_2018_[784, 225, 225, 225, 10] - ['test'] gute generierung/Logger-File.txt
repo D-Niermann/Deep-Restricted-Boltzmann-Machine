@@ -1,0 +1,31 @@
+2.      Creating RBMs
+3.      2,1
+4.      2,2
+5.      2,2
+6.      1,2
+------------------------------------------------
+Info     Thu_Jul_12_12-16-14_2018 
+
+1.-v    Pretrain Session
+2.      	Loading from file
+1.-^    Pretrain Session (took 0.388 sek)
+------------------------------------------------
+
+1.-v    Generation Session
+2.      	Loading data from: ... 5, 10] - ['15cont4']
+3.      	Overriding Values from save
+Info     	No key 'update' in logfile found. 
+Info     	Epoch =  147 
+Info     	l =  [1.198e-05 1.198e-05 1.198e-05 1.198e-05] 
+Info     	T =  0.01 
+Info     	N =  10 
+4.      	Initializing graph
+5.      	loading numpy vars into graph
+6.--v   	Gibbs Sampling
+Info     		Mode: generate | Steps: 1000 
+Info     		Temp_range: 0.02 -> 0.01 
+Info     		Dropout_range: 1 -> 2 
+6.--^   	Gibbs Sampling (took 16.913 sek)
+1.-^    Generation Session (took 30.184 sek)
+Info     Saved data and log to: /home/dario/Dokumente/DBM Project/data/Thu_Jul_12_12-16-14_2018_[784, 225, 225, 225, 10] - ['test'] 
+7.      Plotting...
