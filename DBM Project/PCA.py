@@ -47,32 +47,22 @@ def calc_neuron_hist(layer, neuron_index, neuron_data, neuron_label, fire_thresh
 	"""
 	hist = [None]*len(neuron_index)
 	for n in range(len(neuron_index)):
+
+		# find images that have high fire rates for that neuron 
 		w = np.where(neuron_data[:,n]>fire_thresh)[0]
+
+		# get the corresponding label to the found images
 		sublabel = test_label[w]
+		
+		# create a real label vector where not the [[0,1,0,0,0,0,0],[0,1..],...] 
+		# is stored but the [2,7,6,9,1,...]
 		label = []
 		for i in range(len(sublabel)):
 			where = np.where(sublabel[i]==1)[0][0]
-			if where==0:
-				label.append(where)
-			elif where==1:
-				label.append(where)
-			elif where==2:
-				label.append(where)
-			elif where==3:
-				label.append(where)
-			elif where==4:
-				label.append(where)
-			elif where==5:
-				label.append(where)
-			elif where==6:
-				label.append(where)
-			elif where==7:
-				label.append(where)
-			elif where==8:
-				label.append(where)
-			elif where==9:
-				label.append(where)
+			label.append(where)
 		label = np.array(label).astype(np.float)
+
+		# calc the hist over the label array and add it t the list 
 		hist[n] = np.histogram(label, bins = 10)[0]
 
 	return hist
@@ -99,26 +89,7 @@ for neuron in range(len(neuron_number_)):
 	label = []
 	for i in range(len(sublabel)):
 		where = np.where(sublabel[i]==1)[0][0]
-		if where==0:
-			label.append(where)
-		elif where==1:
-			label.append(where)
-		elif where==2:
-			label.append(where)
-		elif where==3:
-			label.append(where)
-		elif where==4:
-			label.append(where)
-		elif where==5:
-			label.append(where)
-		elif where==6:
-			label.append(where)
-		elif where==7:
-			label.append(where)
-		elif where==8:
-			label.append(where)
-		elif where==9:
-			label.append(where)
+		label.append(where)
 	label = np.array(label).astype(np.float)
 
 
