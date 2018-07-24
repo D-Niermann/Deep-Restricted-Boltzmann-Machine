@@ -1,0 +1,1995 @@
+2.      Creating RBMs
+3.      2,1
+4.      2,2
+5.      2,2
+6.      1,2
+------------------------------------------------
+Info     Mon_Jun__4_15-55-25_2018 
+
+1.-v    Pretrain Session
+2.--v   	Pretraining  1. RBM
+3.---v  		Epoch: 1 / 50
+Info     			Learnrate: 0.0001 
+Info     			error 0.1503 
+3.---^  		Epoch: 1 / 50 (took 2.777 sek)
+4.---v  		Epoch: 2 / 50
+Info     			Learnrate: 0.0001 
+Info     			error 0.1313 
+4.---^  		Epoch: 2 / 50 (took 2.76 sek)
+5.---v  		Epoch: 3 / 50
+Info     			Learnrate: 0.0001 
+Info     			error 0.1132 
+5.---^  		Epoch: 3 / 50 (took 2.762 sek)
+6.---v  		Epoch: 4 / 50
+Info     			Learnrate: 0.0001 
+Info     			error 0.1001 
+6.---^  		Epoch: 4 / 50 (took 2.759 sek)
+7.---v  		Epoch: 5 / 50
+Info     			Learnrate: 0.0001 
+Info     			error 0.0915 
+7.---^  		Epoch: 5 / 50 (took 2.763 sek)
+8.---v  		Epoch: 6 / 50
+Info     			Learnrate: 0.0001 
+Info     			error 0.0846 
+8.---^  		Epoch: 6 / 50 (took 2.768 sek)
+9.---v  		Epoch: 7 / 50
+Info     			Learnrate: 0.0001 
+Info     			error 0.0812 
+9.---^  		Epoch: 7 / 50 (took 2.763 sek)
+10.---v  		Epoch: 8 / 50
+Info     			Learnrate: 0.0001 
+Info     			error 0.0762 
+10.---^  		Epoch: 8 / 50 (took 2.758 sek)
+11.---v  		Epoch: 9 / 50
+Info     			Learnrate: 0.0001 
+Info     			error 0.0732 
+11.---^  		Epoch: 9 / 50 (took 2.767 sek)
+12.---v  		Epoch: 10 / 50
+Info     			Learnrate: 0.0001 
+Info     			error 0.0716 
+12.---^  		Epoch: 10 / 50 (took 2.759 sek)
+13.---v  		Epoch: 11 / 50
+Info     			Learnrate: 0.0001 
+Info     			error 0.0692 
+13.---^  		Epoch: 11 / 50 (took 2.763 sek)
+14.---v  		Epoch: 12 / 50
+Info     			Learnrate: 0.0001 
+Info     			error 0.0671 
+14.---^  		Epoch: 12 / 50 (took 2.763 sek)
+15.---v  		Epoch: 13 / 50
+Info     			Learnrate: 0.0001 
+Info     			error 0.065 
+15.---^  		Epoch: 13 / 50 (took 2.894 sek)
+16.---v  		Epoch: 14 / 50
+Info     			Learnrate: 0.0001 
+Info     			error 0.0637 
+16.---^  		Epoch: 14 / 50 (took 2.761 sek)
+17.---v  		Epoch: 15 / 50
+Info     			Learnrate: 0.0001 
+Info     			error 0.0623 
+17.---^  		Epoch: 15 / 50 (took 2.761 sek)
+18.---v  		Epoch: 16 / 50
+Info     			Learnrate: 0.0001 
+Info     			error 0.0601 
+18.---^  		Epoch: 16 / 50 (took 2.763 sek)
+19.---v  		Epoch: 17 / 50
+Info     			Learnrate: 0.0001 
+Info     			error 0.0599 
+19.---^  		Epoch: 17 / 50 (took 2.759 sek)
+20.---v  		Epoch: 18 / 50
+Info     			Learnrate: 0.0001 
+Info     			error 0.0591 
+20.---^  		Epoch: 18 / 50 (took 2.762 sek)
+21.---v  		Epoch: 19 / 50
+Info     			Learnrate: 0.0001 
+Info     			error 0.0584 
+21.---^  		Epoch: 19 / 50 (took 2.767 sek)
+22.---v  		Epoch: 20 / 50
+Info     			Learnrate: 0.0001 
+Info     			error 0.0572 
+22.---^  		Epoch: 20 / 50 (took 2.758 sek)
+23.---v  		Epoch: 21 / 50
+Info     			Learnrate: 0.0001 
+Info     			error 0.0563 
+23.---^  		Epoch: 21 / 50 (took 2.758 sek)
+24.---v  		Epoch: 22 / 50
+Info     			Learnrate: 0.0001 
+Info     			error 0.0549 
+24.---^  		Epoch: 22 / 50 (took 2.765 sek)
+25.---v  		Epoch: 23 / 50
+Info     			Learnrate: 0.0001 
+Info     			error 0.0545 
+25.---^  		Epoch: 23 / 50 (took 2.767 sek)
+26.---v  		Epoch: 24 / 50
+Info     			Learnrate: 0.0001 
+Info     			error 0.0546 
+26.---^  		Epoch: 24 / 50 (took 2.762 sek)
+27.---v  		Epoch: 25 / 50
+Info     			Learnrate: 0.0001 
+Info     			error 0.0524 
+27.---^  		Epoch: 25 / 50 (took 2.76 sek)
+28.---v  		Epoch: 26 / 50
+Info     			Learnrate: 0.0001 
+Info     			error 0.0534 
+28.---^  		Epoch: 26 / 50 (took 2.76 sek)
+29.---v  		Epoch: 27 / 50
+Info     			Learnrate: 0.0001 
+Info     			error 0.0514 
+29.---^  		Epoch: 27 / 50 (took 2.759 sek)
+30.---v  		Epoch: 28 / 50
+Info     			Learnrate: 0.0001 
+Info     			error 0.0521 
+30.---^  		Epoch: 28 / 50 (took 2.764 sek)
+31.---v  		Epoch: 29 / 50
+Info     			Learnrate: 0.0001 
+Info     			error 0.0512 
+31.---^  		Epoch: 29 / 50 (took 2.761 sek)
+32.---v  		Epoch: 30 / 50
+Info     			Learnrate: 0.0001 
+Info     			error 0.0504 
+32.---^  		Epoch: 30 / 50 (took 2.767 sek)
+33.---v  		Epoch: 31 / 50
+Info     			Learnrate: 0.0001 
+Info     			error 0.0511 
+33.---^  		Epoch: 31 / 50 (took 2.756 sek)
+34.---v  		Epoch: 32 / 50
+Info     			Learnrate: 0.0001 
+Info     			error 0.0497 
+34.---^  		Epoch: 32 / 50 (took 2.761 sek)
+35.---v  		Epoch: 33 / 50
+Info     			Learnrate: 0.0001 
+Info     			error 0.0497 
+35.---^  		Epoch: 33 / 50 (took 2.76 sek)
+36.---v  		Epoch: 34 / 50
+Info     			Learnrate: 0.0001 
+Info     			error 0.0493 
+36.---^  		Epoch: 34 / 50 (took 2.897 sek)
+37.---v  		Epoch: 35 / 50
+Info     			Learnrate: 0.0001 
+Info     			error 0.0491 
+37.---^  		Epoch: 35 / 50 (took 2.764 sek)
+38.---v  		Epoch: 36 / 50
+Info     			Learnrate: 0.0001 
+Info     			error 0.0486 
+38.---^  		Epoch: 36 / 50 (took 2.764 sek)
+39.---v  		Epoch: 37 / 50
+Info     			Learnrate: 0.0001 
+Info     			error 0.0486 
+39.---^  		Epoch: 37 / 50 (took 2.767 sek)
+40.---v  		Epoch: 38 / 50
+Info     			Learnrate: 0.0001 
+Info     			error 0.0474 
+40.---^  		Epoch: 38 / 50 (took 2.758 sek)
+41.---v  		Epoch: 39 / 50
+Info     			Learnrate: 0.0001 
+Info     			error 0.0481 
+41.---^  		Epoch: 39 / 50 (took 2.765 sek)
+42.---v  		Epoch: 40 / 50
+Info     			Learnrate: 0.0001 
+Info     			error 0.0461 
+42.---^  		Epoch: 40 / 50 (took 2.762 sek)
+43.---v  		Epoch: 41 / 50
+Info     			Learnrate: 0.0001 
+Info     			error 0.0457 
+43.---^  		Epoch: 41 / 50 (took 2.769 sek)
+44.---v  		Epoch: 42 / 50
+Info     			Learnrate: 0.0001 
+Info     			error 0.0464 
+44.---^  		Epoch: 42 / 50 (took 2.763 sek)
+45.---v  		Epoch: 43 / 50
+Info     			Learnrate: 0.0001 
+Info     			error 0.0466 
+45.---^  		Epoch: 43 / 50 (took 2.767 sek)
+46.---v  		Epoch: 44 / 50
+Info     			Learnrate: 0.0001 
+Info     			error 0.0461 
+46.---^  		Epoch: 44 / 50 (took 2.762 sek)
+47.---v  		Epoch: 45 / 50
+Info     			Learnrate: 0.0001 
+Info     			error 0.0466 
+47.---^  		Epoch: 45 / 50 (took 2.766 sek)
+48.---v  		Epoch: 46 / 50
+Info     			Learnrate: 0.0001 
+Info     			error 0.0456 
+48.---^  		Epoch: 46 / 50 (took 2.758 sek)
+49.---v  		Epoch: 47 / 50
+Info     			Learnrate: 0.0001 
+Info     			error 0.0445 
+49.---^  		Epoch: 47 / 50 (took 2.764 sek)
+50.---v  		Epoch: 48 / 50
+Info     			Learnrate: 0.0001 
+Info     			error 0.0451 
+50.---^  		Epoch: 48 / 50 (took 2.765 sek)
+51.---v  		Epoch: 49 / 50
+Info     			Learnrate: 0.0001 
+Info     			error 0.0436 
+51.---^  		Epoch: 49 / 50 (took 2.767 sek)
+52.---v  		Epoch: 50 / 50
+Info     			Learnrate: 0.0001 
+Info     			error 0.045 
+52.---^  		Epoch: 50 / 50 (took 2.766 sek)
+2.--^   	Pretraining  1. RBM (took 138.467 sek)
+53.--v   	Pretraining  2. RBM
+54.---v  		Epoch: 1 / 50
+Info     			Learnrate: 0.0001 
+Info     			error 0.3434 
+54.---^  		Epoch: 1 / 50 (took 1.674 sek)
+55.---v  		Epoch: 2 / 50
+Info     			Learnrate: 0.0001 
+Info     			error 0.3133 
+55.---^  		Epoch: 2 / 50 (took 1.66 sek)
+56.---v  		Epoch: 3 / 50
+Info     			Learnrate: 0.0001 
+Info     			error 0.2821 
+56.---^  		Epoch: 3 / 50 (took 1.661 sek)
+57.---v  		Epoch: 4 / 50
+Info     			Learnrate: 0.0001 
+Info     			error 0.2479 
+57.---^  		Epoch: 4 / 50 (took 1.66 sek)
+58.---v  		Epoch: 5 / 50
+Info     			Learnrate: 0.0001 
+Info     			error 0.2233 
+58.---^  		Epoch: 5 / 50 (took 1.661 sek)
+59.---v  		Epoch: 6 / 50
+Info     			Learnrate: 0.0001 
+Info     			error 0.2074 
+59.---^  		Epoch: 6 / 50 (took 1.665 sek)
+60.---v  		Epoch: 7 / 50
+Info     			Learnrate: 0.0001 
+Info     			error 0.1942 
+60.---^  		Epoch: 7 / 50 (took 1.661 sek)
+61.---v  		Epoch: 8 / 50
+Info     			Learnrate: 0.0001 
+Info     			error 0.1833 
+61.---^  		Epoch: 8 / 50 (took 1.661 sek)
+62.---v  		Epoch: 9 / 50
+Info     			Learnrate: 0.0001 
+Info     			error 0.1676 
+62.---^  		Epoch: 9 / 50 (took 1.662 sek)
+63.---v  		Epoch: 10 / 50
+Info     			Learnrate: 0.0001 
+Info     			error 0.167 
+63.---^  		Epoch: 10 / 50 (took 1.782 sek)
+64.---v  		Epoch: 11 / 50
+Info     			Learnrate: 0.0001 
+Info     			error 0.1597 
+64.---^  		Epoch: 11 / 50 (took 1.661 sek)
+65.---v  		Epoch: 12 / 50
+Info     			Learnrate: 0.0001 
+Info     			error 0.1534 
+65.---^  		Epoch: 12 / 50 (took 1.662 sek)
+66.---v  		Epoch: 13 / 50
+Info     			Learnrate: 0.0001 
+Info     			error 0.1491 
+66.---^  		Epoch: 13 / 50 (took 1.669 sek)
+67.---v  		Epoch: 14 / 50
+Info     			Learnrate: 0.0001 
+Info     			error 0.1448 
+67.---^  		Epoch: 14 / 50 (took 1.663 sek)
+68.---v  		Epoch: 15 / 50
+Info     			Learnrate: 0.0001 
+Info     			error 0.1401 
+68.---^  		Epoch: 15 / 50 (took 1.667 sek)
+69.---v  		Epoch: 16 / 50
+Info     			Learnrate: 0.0001 
+Info     			error 0.1391 
+69.---^  		Epoch: 16 / 50 (took 1.66 sek)
+70.---v  		Epoch: 17 / 50
+Info     			Learnrate: 0.0001 
+Info     			error 0.1356 
+70.---^  		Epoch: 17 / 50 (took 1.666 sek)
+71.---v  		Epoch: 18 / 50
+Info     			Learnrate: 0.0001 
+Info     			error 0.1295 
+71.---^  		Epoch: 18 / 50 (took 1.665 sek)
+72.---v  		Epoch: 19 / 50
+Info     			Learnrate: 0.0001 
+Info     			error 0.132 
+72.---^  		Epoch: 19 / 50 (took 1.661 sek)
+73.---v  		Epoch: 20 / 50
+Info     			Learnrate: 0.0001 
+Info     			error 0.1283 
+73.---^  		Epoch: 20 / 50 (took 1.66 sek)
+74.---v  		Epoch: 21 / 50
+Info     			Learnrate: 0.0001 
+Info     			error 0.1251 
+74.---^  		Epoch: 21 / 50 (took 1.661 sek)
+75.---v  		Epoch: 22 / 50
+Info     			Learnrate: 0.0001 
+Info     			error 0.1231 
+75.---^  		Epoch: 22 / 50 (took 1.658 sek)
+76.---v  		Epoch: 23 / 50
+Info     			Learnrate: 0.0001 
+Info     			error 0.1226 
+76.---^  		Epoch: 23 / 50 (took 1.663 sek)
+77.---v  		Epoch: 24 / 50
+Info     			Learnrate: 0.0001 
+Info     			error 0.1197 
+77.---^  		Epoch: 24 / 50 (took 1.662 sek)
+78.---v  		Epoch: 25 / 50
+Info     			Learnrate: 0.0001 
+Info     			error 0.118 
+78.---^  		Epoch: 25 / 50 (took 1.662 sek)
+79.---v  		Epoch: 26 / 50
+Info     			Learnrate: 0.0001 
+Info     			error 0.1177 
+79.---^  		Epoch: 26 / 50 (took 1.661 sek)
+80.---v  		Epoch: 27 / 50
+Info     			Learnrate: 0.0001 
+Info     			error 0.1158 
+80.---^  		Epoch: 27 / 50 (took 1.666 sek)
+81.---v  		Epoch: 28 / 50
+Info     			Learnrate: 0.0001 
+Info     			error 0.1174 
+81.---^  		Epoch: 28 / 50 (took 1.664 sek)
+82.---v  		Epoch: 29 / 50
+Info     			Learnrate: 0.0001 
+Info     			error 0.1154 
+82.---^  		Epoch: 29 / 50 (took 1.664 sek)
+83.---v  		Epoch: 30 / 50
+Info     			Learnrate: 0.0001 
+Info     			error 0.115 
+83.---^  		Epoch: 30 / 50 (took 1.665 sek)
+84.---v  		Epoch: 31 / 50
+Info     			Learnrate: 0.0001 
+Info     			error 0.1094 
+84.---^  		Epoch: 31 / 50 (took 1.663 sek)
+85.---v  		Epoch: 32 / 50
+Info     			Learnrate: 0.0001 
+Info     			error 0.1114 
+85.---^  		Epoch: 32 / 50 (took 1.663 sek)
+86.---v  		Epoch: 33 / 50
+Info     			Learnrate: 0.0001 
+Info     			error 0.1117 
+86.---^  		Epoch: 33 / 50 (took 1.661 sek)
+87.---v  		Epoch: 34 / 50
+Info     			Learnrate: 0.0001 
+Info     			error 0.1083 
+87.---^  		Epoch: 34 / 50 (took 1.665 sek)
+88.---v  		Epoch: 35 / 50
+Info     			Learnrate: 0.0001 
+Info     			error 0.1051 
+88.---^  		Epoch: 35 / 50 (took 1.663 sek)
+89.---v  		Epoch: 36 / 50
+Info     			Learnrate: 0.0001 
+Info     			error 0.1074 
+89.---^  		Epoch: 36 / 50 (took 1.665 sek)
+90.---v  		Epoch: 37 / 50
+Info     			Learnrate: 0.0001 
+Info     			error 0.1048 
+90.---^  		Epoch: 37 / 50 (took 1.666 sek)
+91.---v  		Epoch: 38 / 50
+Info     			Learnrate: 0.0001 
+Info     			error 0.1068 
+91.---^  		Epoch: 38 / 50 (took 1.659 sek)
+92.---v  		Epoch: 39 / 50
+Info     			Learnrate: 0.0001 
+Info     			error 0.1062 
+92.---^  		Epoch: 39 / 50 (took 1.665 sek)
+93.---v  		Epoch: 40 / 50
+Info     			Learnrate: 0.0001 
+Info     			error 0.1056 
+93.---^  		Epoch: 40 / 50 (took 1.664 sek)
+94.---v  		Epoch: 41 / 50
+Info     			Learnrate: 0.0001 
+Info     			error 0.1045 
+94.---^  		Epoch: 41 / 50 (took 1.66 sek)
+95.---v  		Epoch: 42 / 50
+Info     			Learnrate: 0.0001 
+Info     			error 0.1072 
+95.---^  		Epoch: 42 / 50 (took 1.664 sek)
+96.---v  		Epoch: 43 / 50
+Info     			Learnrate: 0.0001 
+Info     			error 0.1053 
+96.---^  		Epoch: 43 / 50 (took 1.662 sek)
+97.---v  		Epoch: 44 / 50
+Info     			Learnrate: 0.0001 
+Info     			error 0.1041 
+97.---^  		Epoch: 44 / 50 (took 1.663 sek)
+98.---v  		Epoch: 45 / 50
+Info     			Learnrate: 0.0001 
+Info     			error 0.1023 
+98.---^  		Epoch: 45 / 50 (took 1.663 sek)
+99.---v  		Epoch: 46 / 50
+Info     			Learnrate: 0.0001 
+Info     			error 0.103 
+99.---^  		Epoch: 46 / 50 (took 1.769 sek)
+100.---v  		Epoch: 47 / 50
+Info     			Learnrate: 0.0001 
+Info     			error 0.1003 
+100.---^  		Epoch: 47 / 50 (took 1.662 sek)
+101.---v  		Epoch: 48 / 50
+Info     			Learnrate: 0.0001 
+Info     			error 0.1001 
+101.---^  		Epoch: 48 / 50 (took 1.665 sek)
+102.---v  		Epoch: 49 / 50
+Info     			Learnrate: 0.0001 
+Info     			error 0.1006 
+102.---^  		Epoch: 49 / 50 (took 1.664 sek)
+103.---v  		Epoch: 50 / 50
+Info     			Learnrate: 0.0001 
+Info     			error 0.1018 
+103.---^  		Epoch: 50 / 50 (took 1.663 sek)
+53.--^   	Pretraining  2. RBM (took 83.432 sek)
+104.--v   	Pretraining  3. RBM
+105.---v  		Epoch: 1 / 50
+Info     			Learnrate: 0.0001 
+Info     			error 0.2799 
+105.---^  		Epoch: 1 / 50 (took 1.891 sek)
+106.---v  		Epoch: 2 / 50
+Info     			Learnrate: 0.0001 
+Info     			error 0.2617 
+106.---^  		Epoch: 2 / 50 (took 1.877 sek)
+107.---v  		Epoch: 3 / 50
+Info     			Learnrate: 0.0001 
+Info     			error 0.2349 
+107.---^  		Epoch: 3 / 50 (took 1.875 sek)
+108.---v  		Epoch: 4 / 50
+Info     			Learnrate: 0.0001 
+Info     			error 0.2051 
+108.---^  		Epoch: 4 / 50 (took 1.876 sek)
+109.---v  		Epoch: 5 / 50
+Info     			Learnrate: 0.0001 
+Info     			error 0.1756 
+109.---^  		Epoch: 5 / 50 (took 1.88 sek)
+110.---v  		Epoch: 6 / 50
+Info     			Learnrate: 0.0001 
+Info     			error 0.1595 
+110.---^  		Epoch: 6 / 50 (took 1.879 sek)
+111.---v  		Epoch: 7 / 50
+Info     			Learnrate: 0.0001 
+Info     			error 0.1511 
+111.---^  		Epoch: 7 / 50 (took 1.88 sek)
+112.---v  		Epoch: 8 / 50
+Info     			Learnrate: 0.0001 
+Info     			error 0.1437 
+112.---^  		Epoch: 8 / 50 (took 1.879 sek)
+113.---v  		Epoch: 9 / 50
+Info     			Learnrate: 0.0001 
+Info     			error 0.1337 
+113.---^  		Epoch: 9 / 50 (took 1.879 sek)
+114.---v  		Epoch: 10 / 50
+Info     			Learnrate: 0.0001 
+Info     			error 0.1297 
+114.---^  		Epoch: 10 / 50 (took 1.878 sek)
+115.---v  		Epoch: 11 / 50
+Info     			Learnrate: 0.0001 
+Info     			error 0.1263 
+115.---^  		Epoch: 11 / 50 (took 1.878 sek)
+116.---v  		Epoch: 12 / 50
+Info     			Learnrate: 0.0001 
+Info     			error 0.1214 
+116.---^  		Epoch: 12 / 50 (took 1.885 sek)
+117.---v  		Epoch: 13 / 50
+Info     			Learnrate: 0.0001 
+Info     			error 0.1154 
+117.---^  		Epoch: 13 / 50 (took 1.877 sek)
+118.---v  		Epoch: 14 / 50
+Info     			Learnrate: 0.0001 
+Info     			error 0.1149 
+118.---^  		Epoch: 14 / 50 (took 1.88 sek)
+119.---v  		Epoch: 15 / 50
+Info     			Learnrate: 0.0001 
+Info     			error 0.1128 
+119.---^  		Epoch: 15 / 50 (took 1.878 sek)
+120.---v  		Epoch: 16 / 50
+Info     			Learnrate: 0.0001 
+Info     			error 0.1075 
+120.---^  		Epoch: 16 / 50 (took 1.881 sek)
+121.---v  		Epoch: 17 / 50
+Info     			Learnrate: 0.0001 
+Info     			error 0.1065 
+121.---^  		Epoch: 17 / 50 (took 1.875 sek)
+122.---v  		Epoch: 18 / 50
+Info     			Learnrate: 0.0001 
+Info     			error 0.1042 
+122.---^  		Epoch: 18 / 50 (took 1.904 sek)
+123.---v  		Epoch: 19 / 50
+Info     			Learnrate: 0.0001 
+Info     			error 0.103 
+123.---^  		Epoch: 19 / 50 (took 1.894 sek)
+124.---v  		Epoch: 20 / 50
+Info     			Learnrate: 0.0001 
+Info     			error 0.0994 
+124.---^  		Epoch: 20 / 50 (took 1.879 sek)
+125.---v  		Epoch: 21 / 50
+Info     			Learnrate: 0.0001 
+Info     			error 0.1016 
+125.---^  		Epoch: 21 / 50 (took 1.879 sek)
+126.---v  		Epoch: 22 / 50
+Info     			Learnrate: 0.0001 
+Info     			error 0.1012 
+126.---^  		Epoch: 22 / 50 (took 1.881 sek)
+127.---v  		Epoch: 23 / 50
+Info     			Learnrate: 0.0001 
+Info     			error 0.099 
+127.---^  		Epoch: 23 / 50 (took 1.875 sek)
+128.---v  		Epoch: 24 / 50
+Info     			Learnrate: 0.0001 
+Info     			error 0.0988 
+128.---^  		Epoch: 24 / 50 (took 1.881 sek)
+129.---v  		Epoch: 25 / 50
+Info     			Learnrate: 0.0001 
+Info     			error 0.098 
+129.---^  		Epoch: 25 / 50 (took 1.881 sek)
+130.---v  		Epoch: 26 / 50
+Info     			Learnrate: 0.0001 
+Info     			error 0.0957 
+130.---^  		Epoch: 26 / 50 (took 1.877 sek)
+131.---v  		Epoch: 27 / 50
+Info     			Learnrate: 0.0001 
+Info     			error 0.0944 
+131.---^  		Epoch: 27 / 50 (took 1.881 sek)
+132.---v  		Epoch: 28 / 50
+Info     			Learnrate: 0.0001 
+Info     			error 0.0955 
+132.---^  		Epoch: 28 / 50 (took 1.919 sek)
+133.---v  		Epoch: 29 / 50
+Info     			Learnrate: 0.0001 
+Info     			error 0.0941 
+133.---^  		Epoch: 29 / 50 (took 2.188 sek)
+134.---v  		Epoch: 30 / 50
+Info     			Learnrate: 0.0001 
+Info     			error 0.0931 
+134.---^  		Epoch: 30 / 50 (took 2.11 sek)
+135.---v  		Epoch: 31 / 50
+Info     			Learnrate: 0.0001 
+Info     			error 0.0931 
+135.---^  		Epoch: 31 / 50 (took 1.938 sek)
+136.---v  		Epoch: 32 / 50
+Info     			Learnrate: 0.0001 
+Info     			error 0.0934 
+136.---^  		Epoch: 32 / 50 (took 2.002 sek)
+137.---v  		Epoch: 33 / 50
+Info     			Learnrate: 0.0001 
+Info     			error 0.093 
+137.---^  		Epoch: 33 / 50 (took 2.128 sek)
+138.---v  		Epoch: 34 / 50
+Info     			Learnrate: 0.0001 
+Info     			error 0.0917 
+138.---^  		Epoch: 34 / 50 (took 2.045 sek)
+139.---v  		Epoch: 35 / 50
+Info     			Learnrate: 0.0001 
+Info     			error 0.0925 
+139.---^  		Epoch: 35 / 50 (took 2.003 sek)
+140.---v  		Epoch: 36 / 50
+Info     			Learnrate: 0.0001 
+Info     			error 0.0922 
+140.---^  		Epoch: 36 / 50 (took 1.9 sek)
+141.---v  		Epoch: 37 / 50
+Info     			Learnrate: 0.0001 
+Info     			error 0.0934 
+141.---^  		Epoch: 37 / 50 (took 1.879 sek)
+142.---v  		Epoch: 38 / 50
+Info     			Learnrate: 0.0001 
+Info     			error 0.0917 
+142.---^  		Epoch: 38 / 50 (took 1.865 sek)
+143.---v  		Epoch: 39 / 50
+Info     			Learnrate: 0.0001 
+Info     			error 0.0912 
+143.---^  		Epoch: 39 / 50 (took 1.87 sek)
+144.---v  		Epoch: 40 / 50
+Info     			Learnrate: 0.0001 
+Info     			error 0.0904 
+144.---^  		Epoch: 40 / 50 (took 1.87 sek)
+145.---v  		Epoch: 41 / 50
+Info     			Learnrate: 0.0001 
+Info     			error 0.0881 
+145.---^  		Epoch: 41 / 50 (took 1.867 sek)
+146.---v  		Epoch: 42 / 50
+Info     			Learnrate: 0.0001 
+Info     			error 0.0904 
+146.---^  		Epoch: 42 / 50 (took 1.864 sek)
+147.---v  		Epoch: 43 / 50
+Info     			Learnrate: 0.0001 
+Info     			error 0.0899 
+147.---^  		Epoch: 43 / 50 (took 1.871 sek)
+148.---v  		Epoch: 44 / 50
+Info     			Learnrate: 0.0001 
+Info     			error 0.0915 
+148.---^  		Epoch: 44 / 50 (took 1.867 sek)
+149.---v  		Epoch: 45 / 50
+Info     			Learnrate: 0.0001 
+Info     			error 0.0912 
+149.---^  		Epoch: 45 / 50 (took 1.87 sek)
+150.---v  		Epoch: 46 / 50
+Info     			Learnrate: 0.0001 
+Info     			error 0.0897 
+150.---^  		Epoch: 46 / 50 (took 1.869 sek)
+151.---v  		Epoch: 47 / 50
+Info     			Learnrate: 0.0001 
+Info     			error 0.0897 
+151.---^  		Epoch: 47 / 50 (took 1.866 sek)
+152.---v  		Epoch: 48 / 50
+Info     			Learnrate: 0.0001 
+Info     			error 0.0886 
+152.---^  		Epoch: 48 / 50 (took 1.87 sek)
+153.---v  		Epoch: 49 / 50
+Info     			Learnrate: 0.0001 
+Info     			error 0.0886 
+153.---^  		Epoch: 49 / 50 (took 1.87 sek)
+154.---v  		Epoch: 50 / 50
+Info     			Learnrate: 0.0001 
+Info     			error 0.0885 
+154.---^  		Epoch: 50 / 50 (took 1.869 sek)
+104.--^   	Pretraining  3. RBM (took 95.234 sek)
+155.--v   	Pretraining  4. RBM
+155.--^   	Pretraining  4. RBM (took 0.0 sek)
+1.-^    Pretrain Session (took 317.161 sek)
+------------------------------------------------
+
+1.-v    DBM Train Session
+2.--v   	Run 0
+3.      		Initializing graph
+Info     		Batchsize: 110 N_Updates 50000 
+4.---v  		Deep BM Epoch: 1 / 100
+5.      			Shuffling TrainData
+6.      			Running Batch
+4.---^  		Deep BM Epoch: 1 / 100 (took 23.602 sek)
+Info     		Learnrate:  [0. 0. 0. 0.] 
+Info     		Temp:  0.01 
+Info     		freerun_steps:  4 
+------------------------------------------------
+
+1.      		Initializing graph
+2.      		loading numpy vars into graph
+3.---v  		Testing DBM with 10000 images
+4.      			Sampling hidden 10 times 
+5.      			Taking only the maximum
+3.---^  		Testing DBM with 10000 images (took 2.549 sek)
+Info     		------------- Test Log ------------- 
+Info     		Reconstr. error normal:  0.04273 
+Info     		Class error:  0.4047 
+Info     		Wrong Digits:  4047  with average:  0.024 
+Info     		Correct Digits:  5953  with average:  0.044 
+------------------------------------------------
+2.--^   	Run 0 (took 26.979 sek)
+
+1.--v   	Run 1
+2.      		Initializing graph
+3.      		loading numpy vars into graph
+Info     		Batchsize: 110 N_Updates 50000 
+4.---v  		Deep BM Epoch: 2 / 100
+5.      			Shuffling TrainData
+6.      			Running Batch
+4.---^  		Deep BM Epoch: 2 / 100 (took 23.105 sek)
+Info     		Learnrate:  [0. 0. 0. 0.] 
+Info     		Temp:  0.01 
+Info     		freerun_steps:  4 
+------------------------------------------------
+1.--^   	Run 1 (took 23.799 sek)
+
+1.--v   	Run 2
+Info     		Batchsize: 110 N_Updates 50000 
+2.---v  		Deep BM Epoch: 3 / 100
+3.      			Shuffling TrainData
+4.      			Running Batch
+2.---^  		Deep BM Epoch: 3 / 100 (took 23.179 sek)
+Info     		Learnrate:  [0. 0. 0. 0.] 
+Info     		Temp:  0.01 
+Info     		freerun_steps:  4 
+------------------------------------------------
+1.--^   	Run 2 (took 23.186 sek)
+
+1.--v   	Run 3
+Info     		Batchsize: 110 N_Updates 50000 
+2.---v  		Deep BM Epoch: 4 / 100
+3.      			Shuffling TrainData
+4.      			Running Batch
+2.---^  		Deep BM Epoch: 4 / 100 (took 23.304 sek)
+Info     		Learnrate:  [0. 0. 0. 0.] 
+Info     		Temp:  0.01 
+Info     		freerun_steps:  4 
+------------------------------------------------
+1.--^   	Run 3 (took 23.311 sek)
+
+1.--v   	Run 4
+Info     		Batchsize: 110 N_Updates 50000 
+2.---v  		Deep BM Epoch: 5 / 100
+3.      			Shuffling TrainData
+4.      			Running Batch
+2.---^  		Deep BM Epoch: 5 / 100 (took 23.212 sek)
+Info     		Learnrate:  [0. 0. 0. 0.] 
+Info     		Temp:  0.01 
+Info     		freerun_steps:  4 
+------------------------------------------------
+1.--^   	Run 4 (took 23.22 sek)
+
+1.--v   	Run 5
+Info     		Batchsize: 110 N_Updates 50000 
+2.---v  		Deep BM Epoch: 6 / 100
+3.      			Shuffling TrainData
+4.      			Running Batch
+2.---^  		Deep BM Epoch: 6 / 100 (took 23.336 sek)
+Info     		Learnrate:  [0. 0. 0. 0.] 
+Info     		Temp:  0.01 
+Info     		freerun_steps:  4 
+------------------------------------------------
+1.--^   	Run 5 (took 23.343 sek)
+
+1.--v   	Run 6
+Info     		Batchsize: 110 N_Updates 50000 
+2.---v  		Deep BM Epoch: 7 / 100
+3.      			Shuffling TrainData
+4.      			Running Batch
+2.---^  		Deep BM Epoch: 7 / 100 (took 23.228 sek)
+Info     		Learnrate:  [9.9e-05 9.9e-05 9.9e-05 9.9e-05] 
+Info     		Temp:  0.01 
+Info     		freerun_steps:  4 
+------------------------------------------------
+1.--^   	Run 6 (took 23.236 sek)
+
+1.--v   	Run 7
+Info     		Batchsize: 110 N_Updates 50000 
+2.---v  		Deep BM Epoch: 8 / 100
+3.      			Shuffling TrainData
+4.      			Running Batch
+2.---^  		Deep BM Epoch: 8 / 100 (took 23.234 sek)
+Info     		Learnrate:  [9.9e-05 9.9e-05 9.9e-05 9.9e-05] 
+Info     		Temp:  0.01 
+Info     		freerun_steps:  4 
+------------------------------------------------
+1.--^   	Run 7 (took 23.241 sek)
+
+1.--v   	Run 8
+Info     		Batchsize: 110 N_Updates 50000 
+2.---v  		Deep BM Epoch: 9 / 100
+3.      			Shuffling TrainData
+4.      			Running Batch
+2.---^  		Deep BM Epoch: 9 / 100 (took 23.345 sek)
+Info     		Learnrate:  [9.9e-05 9.9e-05 9.9e-05 9.9e-05] 
+Info     		Temp:  0.01 
+Info     		freerun_steps:  4 
+------------------------------------------------
+1.--^   	Run 8 (took 23.352 sek)
+
+1.--v   	Run 9
+Info     		Batchsize: 110 N_Updates 50000 
+2.---v  		Deep BM Epoch: 10 / 100
+3.      			Shuffling TrainData
+4.      			Running Batch
+2.---^  		Deep BM Epoch: 10 / 100 (took 23.228 sek)
+Info     		Learnrate:  [9.9e-05 9.9e-05 9.9e-05 9.9e-05] 
+Info     		Temp:  0.01 
+Info     		freerun_steps:  4 
+------------------------------------------------
+1.--^   	Run 9 (took 23.235 sek)
+
+1.--v   	Run 10
+Info     		Batchsize: 110 N_Updates 50000 
+2.---v  		Deep BM Epoch: 11 / 100
+3.      			Shuffling TrainData
+4.      			Running Batch
+2.---^  		Deep BM Epoch: 11 / 100 (took 23.295 sek)
+Info     		Learnrate:  [9.9e-05 9.9e-05 9.9e-05 9.9e-05] 
+Info     		Temp:  0.01 
+Info     		freerun_steps:  4 
+------------------------------------------------
+
+1.      		Initializing graph
+2.      		loading numpy vars into graph
+3.---v  		Testing DBM with 10000 images
+4.      			Sampling hidden 10 times 
+5.      			Taking only the maximum
+3.---^  		Testing DBM with 10000 images (took 2.564 sek)
+Info     		------------- Test Log ------------- 
+Info     		Reconstr. error normal:  0.03968 
+Info     		Class error:  0.1954 
+Info     		Wrong Digits:  1954  with average:  0.347 
+Info     		Correct Digits:  8046  with average:  0.722 
+------------------------------------------------
+1.--^   	Run 10 (took 26.596 sek)
+
+1.--v   	Run 11
+2.      		Initializing graph
+3.      		loading numpy vars into graph
+Info     		Batchsize: 110 N_Updates 50000 
+4.---v  		Deep BM Epoch: 12 / 100
+5.      			Shuffling TrainData
+6.      			Running Batch
+4.---^  		Deep BM Epoch: 12 / 100 (took 23.321 sek)
+Info     		Learnrate:  [9.9e-05 9.9e-05 9.9e-05 9.9e-05] 
+Info     		Temp:  0.01 
+Info     		freerun_steps:  4 
+------------------------------------------------
+1.--^   	Run 11 (took 24.327 sek)
+
+1.--v   	Run 12
+Info     		Batchsize: 110 N_Updates 50000 
+2.---v  		Deep BM Epoch: 13 / 100
+3.      			Shuffling TrainData
+4.      			Running Batch
+2.---^  		Deep BM Epoch: 13 / 100 (took 23.134 sek)
+Info     		Learnrate:  [9.9e-05 9.9e-05 9.9e-05 9.9e-05] 
+Info     		Temp:  0.01 
+Info     		freerun_steps:  4 
+------------------------------------------------
+1.--^   	Run 12 (took 23.142 sek)
+
+1.--v   	Run 13
+Info     		Batchsize: 110 N_Updates 50000 
+2.---v  		Deep BM Epoch: 14 / 100
+3.      			Shuffling TrainData
+4.      			Running Batch
+2.---^  		Deep BM Epoch: 14 / 100 (took 23.204 sek)
+Info     		Learnrate:  [9.9e-05 9.9e-05 9.9e-05 9.9e-05] 
+Info     		Temp:  0.01 
+Info     		freerun_steps:  4 
+------------------------------------------------
+1.--^   	Run 13 (took 23.212 sek)
+
+1.--v   	Run 14
+Info     		Batchsize: 110 N_Updates 50000 
+2.---v  		Deep BM Epoch: 15 / 100
+3.      			Shuffling TrainData
+4.      			Running Batch
+2.---^  		Deep BM Epoch: 15 / 100 (took 23.133 sek)
+Info     		Learnrate:  [9.9e-05 9.9e-05 9.9e-05 9.9e-05] 
+Info     		Temp:  0.01 
+Info     		freerun_steps:  4 
+------------------------------------------------
+1.--^   	Run 14 (took 23.139 sek)
+
+1.--v   	Run 15
+Info     		Batchsize: 110 N_Updates 50000 
+2.---v  		Deep BM Epoch: 16 / 100
+3.      			Shuffling TrainData
+4.      			Running Batch
+2.---^  		Deep BM Epoch: 16 / 100 (took 23.24 sek)
+Info     		Learnrate:  [9.9e-05 9.9e-05 9.9e-05 9.9e-05] 
+Info     		Temp:  0.01 
+Info     		freerun_steps:  4 
+------------------------------------------------
+1.--^   	Run 15 (took 23.248 sek)
+
+1.--v   	Run 16
+Info     		Batchsize: 110 N_Updates 50000 
+2.---v  		Deep BM Epoch: 17 / 100
+3.      			Shuffling TrainData
+4.      			Running Batch
+2.---^  		Deep BM Epoch: 17 / 100 (took 23.168 sek)
+Info     		Learnrate:  [9.8e-05 9.8e-05 9.8e-05 9.8e-05] 
+Info     		Temp:  0.01 
+Info     		freerun_steps:  4 
+------------------------------------------------
+1.--^   	Run 16 (took 23.176 sek)
+
+1.--v   	Run 17
+Info     		Batchsize: 110 N_Updates 50000 
+2.---v  		Deep BM Epoch: 18 / 100
+3.      			Shuffling TrainData
+4.      			Running Batch
+2.---^  		Deep BM Epoch: 18 / 100 (took 23.11 sek)
+Info     		Learnrate:  [9.8e-05 9.8e-05 9.8e-05 9.8e-05] 
+Info     		Temp:  0.01 
+Info     		freerun_steps:  4 
+------------------------------------------------
+1.--^   	Run 17 (took 23.117 sek)
+
+1.--v   	Run 18
+Info     		Batchsize: 110 N_Updates 50000 
+2.---v  		Deep BM Epoch: 19 / 100
+3.      			Shuffling TrainData
+4.      			Running Batch
+2.---^  		Deep BM Epoch: 19 / 100 (took 23.266 sek)
+Info     		Learnrate:  [9.8e-05 9.8e-05 9.8e-05 9.8e-05] 
+Info     		Temp:  0.01 
+Info     		freerun_steps:  4 
+------------------------------------------------
+1.--^   	Run 18 (took 23.273 sek)
+
+1.--v   	Run 19
+Info     		Batchsize: 110 N_Updates 50000 
+2.---v  		Deep BM Epoch: 20 / 100
+3.      			Shuffling TrainData
+4.      			Running Batch
+2.---^  		Deep BM Epoch: 20 / 100 (took 23.134 sek)
+Info     		Learnrate:  [9.8e-05 9.8e-05 9.8e-05 9.8e-05] 
+Info     		Temp:  0.01 
+Info     		freerun_steps:  4 
+------------------------------------------------
+1.--^   	Run 19 (took 23.141 sek)
+
+1.--v   	Run 20
+Info     		Batchsize: 110 N_Updates 50000 
+2.---v  		Deep BM Epoch: 21 / 100
+3.      			Shuffling TrainData
+4.      			Running Batch
+2.---^  		Deep BM Epoch: 21 / 100 (took 23.117 sek)
+Info     		Learnrate:  [9.8e-05 9.8e-05 9.8e-05 9.8e-05] 
+Info     		Temp:  0.01 
+Info     		freerun_steps:  4 
+------------------------------------------------
+
+1.      		Initializing graph
+2.      		loading numpy vars into graph
+3.---v  		Testing DBM with 10000 images
+4.      			Sampling hidden 10 times 
+5.      			Taking only the maximum
+3.---^  		Testing DBM with 10000 images (took 2.55 sek)
+Info     		------------- Test Log ------------- 
+Info     		Reconstr. error normal:  0.04046 
+Info     		Class error:  0.2048 
+Info     		Wrong Digits:  2048  with average:  0.497 
+Info     		Correct Digits:  7952  with average:  0.859 
+------------------------------------------------
+1.--^   	Run 20 (took 26.661 sek)
+
+1.--v   	Run 21
+2.      		Initializing graph
+3.      		loading numpy vars into graph
+Info     		Batchsize: 110 N_Updates 50000 
+4.---v  		Deep BM Epoch: 22 / 100
+5.      			Shuffling TrainData
+6.      			Running Batch
+4.---^  		Deep BM Epoch: 22 / 100 (took 23.912 sek)
+Info     		Learnrate:  [9.8e-05 9.8e-05 9.8e-05 9.8e-05] 
+Info     		Temp:  0.01 
+Info     		freerun_steps:  4 
+------------------------------------------------
+1.--^   	Run 21 (took 25.131 sek)
+
+1.--v   	Run 22
+Info     		Batchsize: 110 N_Updates 50000 
+2.---v  		Deep BM Epoch: 23 / 100
+3.      			Shuffling TrainData
+4.      			Running Batch
+2.---^  		Deep BM Epoch: 23 / 100 (took 23.164 sek)
+Info     		Learnrate:  [9.8e-05 9.8e-05 9.8e-05 9.8e-05] 
+Info     		Temp:  0.01 
+Info     		freerun_steps:  4 
+------------------------------------------------
+1.--^   	Run 22 (took 23.172 sek)
+
+1.--v   	Run 23
+Info     		Batchsize: 110 N_Updates 50000 
+2.---v  		Deep BM Epoch: 24 / 100
+3.      			Shuffling TrainData
+4.      			Running Batch
+2.---^  		Deep BM Epoch: 24 / 100 (took 23.395 sek)
+Info     		Learnrate:  [9.8e-05 9.8e-05 9.8e-05 9.8e-05] 
+Info     		Temp:  0.01 
+Info     		freerun_steps:  4 
+------------------------------------------------
+1.--^   	Run 23 (took 23.402 sek)
+
+1.--v   	Run 24
+Info     		Batchsize: 110 N_Updates 50000 
+2.---v  		Deep BM Epoch: 25 / 100
+3.      			Shuffling TrainData
+4.      			Running Batch
+2.---^  		Deep BM Epoch: 25 / 100 (took 23.222 sek)
+Info     		Learnrate:  [9.8e-05 9.8e-05 9.8e-05 9.8e-05] 
+Info     		Temp:  0.01 
+Info     		freerun_steps:  4 
+------------------------------------------------
+1.--^   	Run 24 (took 23.23 sek)
+
+1.--v   	Run 25
+Info     		Batchsize: 110 N_Updates 50000 
+2.---v  		Deep BM Epoch: 26 / 100
+3.      			Shuffling TrainData
+4.      			Running Batch
+2.---^  		Deep BM Epoch: 26 / 100 (took 23.348 sek)
+Info     		Learnrate:  [9.8e-05 9.8e-05 9.8e-05 9.8e-05] 
+Info     		Temp:  0.01 
+Info     		freerun_steps:  4 
+------------------------------------------------
+1.--^   	Run 25 (took 23.356 sek)
+
+1.--v   	Run 26
+Info     		Batchsize: 110 N_Updates 50000 
+2.---v  		Deep BM Epoch: 27 / 100
+3.      			Shuffling TrainData
+4.      			Running Batch
+2.---^  		Deep BM Epoch: 27 / 100 (took 23.267 sek)
+Info     		Learnrate:  [9.7e-05 9.7e-05 9.7e-05 9.7e-05] 
+Info     		Temp:  0.01 
+Info     		freerun_steps:  4 
+------------------------------------------------
+1.--^   	Run 26 (took 23.274 sek)
+
+1.--v   	Run 27
+Info     		Batchsize: 110 N_Updates 50000 
+2.---v  		Deep BM Epoch: 28 / 100
+3.      			Shuffling TrainData
+4.      			Running Batch
+2.---^  		Deep BM Epoch: 28 / 100 (took 23.248 sek)
+Info     		Learnrate:  [9.7e-05 9.7e-05 9.7e-05 9.7e-05] 
+Info     		Temp:  0.01 
+Info     		freerun_steps:  4 
+------------------------------------------------
+1.--^   	Run 27 (took 23.256 sek)
+
+1.--v   	Run 28
+Info     		Batchsize: 110 N_Updates 50000 
+2.---v  		Deep BM Epoch: 29 / 100
+3.      			Shuffling TrainData
+4.      			Running Batch
+2.---^  		Deep BM Epoch: 29 / 100 (took 23.487 sek)
+Info     		Learnrate:  [9.7e-05 9.7e-05 9.7e-05 9.7e-05] 
+Info     		Temp:  0.01 
+Info     		freerun_steps:  4 
+------------------------------------------------
+1.--^   	Run 28 (took 23.495 sek)
+
+1.--v   	Run 29
+Info     		Batchsize: 110 N_Updates 50000 
+2.---v  		Deep BM Epoch: 30 / 100
+3.      			Shuffling TrainData
+4.      			Running Batch
+2.---^  		Deep BM Epoch: 30 / 100 (took 23.324 sek)
+Info     		Learnrate:  [9.7e-05 9.7e-05 9.7e-05 9.7e-05] 
+Info     		Temp:  0.01 
+Info     		freerun_steps:  4 
+------------------------------------------------
+1.--^   	Run 29 (took 23.331 sek)
+
+1.--v   	Run 30
+Info     		Batchsize: 110 N_Updates 50000 
+2.---v  		Deep BM Epoch: 31 / 100
+3.      			Shuffling TrainData
+4.      			Running Batch
+2.---^  		Deep BM Epoch: 31 / 100 (took 23.371 sek)
+Info     		Learnrate:  [9.7e-05 9.7e-05 9.7e-05 9.7e-05] 
+Info     		Temp:  0.01 
+Info     		freerun_steps:  4 
+------------------------------------------------
+
+1.      		Initializing graph
+2.      		loading numpy vars into graph
+3.---v  		Testing DBM with 10000 images
+4.      			Sampling hidden 10 times 
+5.      			Taking only the maximum
+3.---^  		Testing DBM with 10000 images (took 2.671 sek)
+Info     		------------- Test Log ------------- 
+Info     		Reconstr. error normal:  0.04113 
+Info     		Class error:  0.1572 
+Info     		Wrong Digits:  1572  with average:  0.71 
+Info     		Correct Digits:  8428  with average:  0.959 
+------------------------------------------------
+1.--^   	Run 30 (took 27.228 sek)
+
+1.--v   	Run 31
+2.      		Initializing graph
+3.      		loading numpy vars into graph
+Info     		Batchsize: 110 N_Updates 50000 
+4.---v  		Deep BM Epoch: 32 / 100
+5.      			Shuffling TrainData
+6.      			Running Batch
+4.---^  		Deep BM Epoch: 32 / 100 (took 23.747 sek)
+Info     		Learnrate:  [9.7e-05 9.7e-05 9.7e-05 9.7e-05] 
+Info     		Temp:  0.01 
+Info     		freerun_steps:  4 
+------------------------------------------------
+1.--^   	Run 31 (took 25.334 sek)
+
+1.--v   	Run 32
+Info     		Batchsize: 110 N_Updates 50000 
+2.---v  		Deep BM Epoch: 33 / 100
+3.      			Shuffling TrainData
+4.      			Running Batch
+2.---^  		Deep BM Epoch: 33 / 100 (took 23.253 sek)
+Info     		Learnrate:  [9.7e-05 9.7e-05 9.7e-05 9.7e-05] 
+Info     		Temp:  0.01 
+Info     		freerun_steps:  4 
+------------------------------------------------
+1.--^   	Run 32 (took 23.264 sek)
+
+1.--v   	Run 33
+Info     		Batchsize: 110 N_Updates 50000 
+2.---v  		Deep BM Epoch: 34 / 100
+3.      			Shuffling TrainData
+4.      			Running Batch
+2.---^  		Deep BM Epoch: 34 / 100 (took 23.407 sek)
+Info     		Learnrate:  [9.7e-05 9.7e-05 9.7e-05 9.7e-05] 
+Info     		Temp:  0.01 
+Info     		freerun_steps:  4 
+------------------------------------------------
+1.--^   	Run 33 (took 23.415 sek)
+
+1.--v   	Run 34
+Info     		Batchsize: 110 N_Updates 50000 
+2.---v  		Deep BM Epoch: 35 / 100
+3.      			Shuffling TrainData
+4.      			Running Batch
+2.---^  		Deep BM Epoch: 35 / 100 (took 23.236 sek)
+Info     		Learnrate:  [9.7e-05 9.7e-05 9.7e-05 9.7e-05] 
+Info     		Temp:  0.01 
+Info     		freerun_steps:  4 
+------------------------------------------------
+1.--^   	Run 34 (took 23.243 sek)
+
+1.--v   	Run 35
+Info     		Batchsize: 110 N_Updates 50000 
+2.---v  		Deep BM Epoch: 36 / 100
+3.      			Shuffling TrainData
+4.      			Running Batch
+2.---^  		Deep BM Epoch: 36 / 100 (took 23.415 sek)
+Info     		Learnrate:  [9.7e-05 9.7e-05 9.7e-05 9.7e-05] 
+Info     		Temp:  0.01 
+Info     		freerun_steps:  4 
+------------------------------------------------
+1.--^   	Run 35 (took 23.421 sek)
+
+1.--v   	Run 36
+Info     		Batchsize: 110 N_Updates 50000 
+2.---v  		Deep BM Epoch: 37 / 100
+3.      			Shuffling TrainData
+4.      			Running Batch
+2.---^  		Deep BM Epoch: 37 / 100 (took 23.31 sek)
+Info     		Learnrate:  [9.7e-05 9.7e-05 9.7e-05 9.7e-05] 
+Info     		Temp:  0.01 
+Info     		freerun_steps:  4 
+------------------------------------------------
+1.--^   	Run 36 (took 23.318 sek)
+
+1.--v   	Run 37
+Info     		Batchsize: 110 N_Updates 50000 
+2.---v  		Deep BM Epoch: 38 / 100
+3.      			Shuffling TrainData
+4.      			Running Batch
+2.---^  		Deep BM Epoch: 38 / 100 (took 23.366 sek)
+Info     		Learnrate:  [9.6e-05 9.6e-05 9.6e-05 9.6e-05] 
+Info     		Temp:  0.01 
+Info     		freerun_steps:  4 
+------------------------------------------------
+1.--^   	Run 37 (took 23.373 sek)
+
+1.--v   	Run 38
+Info     		Batchsize: 110 N_Updates 50000 
+2.---v  		Deep BM Epoch: 39 / 100
+3.      			Shuffling TrainData
+4.      			Running Batch
+2.---^  		Deep BM Epoch: 39 / 100 (took 23.413 sek)
+Info     		Learnrate:  [9.6e-05 9.6e-05 9.6e-05 9.6e-05] 
+Info     		Temp:  0.01 
+Info     		freerun_steps:  4 
+------------------------------------------------
+1.--^   	Run 38 (took 23.42 sek)
+
+1.--v   	Run 39
+Info     		Batchsize: 110 N_Updates 50000 
+2.---v  		Deep BM Epoch: 40 / 100
+3.      			Shuffling TrainData
+4.      			Running Batch
+2.---^  		Deep BM Epoch: 40 / 100 (took 23.345 sek)
+Info     		Learnrate:  [9.6e-05 9.6e-05 9.6e-05 9.6e-05] 
+Info     		Temp:  0.01 
+Info     		freerun_steps:  4 
+------------------------------------------------
+1.--^   	Run 39 (took 23.353 sek)
+
+1.--v   	Run 40
+Info     		Batchsize: 110 N_Updates 50000 
+2.---v  		Deep BM Epoch: 41 / 100
+3.      			Shuffling TrainData
+4.      			Running Batch
+2.---^  		Deep BM Epoch: 41 / 100 (took 23.333 sek)
+Info     		Learnrate:  [9.6e-05 9.6e-05 9.6e-05 9.6e-05] 
+Info     		Temp:  0.01 
+Info     		freerun_steps:  4 
+------------------------------------------------
+
+1.      		Initializing graph
+2.      		loading numpy vars into graph
+3.---v  		Testing DBM with 10000 images
+4.      			Sampling hidden 10 times 
+5.      			Taking only the maximum
+3.---^  		Testing DBM with 10000 images (took 2.716 sek)
+Info     		------------- Test Log ------------- 
+Info     		Reconstr. error normal:  0.04116 
+Info     		Class error:  0.1636 
+Info     		Wrong Digits:  1636  with average:  0.715 
+Info     		Correct Digits:  8364  with average:  0.963 
+------------------------------------------------
+1.--^   	Run 40 (took 27.456 sek)
+
+1.--v   	Run 41
+2.      		Initializing graph
+3.      		loading numpy vars into graph
+Info     		Batchsize: 110 N_Updates 50000 
+4.---v  		Deep BM Epoch: 42 / 100
+5.      			Shuffling TrainData
+6.      			Running Batch
+4.---^  		Deep BM Epoch: 42 / 100 (took 23.817 sek)
+Info     		Learnrate:  [9.6e-05 9.6e-05 9.6e-05 9.6e-05] 
+Info     		Temp:  0.01 
+Info     		freerun_steps:  4 
+------------------------------------------------
+1.--^   	Run 41 (took 25.626 sek)
+
+1.--v   	Run 42
+Info     		Batchsize: 110 N_Updates 50000 
+2.---v  		Deep BM Epoch: 43 / 100
+3.      			Shuffling TrainData
+4.      			Running Batch
+2.---^  		Deep BM Epoch: 43 / 100 (took 23.134 sek)
+Info     		Learnrate:  [9.6e-05 9.6e-05 9.6e-05 9.6e-05] 
+Info     		Temp:  0.01 
+Info     		freerun_steps:  4 
+------------------------------------------------
+1.--^   	Run 42 (took 23.141 sek)
+
+1.--v   	Run 43
+Info     		Batchsize: 110 N_Updates 50000 
+2.---v  		Deep BM Epoch: 44 / 100
+3.      			Shuffling TrainData
+4.      			Running Batch
+2.---^  		Deep BM Epoch: 44 / 100 (took 23.263 sek)
+Info     		Learnrate:  [9.6e-05 9.6e-05 9.6e-05 9.6e-05] 
+Info     		Temp:  0.01 
+Info     		freerun_steps:  4 
+------------------------------------------------
+1.--^   	Run 43 (took 23.271 sek)
+
+1.--v   	Run 44
+Info     		Batchsize: 110 N_Updates 50000 
+2.---v  		Deep BM Epoch: 45 / 100
+3.      			Shuffling TrainData
+4.      			Running Batch
+2.---^  		Deep BM Epoch: 45 / 100 (took 23.165 sek)
+Info     		Learnrate:  [9.6e-05 9.6e-05 9.6e-05 9.6e-05] 
+Info     		Temp:  0.01 
+Info     		freerun_steps:  4 
+------------------------------------------------
+1.--^   	Run 44 (took 23.171 sek)
+
+1.--v   	Run 45
+Info     		Batchsize: 110 N_Updates 50000 
+2.---v  		Deep BM Epoch: 46 / 100
+3.      			Shuffling TrainData
+4.      			Running Batch
+2.---^  		Deep BM Epoch: 46 / 100 (took 23.203 sek)
+Info     		Learnrate:  [9.6e-05 9.6e-05 9.6e-05 9.6e-05] 
+Info     		Temp:  0.01 
+Info     		freerun_steps:  4 
+------------------------------------------------
+1.--^   	Run 45 (took 23.21 sek)
+
+1.--v   	Run 46
+Info     		Batchsize: 110 N_Updates 50000 
+2.---v  		Deep BM Epoch: 47 / 100
+3.      			Shuffling TrainData
+4.      			Running Batch
+2.---^  		Deep BM Epoch: 47 / 100 (took 23.229 sek)
+Info     		Learnrate:  [9.6e-05 9.6e-05 9.6e-05 9.6e-05] 
+Info     		Temp:  0.01 
+Info     		freerun_steps:  4 
+------------------------------------------------
+1.--^   	Run 46 (took 23.236 sek)
+
+1.--v   	Run 47
+Info     		Batchsize: 110 N_Updates 50000 
+2.---v  		Deep BM Epoch: 48 / 100
+3.      			Shuffling TrainData
+4.      			Running Batch
+2.---^  		Deep BM Epoch: 48 / 100 (took 23.214 sek)
+Info     		Learnrate:  [9.6e-05 9.6e-05 9.6e-05 9.6e-05] 
+Info     		Temp:  0.01 
+Info     		freerun_steps:  4 
+------------------------------------------------
+1.--^   	Run 47 (took 23.221 sek)
+
+1.--v   	Run 48
+Info     		Batchsize: 110 N_Updates 50000 
+2.---v  		Deep BM Epoch: 49 / 100
+3.      			Shuffling TrainData
+4.      			Running Batch
+2.---^  		Deep BM Epoch: 49 / 100 (took 23.412 sek)
+Info     		Learnrate:  [9.5e-05 9.5e-05 9.5e-05 9.5e-05] 
+Info     		Temp:  0.01 
+Info     		freerun_steps:  4 
+------------------------------------------------
+1.--^   	Run 48 (took 23.42 sek)
+
+1.--v   	Run 49
+Info     		Batchsize: 110 N_Updates 50000 
+2.---v  		Deep BM Epoch: 50 / 100
+3.      			Shuffling TrainData
+4.      			Running Batch
+2.---^  		Deep BM Epoch: 50 / 100 (took 23.221 sek)
+Info     		Learnrate:  [9.5e-05 9.5e-05 9.5e-05 9.5e-05] 
+Info     		Temp:  0.01 
+Info     		freerun_steps:  4 
+------------------------------------------------
+1.--^   	Run 49 (took 23.229 sek)
+
+1.--v   	Run 50
+Info     		Batchsize: 110 N_Updates 50000 
+2.---v  		Deep BM Epoch: 51 / 100
+3.      			Shuffling TrainData
+4.      			Running Batch
+2.---^  		Deep BM Epoch: 51 / 100 (took 23.212 sek)
+Info     		Learnrate:  [9.5e-05 9.5e-05 9.5e-05 9.5e-05] 
+Info     		Temp:  0.01 
+Info     		freerun_steps:  4 
+------------------------------------------------
+
+1.      		Initializing graph
+2.      		loading numpy vars into graph
+3.---v  		Testing DBM with 10000 images
+4.      			Sampling hidden 10 times 
+5.      			Taking only the maximum
+3.---^  		Testing DBM with 10000 images (took 2.754 sek)
+Info     		------------- Test Log ------------- 
+Info     		Reconstr. error normal:  0.04139 
+Info     		Class error:  0.1496 
+Info     		Wrong Digits:  1496  with average:  0.821 
+Info     		Correct Digits:  8504  with average:  0.988 
+------------------------------------------------
+1.--^   	Run 50 (took 27.626 sek)
+
+1.--v   	Run 51
+2.      		Initializing graph
+3.      		loading numpy vars into graph
+Info     		Batchsize: 110 N_Updates 50000 
+4.---v  		Deep BM Epoch: 52 / 100
+5.      			Shuffling TrainData
+6.      			Running Batch
+4.---^  		Deep BM Epoch: 52 / 100 (took 24.006 sek)
+Info     		Learnrate:  [9.5e-05 9.5e-05 9.5e-05 9.5e-05] 
+Info     		Temp:  0.01 
+Info     		freerun_steps:  4 
+------------------------------------------------
+1.--^   	Run 51 (took 26.132 sek)
+
+1.--v   	Run 52
+Info     		Batchsize: 110 N_Updates 50000 
+2.---v  		Deep BM Epoch: 53 / 100
+3.      			Shuffling TrainData
+4.      			Running Batch
+2.---^  		Deep BM Epoch: 53 / 100 (took 23.159 sek)
+Info     		Learnrate:  [9.5e-05 9.5e-05 9.5e-05 9.5e-05] 
+Info     		Temp:  0.01 
+Info     		freerun_steps:  4 
+------------------------------------------------
+1.--^   	Run 52 (took 23.166 sek)
+
+1.--v   	Run 53
+Info     		Batchsize: 110 N_Updates 50000 
+2.---v  		Deep BM Epoch: 54 / 100
+3.      			Shuffling TrainData
+4.      			Running Batch
+2.---^  		Deep BM Epoch: 54 / 100 (took 23.273 sek)
+Info     		Learnrate:  [9.5e-05 9.5e-05 9.5e-05 9.5e-05] 
+Info     		Temp:  0.01 
+Info     		freerun_steps:  4 
+------------------------------------------------
+1.--^   	Run 53 (took 23.28 sek)
+
+1.--v   	Run 54
+Info     		Batchsize: 110 N_Updates 50000 
+2.---v  		Deep BM Epoch: 55 / 100
+3.      			Shuffling TrainData
+4.      			Running Batch
+2.---^  		Deep BM Epoch: 55 / 100 (took 23.162 sek)
+Info     		Learnrate:  [9.5e-05 9.5e-05 9.5e-05 9.5e-05] 
+Info     		Temp:  0.01 
+Info     		freerun_steps:  4 
+------------------------------------------------
+1.--^   	Run 54 (took 23.17 sek)
+
+1.--v   	Run 55
+Info     		Batchsize: 110 N_Updates 50000 
+2.---v  		Deep BM Epoch: 56 / 100
+3.      			Shuffling TrainData
+4.      			Running Batch
+2.---^  		Deep BM Epoch: 56 / 100 (took 23.176 sek)
+Info     		Learnrate:  [9.5e-05 9.5e-05 9.5e-05 9.5e-05] 
+Info     		Temp:  0.01 
+Info     		freerun_steps:  4 
+------------------------------------------------
+1.--^   	Run 55 (took 23.184 sek)
+
+1.--v   	Run 56
+Info     		Batchsize: 110 N_Updates 50000 
+2.---v  		Deep BM Epoch: 57 / 100
+3.      			Shuffling TrainData
+4.      			Running Batch
+2.---^  		Deep BM Epoch: 57 / 100 (took 23.464 sek)
+Info     		Learnrate:  [9.5e-05 9.5e-05 9.5e-05 9.5e-05] 
+Info     		Temp:  0.01 
+Info     		freerun_steps:  4 
+------------------------------------------------
+1.--^   	Run 56 (took 23.47 sek)
+
+1.--v   	Run 57
+Info     		Batchsize: 110 N_Updates 50000 
+2.---v  		Deep BM Epoch: 58 / 100
+3.      			Shuffling TrainData
+4.      			Running Batch
+2.---^  		Deep BM Epoch: 58 / 100 (took 23.26 sek)
+Info     		Learnrate:  [9.5e-05 9.5e-05 9.5e-05 9.5e-05] 
+Info     		Temp:  0.01 
+Info     		freerun_steps:  4 
+------------------------------------------------
+1.--^   	Run 57 (took 23.268 sek)
+
+1.--v   	Run 58
+Info     		Batchsize: 110 N_Updates 50000 
+2.---v  		Deep BM Epoch: 59 / 100
+3.      			Shuffling TrainData
+4.      			Running Batch
+2.---^  		Deep BM Epoch: 59 / 100 (took 23.388 sek)
+Info     		Learnrate:  [9.5e-05 9.5e-05 9.5e-05 9.5e-05] 
+Info     		Temp:  0.01 
+Info     		freerun_steps:  4 
+------------------------------------------------
+1.--^   	Run 58 (took 23.396 sek)
+
+1.--v   	Run 59
+Info     		Batchsize: 110 N_Updates 50000 
+2.---v  		Deep BM Epoch: 60 / 100
+3.      			Shuffling TrainData
+4.      			Running Batch
+2.---^  		Deep BM Epoch: 60 / 100 (took 23.268 sek)
+Info     		Learnrate:  [9.4e-05 9.4e-05 9.4e-05 9.4e-05] 
+Info     		Temp:  0.01 
+Info     		freerun_steps:  4 
+------------------------------------------------
+1.--^   	Run 59 (took 23.275 sek)
+
+1.--v   	Run 60
+Info     		Batchsize: 110 N_Updates 50000 
+2.---v  		Deep BM Epoch: 61 / 100
+3.      			Shuffling TrainData
+4.      			Running Batch
+2.---^  		Deep BM Epoch: 61 / 100 (took 23.322 sek)
+Info     		Learnrate:  [9.4e-05 9.4e-05 9.4e-05 9.4e-05] 
+Info     		Temp:  0.01 
+Info     		freerun_steps:  4 
+------------------------------------------------
+
+1.      		Initializing graph
+2.      		loading numpy vars into graph
+3.---v  		Testing DBM with 10000 images
+4.      			Sampling hidden 10 times 
+5.      			Taking only the maximum
+3.---^  		Testing DBM with 10000 images (took 2.766 sek)
+Info     		------------- Test Log ------------- 
+Info     		Reconstr. error normal:  0.04121 
+Info     		Class error:  0.1386 
+Info     		Wrong Digits:  1386  with average:  0.861 
+Info     		Correct Digits:  8614  with average:  0.986 
+------------------------------------------------
+1.--^   	Run 60 (took 28.012 sek)
+
+1.--v   	Run 61
+2.      		Initializing graph
+3.      		loading numpy vars into graph
+Info     		Batchsize: 110 N_Updates 50000 
+4.---v  		Deep BM Epoch: 62 / 100
+5.      			Shuffling TrainData
+6.      			Running Batch
+4.---^  		Deep BM Epoch: 62 / 100 (took 23.953 sek)
+Info     		Learnrate:  [9.4e-05 9.4e-05 9.4e-05 9.4e-05] 
+Info     		Temp:  0.01 
+Info     		freerun_steps:  4 
+------------------------------------------------
+1.--^   	Run 61 (took 26.373 sek)
+
+1.--v   	Run 62
+Info     		Batchsize: 110 N_Updates 50000 
+2.---v  		Deep BM Epoch: 63 / 100
+3.      			Shuffling TrainData
+4.      			Running Batch
+2.---^  		Deep BM Epoch: 63 / 100 (took 23.153 sek)
+Info     		Learnrate:  [9.4e-05 9.4e-05 9.4e-05 9.4e-05] 
+Info     		Temp:  0.01 
+Info     		freerun_steps:  4 
+------------------------------------------------
+1.--^   	Run 62 (took 23.16 sek)
+
+1.--v   	Run 63
+Info     		Batchsize: 110 N_Updates 50000 
+2.---v  		Deep BM Epoch: 64 / 100
+3.      			Shuffling TrainData
+4.      			Running Batch
+2.---^  		Deep BM Epoch: 64 / 100 (took 23.287 sek)
+Info     		Learnrate:  [9.4e-05 9.4e-05 9.4e-05 9.4e-05] 
+Info     		Temp:  0.01 
+Info     		freerun_steps:  4 
+------------------------------------------------
+1.--^   	Run 63 (took 23.295 sek)
+
+1.--v   	Run 64
+Info     		Batchsize: 110 N_Updates 50000 
+2.---v  		Deep BM Epoch: 65 / 100
+3.      			Shuffling TrainData
+4.      			Running Batch
+2.---^  		Deep BM Epoch: 65 / 100 (took 23.113 sek)
+Info     		Learnrate:  [9.4e-05 9.4e-05 9.4e-05 9.4e-05] 
+Info     		Temp:  0.01 
+Info     		freerun_steps:  4 
+------------------------------------------------
+1.--^   	Run 64 (took 23.121 sek)
+
+1.--v   	Run 65
+Info     		Batchsize: 110 N_Updates 50000 
+2.---v  		Deep BM Epoch: 66 / 100
+3.      			Shuffling TrainData
+4.      			Running Batch
+2.---^  		Deep BM Epoch: 66 / 100 (took 23.196 sek)
+Info     		Learnrate:  [9.4e-05 9.4e-05 9.4e-05 9.4e-05] 
+Info     		Temp:  0.01 
+Info     		freerun_steps:  4 
+------------------------------------------------
+1.--^   	Run 65 (took 23.203 sek)
+
+1.--v   	Run 66
+Info     		Batchsize: 110 N_Updates 50000 
+2.---v  		Deep BM Epoch: 67 / 100
+3.      			Shuffling TrainData
+4.      			Running Batch
+2.---^  		Deep BM Epoch: 67 / 100 (took 23.244 sek)
+Info     		Learnrate:  [9.4e-05 9.4e-05 9.4e-05 9.4e-05] 
+Info     		Temp:  0.01 
+Info     		freerun_steps:  4 
+------------------------------------------------
+1.--^   	Run 66 (took 23.251 sek)
+
+1.--v   	Run 67
+Info     		Batchsize: 110 N_Updates 50000 
+2.---v  		Deep BM Epoch: 68 / 100
+3.      			Shuffling TrainData
+4.      			Running Batch
+2.---^  		Deep BM Epoch: 68 / 100 (took 23.157 sek)
+Info     		Learnrate:  [9.4e-05 9.4e-05 9.4e-05 9.4e-05] 
+Info     		Temp:  0.01 
+Info     		freerun_steps:  4 
+------------------------------------------------
+1.--^   	Run 67 (took 23.165 sek)
+
+1.--v   	Run 68
+Info     		Batchsize: 110 N_Updates 50000 
+2.---v  		Deep BM Epoch: 69 / 100
+3.      			Shuffling TrainData
+4.      			Running Batch
+2.---^  		Deep BM Epoch: 69 / 100 (took 23.356 sek)
+Info     		Learnrate:  [9.4e-05 9.4e-05 9.4e-05 9.4e-05] 
+Info     		Temp:  0.01 
+Info     		freerun_steps:  4 
+------------------------------------------------
+1.--^   	Run 68 (took 23.363 sek)
+
+1.--v   	Run 69
+Info     		Batchsize: 110 N_Updates 50000 
+2.---v  		Deep BM Epoch: 70 / 100
+3.      			Shuffling TrainData
+4.      			Running Batch
+2.---^  		Deep BM Epoch: 70 / 100 (took 23.174 sek)
+Info     		Learnrate:  [9.4e-05 9.4e-05 9.4e-05 9.4e-05] 
+Info     		Temp:  0.01 
+Info     		freerun_steps:  4 
+------------------------------------------------
+1.--^   	Run 69 (took 23.181 sek)
+
+1.--v   	Run 70
+Info     		Batchsize: 110 N_Updates 50000 
+2.---v  		Deep BM Epoch: 71 / 100
+3.      			Shuffling TrainData
+4.      			Running Batch
+2.---^  		Deep BM Epoch: 71 / 100 (took 23.161 sek)
+Info     		Learnrate:  [9.3e-05 9.3e-05 9.3e-05 9.3e-05] 
+Info     		Temp:  0.01 
+Info     		freerun_steps:  4 
+------------------------------------------------
+
+1.      		Initializing graph
+2.      		loading numpy vars into graph
+3.---v  		Testing DBM with 10000 images
+4.      			Sampling hidden 10 times 
+5.      			Taking only the maximum
+3.---^  		Testing DBM with 10000 images (took 2.828 sek)
+Info     		------------- Test Log ------------- 
+Info     		Reconstr. error normal:  0.04166 
+Info     		Class error:  0.1493 
+Info     		Wrong Digits:  1493  with average:  0.836 
+Info     		Correct Digits:  8507  with average:  0.987 
+------------------------------------------------
+1.--^   	Run 70 (took 28.259 sek)
+
+1.--v   	Run 71
+2.      		Initializing graph
+3.      		loading numpy vars into graph
+Info     		Batchsize: 110 N_Updates 50000 
+4.---v  		Deep BM Epoch: 72 / 100
+5.      			Shuffling TrainData
+6.      			Running Batch
+4.---^  		Deep BM Epoch: 72 / 100 (took 23.978 sek)
+Info     		Learnrate:  [9.3e-05 9.3e-05 9.3e-05 9.3e-05] 
+Info     		Temp:  0.01 
+Info     		freerun_steps:  4 
+------------------------------------------------
+1.--^   	Run 71 (took 26.72 sek)
+
+1.--v   	Run 72
+Info     		Batchsize: 110 N_Updates 50000 
+2.---v  		Deep BM Epoch: 73 / 100
+3.      			Shuffling TrainData
+4.      			Running Batch
+2.---^  		Deep BM Epoch: 73 / 100 (took 23.156 sek)
+Info     		Learnrate:  [9.3e-05 9.3e-05 9.3e-05 9.3e-05] 
+Info     		Temp:  0.01 
+Info     		freerun_steps:  4 
+------------------------------------------------
+1.--^   	Run 72 (took 23.164 sek)
+
+1.--v   	Run 73
+Info     		Batchsize: 110 N_Updates 50000 
+2.---v  		Deep BM Epoch: 74 / 100
+3.      			Shuffling TrainData
+4.      			Running Batch
+2.---^  		Deep BM Epoch: 74 / 100 (took 23.404 sek)
+Info     		Learnrate:  [9.3e-05 9.3e-05 9.3e-05 9.3e-05] 
+Info     		Temp:  0.01 
+Info     		freerun_steps:  4 
+------------------------------------------------
+1.--^   	Run 73 (took 23.41 sek)
+
+1.--v   	Run 74
+Info     		Batchsize: 110 N_Updates 50000 
+2.---v  		Deep BM Epoch: 75 / 100
+3.      			Shuffling TrainData
+4.      			Running Batch
+2.---^  		Deep BM Epoch: 75 / 100 (took 23.201 sek)
+Info     		Learnrate:  [9.3e-05 9.3e-05 9.3e-05 9.3e-05] 
+Info     		Temp:  0.01 
+Info     		freerun_steps:  4 
+------------------------------------------------
+1.--^   	Run 74 (took 23.208 sek)
+
+1.--v   	Run 75
+Info     		Batchsize: 110 N_Updates 50000 
+2.---v  		Deep BM Epoch: 76 / 100
+3.      			Shuffling TrainData
+4.      			Running Batch
+2.---^  		Deep BM Epoch: 76 / 100 (took 23.315 sek)
+Info     		Learnrate:  [9.3e-05 9.3e-05 9.3e-05 9.3e-05] 
+Info     		Temp:  0.01 
+Info     		freerun_steps:  4 
+------------------------------------------------
+1.--^   	Run 75 (took 23.323 sek)
+
+1.--v   	Run 76
+Info     		Batchsize: 110 N_Updates 50000 
+2.---v  		Deep BM Epoch: 77 / 100
+3.      			Shuffling TrainData
+4.      			Running Batch
+2.---^  		Deep BM Epoch: 77 / 100 (took 23.218 sek)
+Info     		Learnrate:  [9.3e-05 9.3e-05 9.3e-05 9.3e-05] 
+Info     		Temp:  0.01 
+Info     		freerun_steps:  4 
+------------------------------------------------
+1.--^   	Run 76 (took 23.226 sek)
+
+1.--v   	Run 77
+Info     		Batchsize: 110 N_Updates 50000 
+2.---v  		Deep BM Epoch: 78 / 100
+3.      			Shuffling TrainData
+4.      			Running Batch
+2.---^  		Deep BM Epoch: 78 / 100 (took 23.252 sek)
+Info     		Learnrate:  [9.3e-05 9.3e-05 9.3e-05 9.3e-05] 
+Info     		Temp:  0.01 
+Info     		freerun_steps:  4 
+------------------------------------------------
+1.--^   	Run 77 (took 23.259 sek)
+
+1.--v   	Run 78
+Info     		Batchsize: 110 N_Updates 50000 
+2.---v  		Deep BM Epoch: 79 / 100
+3.      			Shuffling TrainData
+4.      			Running Batch
+2.---^  		Deep BM Epoch: 79 / 100 (took 23.364 sek)
+Info     		Learnrate:  [9.3e-05 9.3e-05 9.3e-05 9.3e-05] 
+Info     		Temp:  0.01 
+Info     		freerun_steps:  4 
+------------------------------------------------
+1.--^   	Run 78 (took 23.371 sek)
+
+1.--v   	Run 79
+Info     		Batchsize: 110 N_Updates 50000 
+2.---v  		Deep BM Epoch: 80 / 100
+3.      			Shuffling TrainData
+4.      			Running Batch
+2.---^  		Deep BM Epoch: 80 / 100 (took 23.256 sek)
+Info     		Learnrate:  [9.3e-05 9.3e-05 9.3e-05 9.3e-05] 
+Info     		Temp:  0.01 
+Info     		freerun_steps:  4 
+------------------------------------------------
+1.--^   	Run 79 (took 23.263 sek)
+
+1.--v   	Run 80
+Info     		Batchsize: 110 N_Updates 50000 
+2.---v  		Deep BM Epoch: 81 / 100
+3.      			Shuffling TrainData
+4.      			Running Batch
+2.---^  		Deep BM Epoch: 81 / 100 (took 23.283 sek)
+Info     		Learnrate:  [9.3e-05 9.3e-05 9.3e-05 9.3e-05] 
+Info     		Temp:  0.01 
+Info     		freerun_steps:  4 
+------------------------------------------------
+
+1.      		Initializing graph
+2.      		loading numpy vars into graph
+3.---v  		Testing DBM with 10000 images
+4.      			Sampling hidden 10 times 
+5.      			Taking only the maximum
+3.---^  		Testing DBM with 10000 images (took 2.755 sek)
+Info     		------------- Test Log ------------- 
+Info     		Reconstr. error normal:  0.04147 
+Info     		Class error:  0.1418 
+Info     		Wrong Digits:  1418  with average:  0.828 
+Info     		Correct Digits:  8582  with average:  0.981 
+------------------------------------------------
+1.--^   	Run 80 (took 28.633 sek)
+
+1.--v   	Run 81
+2.      		Initializing graph
+3.      		loading numpy vars into graph
+Info     		Batchsize: 110 N_Updates 50000 
+4.---v  		Deep BM Epoch: 82 / 100
+5.      			Shuffling TrainData
+6.      			Running Batch
+4.---^  		Deep BM Epoch: 82 / 100 (took 24.151 sek)
+Info     		Learnrate:  [9.3e-05 9.3e-05 9.3e-05 9.3e-05] 
+Info     		Temp:  0.01 
+Info     		freerun_steps:  4 
+------------------------------------------------
+1.--^   	Run 81 (took 27.306 sek)
+
+1.--v   	Run 82
+Info     		Batchsize: 110 N_Updates 50000 
+2.---v  		Deep BM Epoch: 83 / 100
+3.      			Shuffling TrainData
+4.      			Running Batch
+2.---^  		Deep BM Epoch: 83 / 100 (took 23.221 sek)
+Info     		Learnrate:  [9.2e-05 9.2e-05 9.2e-05 9.2e-05] 
+Info     		Temp:  0.01 
+Info     		freerun_steps:  4 
+------------------------------------------------
+1.--^   	Run 82 (took 23.229 sek)
+
+1.--v   	Run 83
+Info     		Batchsize: 110 N_Updates 50000 
+2.---v  		Deep BM Epoch: 84 / 100
+3.      			Shuffling TrainData
+4.      			Running Batch
+2.---^  		Deep BM Epoch: 84 / 100 (took 23.31 sek)
+Info     		Learnrate:  [9.2e-05 9.2e-05 9.2e-05 9.2e-05] 
+Info     		Temp:  0.01 
+Info     		freerun_steps:  4 
+------------------------------------------------
+1.--^   	Run 83 (took 23.317 sek)
+
+1.--v   	Run 84
+Info     		Batchsize: 110 N_Updates 50000 
+2.---v  		Deep BM Epoch: 85 / 100
+3.      			Shuffling TrainData
+4.      			Running Batch
+2.---^  		Deep BM Epoch: 85 / 100 (took 23.247 sek)
+Info     		Learnrate:  [9.2e-05 9.2e-05 9.2e-05 9.2e-05] 
+Info     		Temp:  0.01 
+Info     		freerun_steps:  4 
+------------------------------------------------
+1.--^   	Run 84 (took 23.255 sek)
+
+1.--v   	Run 85
+Info     		Batchsize: 110 N_Updates 50000 
+2.---v  		Deep BM Epoch: 86 / 100
+3.      			Shuffling TrainData
+4.      			Running Batch
+2.---^  		Deep BM Epoch: 86 / 100 (took 23.321 sek)
+Info     		Learnrate:  [9.2e-05 9.2e-05 9.2e-05 9.2e-05] 
+Info     		Temp:  0.01 
+Info     		freerun_steps:  4 
+------------------------------------------------
+1.--^   	Run 85 (took 23.329 sek)
+
+1.--v   	Run 86
+Info     		Batchsize: 110 N_Updates 50000 
+2.---v  		Deep BM Epoch: 87 / 100
+3.      			Shuffling TrainData
+4.      			Running Batch
+2.---^  		Deep BM Epoch: 87 / 100 (took 23.247 sek)
+Info     		Learnrate:  [9.2e-05 9.2e-05 9.2e-05 9.2e-05] 
+Info     		Temp:  0.01 
+Info     		freerun_steps:  4 
+------------------------------------------------
+1.--^   	Run 86 (took 23.254 sek)
+
+1.--v   	Run 87
+Info     		Batchsize: 110 N_Updates 50000 
+2.---v  		Deep BM Epoch: 88 / 100
+3.      			Shuffling TrainData
+4.      			Running Batch
+2.---^  		Deep BM Epoch: 88 / 100 (took 23.2 sek)
+Info     		Learnrate:  [9.2e-05 9.2e-05 9.2e-05 9.2e-05] 
+Info     		Temp:  0.01 
+Info     		freerun_steps:  4 
+------------------------------------------------
+1.--^   	Run 87 (took 23.208 sek)
+
+1.--v   	Run 88
+Info     		Batchsize: 110 N_Updates 50000 
+2.---v  		Deep BM Epoch: 89 / 100
+3.      			Shuffling TrainData
+4.      			Running Batch
+2.---^  		Deep BM Epoch: 89 / 100 (took 23.341 sek)
+Info     		Learnrate:  [9.2e-05 9.2e-05 9.2e-05 9.2e-05] 
+Info     		Temp:  0.01 
+Info     		freerun_steps:  4 
+------------------------------------------------
+1.--^   	Run 88 (took 23.349 sek)
+
+1.--v   	Run 89
+Info     		Batchsize: 110 N_Updates 50000 
+2.---v  		Deep BM Epoch: 90 / 100
+3.      			Shuffling TrainData
+4.      			Running Batch
+2.---^  		Deep BM Epoch: 90 / 100 (took 23.272 sek)
+Info     		Learnrate:  [9.2e-05 9.2e-05 9.2e-05 9.2e-05] 
+Info     		Temp:  0.01 
+Info     		freerun_steps:  4 
+------------------------------------------------
+1.--^   	Run 89 (took 23.279 sek)
+
+1.--v   	Run 90
+Info     		Batchsize: 110 N_Updates 50000 
+2.---v  		Deep BM Epoch: 91 / 100
+3.      			Shuffling TrainData
+4.      			Running Batch
+2.---^  		Deep BM Epoch: 91 / 100 (took 23.277 sek)
+Info     		Learnrate:  [9.2e-05 9.2e-05 9.2e-05 9.2e-05] 
+Info     		Temp:  0.01 
+Info     		freerun_steps:  4 
+------------------------------------------------
+
+1.      		Initializing graph
+2.      		loading numpy vars into graph
+3.---v  		Testing DBM with 10000 images
+4.      			Sampling hidden 10 times 
+5.      			Taking only the maximum
+3.---^  		Testing DBM with 10000 images (took 2.771 sek)
+Info     		------------- Test Log ------------- 
+Info     		Reconstr. error normal:  0.04154 
+Info     		Class error:  0.1305 
+Info     		Wrong Digits:  1305  with average:  0.878 
+Info     		Correct Digits:  8695  with average:  0.994 
+------------------------------------------------
+1.--^   	Run 90 (took 28.811 sek)
+
+1.--v   	Run 91
+2.      		Initializing graph
+3.      		loading numpy vars into graph
+Info     		Batchsize: 110 N_Updates 50000 
+4.---v  		Deep BM Epoch: 92 / 100
+5.      			Shuffling TrainData
+6.      			Running Batch
+4.---^  		Deep BM Epoch: 92 / 100 (took 24.465 sek)
+Info     		Learnrate:  [9.2e-05 9.2e-05 9.2e-05 9.2e-05] 
+Info     		Temp:  0.01 
+Info     		freerun_steps:  4 
+------------------------------------------------
+1.--^   	Run 91 (took 27.828 sek)
+
+1.--v   	Run 92
+Info     		Batchsize: 110 N_Updates 50000 
+2.---v  		Deep BM Epoch: 93 / 100
+3.      			Shuffling TrainData
+4.      			Running Batch
+2.---^  		Deep BM Epoch: 93 / 100 (took 23.141 sek)
+Info     		Learnrate:  [9.2e-05 9.2e-05 9.2e-05 9.2e-05] 
+Info     		Temp:  0.01 
+Info     		freerun_steps:  4 
+------------------------------------------------
+1.--^   	Run 92 (took 23.148 sek)
+
+1.--v   	Run 93
+Info     		Batchsize: 110 N_Updates 50000 
+2.---v  		Deep BM Epoch: 94 / 100
+3.      			Shuffling TrainData
+4.      			Running Batch
+2.---^  		Deep BM Epoch: 94 / 100 (took 23.27 sek)
+Info     		Learnrate:  [9.1e-05 9.1e-05 9.1e-05 9.1e-05] 
+Info     		Temp:  0.01 
+Info     		freerun_steps:  4 
+------------------------------------------------
+1.--^   	Run 93 (took 23.278 sek)
+
+1.--v   	Run 94
+Info     		Batchsize: 110 N_Updates 50000 
+2.---v  		Deep BM Epoch: 95 / 100
+3.      			Shuffling TrainData
+4.      			Running Batch
+2.---^  		Deep BM Epoch: 95 / 100 (took 23.238 sek)
+Info     		Learnrate:  [9.1e-05 9.1e-05 9.1e-05 9.1e-05] 
+Info     		Temp:  0.01 
+Info     		freerun_steps:  4 
+------------------------------------------------
+1.--^   	Run 94 (took 23.246 sek)
+
+1.--v   	Run 95
+Info     		Batchsize: 110 N_Updates 50000 
+2.---v  		Deep BM Epoch: 96 / 100
+3.      			Shuffling TrainData
+4.      			Running Batch
+2.---^  		Deep BM Epoch: 96 / 100 (took 23.303 sek)
+Info     		Learnrate:  [9.1e-05 9.1e-05 9.1e-05 9.1e-05] 
+Info     		Temp:  0.01 
+Info     		freerun_steps:  4 
+------------------------------------------------
+1.--^   	Run 95 (took 23.309 sek)
+
+1.--v   	Run 96
+Info     		Batchsize: 110 N_Updates 50000 
+2.---v  		Deep BM Epoch: 97 / 100
+3.      			Shuffling TrainData
+4.      			Running Batch
+2.---^  		Deep BM Epoch: 97 / 100 (took 23.297 sek)
+Info     		Learnrate:  [9.1e-05 9.1e-05 9.1e-05 9.1e-05] 
+Info     		Temp:  0.01 
+Info     		freerun_steps:  4 
+------------------------------------------------
+1.--^   	Run 96 (took 23.305 sek)
+
+1.--v   	Run 97
+Info     		Batchsize: 110 N_Updates 50000 
+2.---v  		Deep BM Epoch: 98 / 100
+3.      			Shuffling TrainData
+4.      			Running Batch
+2.---^  		Deep BM Epoch: 98 / 100 (took 23.267 sek)
+Info     		Learnrate:  [9.1e-05 9.1e-05 9.1e-05 9.1e-05] 
+Info     		Temp:  0.01 
+Info     		freerun_steps:  4 
+------------------------------------------------
+1.--^   	Run 97 (took 23.275 sek)
+
+1.--v   	Run 98
+Info     		Batchsize: 110 N_Updates 50000 
+2.---v  		Deep BM Epoch: 99 / 100
+3.      			Shuffling TrainData
+4.      			Running Batch
+2.---^  		Deep BM Epoch: 99 / 100 (took 23.488 sek)
+Info     		Learnrate:  [9.1e-05 9.1e-05 9.1e-05 9.1e-05] 
+Info     		Temp:  0.01 
+Info     		freerun_steps:  4 
+------------------------------------------------
+1.--^   	Run 98 (took 23.495 sek)
+
+1.--v   	Run 99
+Info     		Batchsize: 110 N_Updates 50000 
+2.---v  		Deep BM Epoch: 100 / 100
+3.      			Shuffling TrainData
+4.      			Running Batch
+2.---^  		Deep BM Epoch: 100 / 100 (took 23.265 sek)
+Info     		Learnrate:  [9.1e-05 9.1e-05 9.1e-05 9.1e-05] 
+Info     		Temp:  0.01 
+Info     		freerun_steps:  4 
+------------------------------------------------
+1.--^   	Run 99 (took 23.273 sek)
+1.-^    DBM Train Session (took 2396.533 sek)
+------------------------------------------------
+
+1.      Initializing graph
+2.      loading numpy vars into graph
+3.-v    Testing DBM with 10000 images
+4.      	Sampling hidden 40 times 
+5.      	Taking only the maximum
+6.      	Making Confusion Matrix
+3.-^    Testing DBM with 10000 images (took 8.46 sek)
+Info     ------------- Test Log ------------- 
+Info     Reconstr. error normal:  0.04159 
+Info     Class error:  0.1366 
+Info     Wrong Digits:  1366  with average:  0.806 
+Info     Correct Digits:  8634  with average:  0.984 
+------------------------------------------------
+
+1.      using dataframe items conversion for python 3.x
+Info     Saved data and log to: /home/dario/Dokumente/DBM Project/data/Mon_Jun__4_15-55-25_2018_[784, 225, 225, 225, 10] - ['more pretrain2'] 
+2.      Plotting...
+3.      0
+4.      1
+5.      2
+6.      3

@@ -1,0 +1,45 @@
+2.      Creating RBMs
+3.      2,1
+4.      2,2
+5.      2,2
+6.      1,2
+------------------------------------------------
+Info     Mon_Jul_16_12-33-25_2018 
+
+1.-v    Pretrain Session
+2.      	Loading from file
+1.-^    Pretrain Session (took 0.276 sek)
+------------------------------------------------
+
+1.-v    Context Session
+2.      	Loading data from: ... ] - ['original'] 15%
+3.      	Overriding Values from save
+Info     	No key 'update' in logfile found. 
+Info     	Epoch =  99 
+Info     	l =  [9.099e-05 9.099e-05 9.099e-05 9.099e-05] 
+Info     	T =  0.01 
+Info     	N =  4 
+Info     	Found 5139 Images 
+4.      	Initializing graph
+5.      	loading numpy vars into graph
+6.--v   	Sampling data
+7.---v  		Gibbs Sampling
+Info     			Mode: context | Steps: 100 
+Info     			Temp_range: 0.01 -> 0.01 
+Info     			Dropout_range: 100 -> 100 
+7.---^  		Gibbs Sampling (took 6.083 sek)
+8.---v  		Gibbs Sampling
+Info     			Mode: context | Steps: 100 
+Info     			Temp_range: 0.01 -> 0.01 
+Info     			Dropout_range: 2 -> 100 
+9.      			Setting Weights to 0
+8.---^  		Gibbs Sampling (took 6.094 sek)
+Info     		Inorrect Context: 485 / 9.44 % 
+Info     		Inorrect No Context: 726 / 14.13 % 
+Info     		Diff:      241 
+Info     		Outside subspace (c/nc): 0 , 535 
+10.      		Means: Correct // Wrong (c/nc): 
+ 	 	  0.9494 0.9245 // 0.4509 0.2322
+6.--^   	Sampling data (took 15.249 sek)
+Info     	Saved data and log to: /home/dario/Dokumente/DBM Project/data/Mon_Jul_16_12-33-25_2018_[784, 225, 225, 225, 10] - ['wdiff'] 
+11.      	Plotting...
