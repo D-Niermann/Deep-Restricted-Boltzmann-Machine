@@ -52,7 +52,7 @@ def calc_neuron_hist(layer, neuron_index, neuron_data, neuron_label, fire_thresh
 		w = np.where(neuron_data[:,n]>fire_thresh)[0]
 
 		# get the corresponding label to the found images
-		sublabel = test_label[w]
+		sublabel = neuron_label[w]
 		
 		# create a real label vector where not the [[0,1,0,0,0,0,0],[0,1..],...] 
 		# is stored but the [2,7,6,9,1,...]

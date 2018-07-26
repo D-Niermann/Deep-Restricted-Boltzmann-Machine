@@ -36,19 +36,19 @@ def save_fig(path,save_to_file):
         return None
 
 
-def calc_neuron_hist(neuron_index, neuron_data, neuron_label, fire_thresh, len_subspace=10):
+def calc_neuron_hist(neuron_index, activities, neuron_label, fire_thresh):
     """ calcs the ...
     neuron_index    :: array of neurons to compute the hist for
-    neuron_data     :: where the activities (averages) for each image are stored,
+    activities     :: where the activities (averages) for each image are stored,
                         e.g. DBM.layer_save_test, shape [batchsize,neurons]
-    neuron_label    :: corresponding labels to neuron_data, e.g. test_label or 
+    neuron_label    :: corresponding labels to activities, e.g. test_label or 
                         subsets of labels for context
     """
     hist = [None]*len(neuron_index)
     for n in range(len(neuron_index)):
 
         # find images that have high fire rates for that neuron 
-        w = np.where(neuron_data[:,neuron_index[n]]>fire_thresh)[0]
+        w = np.where(activities[:,neuron_index[n]]>fire_thresh)[1]
 
         # get the corresponding label to the found images
         sublabel = neuron_label[w]
@@ -62,7 +62,7 @@ def calc_neuron_hist(neuron_index, neuron_data, neuron_label, fire_thresh, len_s
         label = np.array(label).astype(np.float)
 
         # calc the hist over the label array and add it t the list 
-        hist[n] = np.histogram(label, bins = len_subspace)[0]
+        hist[n] = np.histogram(label, bins = len(set(label)))[0]
 
     return hist
 
