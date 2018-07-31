@@ -57,6 +57,8 @@ if True:
 	mpl.rcParams["lines.linewidth"] = 1.25
 	mpl.rcParams["font.family"]= "serif"
 
+	plt.rc('text', usetex=True)
+	plt.rc('font', family='serif')
 		# plt.rcParams['image.cmap'] = 'coolwarm'
 		# seaborn.set_palette(seaborn.color_palette("Set2", 10))
 
@@ -733,6 +735,7 @@ class DBM_class(object):
 		self.layer_energy      = [None]*(self.n_layers-1)
 		self.unit_diversity    = [None]*self.n_layers # measure how diverse each unit is in the batch 
 		self.layer_diversity   = [None]*self.n_layers # measure how diverse each layer is in the batch 
+		self.layer_variance    = [None]*self.n_layers # use this after the layer diversity calc to get variance 
 		self.freerun_diff      = [None]*self.n_layers # calculates mean(abs(layer_save (clamped run) - layer)) 
 														# if called after freerunnning it tells the mean difference between freeerun and clamped run
 
@@ -792,6 +795,7 @@ class DBM_class(object):
 			self.layer_activities[i]  = tf.reduce_sum(self.layer[i])/(self.batchsize*self.SHAPE[i])*100
 			self.unit_diversity[i]    = tf.sqrt(tf.reduce_mean(tf.square(self.layer[i] - tf.reduce_mean(self.layer[i], axis=0)),axis=0))
 			self.layer_diversity[i]   = tf.reduce_mean(self.unit_diversity[i])
+			self.layer_variance[i]    = tf.nn.moments(self.unit_diversity[i],0)[1]
 			self.freerun_diff[i]      = tf.reduce_mean(tf.abs(self.layer_save[i]-self.layer[i]))
 
 		for i in range(len(self.layer)-1):
@@ -1085,9 +1089,9 @@ class DBM_class(object):
 		self.batchsize       = len(my_test_data)
 		self.learnrate       = LEARNRATE_START
 		
-		self.layer_save_test = [[None] for i in range(self.n_layers)]   # save layers while N hidden updates
-		for layer in range(len(self.layer_save_test)):
-			self.layer_save_test[layer] = np.zeros([N, self.batchsize, self.SHAPE[layer]])
+		layer_save_test = [[None] for i in range(self.n_layers)]   # save layers while N hidden updates
+		for layer in range(len(layer_save_test)):
+			layer_save_test[layer] = np.zeros([N, self.batchsize, self.SHAPE[layer]])
 		self.layer_act_test  = np.zeros([N,self.n_layers])  # layer activities while N hidden updates
 
 		#temp decrease
@@ -1119,37 +1123,40 @@ class DBM_class(object):
 		# make N clamped updates
 		for n in range(N):
 			self.layer_act_test[n,:] = sess.run(self.layer_activities, {self.temp_tf : temp})
-			self.glauber_step("visible", temp, droprate, self.layer_save_test, n) # sess.run(self.update_l_s[1:], {self.temp_tf : temp})
+			self.glauber_step("visible", temp, droprate, layer_save_test, n) # sess.run(self.update_l_s[1:], {self.temp_tf : temp})
 			# increment temp
 			temp+=temp_delta
 
 		# calc layer variance across batch
 		self.layer_diversity_test = sess.run(self.layer_diversity)
+		self.layer_variance_test  = sess.run(self.layer_variance)
+		# self.unit_diversity_test  = sess.run(self.unit_diversity) # histogram sollte ja um 0.3 verteilt sein, sieht aber nicht besonders aus
 
-		
 
 		log.end()
 
 		## get firerates of every unit 
 		self.firerate_test = sess.run(self.update_l_p, {self.temp_tf : temp, self.droprate_tf : droprate})
 		# were firerates are around 0.1
-		research_layer = 3 
-		self.neuron_index_test = np.where((np.mean(DBM.firerate_test[research_layer],0)>0.08) & (np.mean(DBM.firerate_test[research_layer],0)<0.12))[0]
-		# generate hisogramms for all these neurons 
-		self.hists_test = calc_neuron_hist(self.neuron_index_test,DBM.firerate_test[research_layer],test_label,0.5)
+		self.neuron_good_test_firerate_ind=[None]*DBM.n_layers
+		for l in range(1,DBM.n_layers-1):
+			self.neuron_good_test_firerate_ind[l] = np.where((np.mean(self.firerate_test[l],0)>0.02) & (np.mean(self.firerate_test[l],0)<0.4))[0]
+		
 
-		### layer input measure from each adjacent layer
+		# ### layer input measure from each adjacent layer
 		self.l_input_test, self.l_var_test = self.get_total_layer_input()
+
+
 		### unit input histogram measure
 		self.hist_input_test =  self.get_units_input()
 
 		
 		#### reconstruction of v 
 		# update v M times
-		self.last_layer_save = self.layer_save_test[-1][-1]
+		self.last_layer_save = layer_save_test[-1][-1]
 
 		for i in range(N):
-			self.layer_save_test[0][i] = sess.run(self.update_l_s[0],{self.temp_tf : temp, self.droprate_tf: droprate})
+			layer_save_test[0][i] = sess.run(self.update_l_s[0],{self.temp_tf : temp, self.droprate_tf: droprate})
 
 
 
@@ -1348,13 +1355,13 @@ class DBM_class(object):
 			## gather input data # calc layer variance across batch
 			if subspace=="all":
 				## calc layer probs and set these to the layer vars to smooth later calcs
-				self.firerates_nc              = sess.run(self.update_l_p[1:],{self.temp_tf : temp, self.droprate_tf : droprate})
+				self.firerate_nc              = sess.run(self.update_l_p[1:],{self.temp_tf : temp, self.droprate_tf : droprate})
 				self.l_input_nc, self.l_var_nc = self.get_total_layer_input()
 				self.hist_input_nc             = self.get_units_input()
 				self.unit_diversity_nc         = sess.run(self.unit_diversity)
 				self.layer_diversity_nc        = sess.run(self.layer_diversity)
 			else:
-				self.firerates_c             = sess.run(self.update_l_p[1:],{self.temp_tf : temp, self.droprate_tf : droprate})
+				self.firerate_c             = sess.run(self.update_l_p[1:],{self.temp_tf : temp, self.droprate_tf : droprate})
 				self.l_input_c, self.l_var_c = self.get_total_layer_input()
 				self.hist_input_c            = self.get_units_input()
 				self.unit_diversity_c        = sess.run(self.unit_diversity)
@@ -1599,12 +1606,12 @@ TEMP_SLOPE    = 0 #10e-7			# linear decrease slope higher number -> fast cooling
 TEMP_MIN      = 0.01
 
 ### state vars 
-DO_PRETRAINING = 1		# if no pretrain then files are automatically loaded
-DO_TRAINING    = 1		# if to train the whole DBM
+DO_PRETRAINING = 0		# if no pretrain then files are automatically loaded
+DO_TRAINING    = 0		# if to train the whole DBM
 DO_TESTING     = 1		# if testing the DBM with test data
 DO_SHOW_PLOTS  = 1		# if plots will show on display - either way they get saved into saveto_path
 
-DO_CONTEXT    = 0		# if to test the context
+DO_CONTEXT    = 1		# if to test the context
 DO_GEN_IMAGES = 0		# if to generate images (mode can be choosen at function call)
 DO_NOISE_STAB = 0		# if to make a noise stability test
 
@@ -1616,7 +1623,7 @@ DO_NORM_W    = 1		# if to norm the weights and biases to 1 while training
 ### saving and loading
 DO_SAVE_TO_FILE       = 0 	# if to save plots and data to file
 DO_SAVE_PRETRAINED    = 0 	# if to save the pretrained weights seperately (for later use)
-DO_LOAD_FROM_FILE     = 0	# if to load weights and biases from datadir + pathsuffix
+DO_LOAD_FROM_FILE     = 1	# if to load weights and biases from datadir + pathsuffix
 PATHSUFFIX            = "Mon_Jun__4_15-55-25_2018_[784, 225, 225, 225, 10] - ['original'] 15%"
 						#"Mon_Jun__4_15-55-25_2018_[784, 225, 225, 225, 10] - ['original'] 15%"
 							#"Thu_Jun__7_16-21-28_2018_[784, 225, 225, 225, 10] - ['15cont4']"
@@ -1624,9 +1631,9 @@ PATHSUFFIX_PRETRAINED = "Thu_Jun__7_13-49-25_2018"
 
 
 DBM_SHAPE = [	int(sqrt(len(train_data[0])))*int(sqrt(len(train_data[0]))),
-				8*8,
-				8*8,
-				8*8,
+				15*15,
+				15*15,
+				15*15,
 				10]
 ###########################################################################################################
 
@@ -1728,7 +1735,7 @@ if DO_TRAINING:
 if DO_TESTING:
 	with tf.Session() as sess:
 		DBM.test(test_data, test_label if LOAD_MNIST else None,
-				N               = 50,  # sample ist aus random werten, also mindestens 2 sample machen 
+				N               = 10,  # sample ist aus random werten, also mindestens 2 sample machen 
 				create_conf_mat = 1,
 				temp_start      = temp,
 				temp_end        = temp)
@@ -1821,7 +1828,7 @@ if DO_CONTEXT:
 
 		# calculte h2 firerates over all gibbs_steps 
 		log.start("Sampling data")
-		h2_no_context = DBM.gibbs_sampling(test_data[index_for_number_gibbs[:]], 100, 
+		h2_no_context = DBM.gibbs_sampling(test_data[index_for_number_gibbs[:]], 33, 
 							temp , temp, 
 							999, 999,
 							mode     = "context",
@@ -1829,7 +1836,7 @@ if DO_CONTEXT:
 							liveplot = 0)
 
 		# # with context
-		h2_context = DBM.gibbs_sampling(test_data[index_for_number_gibbs[:]], 100, 
+		h2_context = DBM.gibbs_sampling(test_data[index_for_number_gibbs[:]], 33, 
 							temp , temp, 
 							999, 999,
 							mode     = "context",
@@ -1918,179 +1925,96 @@ if DO_CONTEXT:
 			file_gs.close()
 
 
-		# # calc how many digits got badly classified under a threshold 
-		# wrong_class_nc = [np.sum(np.array(desired_digits_nc)[:]<i) for i in np.linspace(0,1,1000)]
-		# wrong_class_c  = [np.sum(np.array(desired_digits_c)[:]<i)  for i in np.linspace(0,1,1000)]
-
-		# wrong_class_nc2 = [np.sum(np.array(wrong_digits_nc)[:]>i) for i in np.linspace(0,1,1000)]
-		# wrong_class_c2  = [np.sum(np.array(wrong_digits_c)[:]>i)  for i in np.linspace(0,1,1000)]
-
-
-		# plt.figure()
-		# plt.plot(np.linspace(0,1,1000),wrong_class_c,"-",label="With Context")
-		# plt.plot(np.linspace(0,1,1000),wrong_class_nc,"-",label="Without Context")
-		# plt.plot(np.linspace(0,1,1000),wrong_class_c2,"-",label="With Context / Mean")
-		# plt.plot(np.linspace(0,1,1000),wrong_class_nc2,"-",label="Without Context / Mean")
-		# plt.title("How many digits got classified below Threshold")
-		# plt.xlabel("Threshold")
-		# plt.ylabel("Number of Digits")
-		# plt.legend(loc="best")
-
-		# plot time series
-		fig,ax = plt.subplots(1,3,figsize=(13,4));
-		for i in range(DBM.n_layers-1):
-			color = next(ax[0]._get_lines.prop_cycler)['color'];
-			# color="r"
-			ax[0].plot(DBM.activity_nc[i],"--",color = color)
-			ax[0].plot(DBM.activity_c[i],"-",color   = color)
-			label_str = get_layer_label(DBM.n_layers, i+1)
-			ax[0].plot(0,0,color=color,label=label_str)
-		ax[0].plot(1,1,"k--",label="No Context")
-		ax[0].plot(1,1,"k-",label="with Context")
-		ax[0].legend(loc="upper right")
-		ax[0].set_ylabel("Active Neurons in %")
-		ax[0].set_xlabel("Timestep")
-
-		for i in range(DBM.n_layers-1):
-			color = next(ax[1]._get_lines.prop_cycler)['color'];
-			# color="r"
-			
-			ax[1].plot(DBM.layer_diff_gibbs_c[i,1:],"-",color=color)
-			ax[1].plot(DBM.layer_diff_gibbs_nc[i,1:],"--",color=color)
-			label_str = get_layer_label(DBM.n_layers, i+1)
-			ax[1].plot(0,0,color=color,label=label_str)
-		ax[1].plot(0,0,"k--",label="No Context")
-		ax[1].plot(0,0,"k-",label="with Context")
-		ax[1].legend(loc="best")
-		ax[1].set_ylabel("|Layer(t) - Layer(t-1)|")
-		ax[1].set_xlabel("Timestep")
-
-		ax[2].plot(DBM.class_error_gibbs_c,"-",color=color)
-		ax[2].plot(DBM.class_error_gibbs_nc,"--",color=color)
-
-		ax[2].plot(0,0,"k--",label="No Context")
-		ax[2].plot(0,0,"k-",label="With Context")
-		ax[2].legend(loc="best")
-		ax[2].set_ylabel("Class Error")
-		ax[2].set_xlabel("Timestep")
-		# plt.subplots_adjust(bottom=None, right=0.73, left=0.1, top=None,
-		# 	            wspace=None, hspace=None)
-		plt.tight_layout()
-		save_fig(saveto_path+"/context_time_series.pdf",DO_SAVE_TO_FILE)
 
 
 
-		### plt histograms for each used digit
-		fig,ax = plt.subplots(1,len(subspace),figsize=(12,7),sharey="row")
-		for i,digit in enumerate(subspace):
-			y_nc = np.mean(hist_data_nc[digit][1:],axis=0)
-			y_c  = np.mean(hist_data[digit][1:],axis=0)
-			for j in range(10):
-				if y_nc[j]>y_c[j]:
-					ax[i].bar(j,y_nc[j],color=[0.8,0.1,0.1],label="Without Context",linewidth=0.1,edgecolor="k")
-					ax[i].bar(j,y_c[j],color=[0.1,0.7,0.1],label="With Context",linewidth=0.1,edgecolor="k")
-				else:
-					ax[i].bar(j,y_c[j],color=[0.1,0.7,0.1],label="With Context",linewidth=0.1,edgecolor="k")
-					ax[i].bar(j,y_nc[j],color=[0.8,0.1,0.1],label="Without Context",linewidth=0.1,edgecolor="k")
 
-			plt.legend(loc="center left",bbox_to_anchor = (1.0,0.5))
-			ax[i].set_ylim([0,1])
-			ax[0].set_ylabel("Mean Predicted Label")
-			ax[i].set_title(str(digit))
-			ax[i].set_xticks(range(10))
-		plt.subplots_adjust(bottom=None, right=0.84, left=0.1, top=None,
-	            wspace=None, hspace=None)
-
-		save_fig(saveto_path+"/context_hists.pdf",DO_SAVE_TO_FILE)
-
-
-
-		# plot the variance of the layers for c/nc normed to nc and the firerates as hist
-		log.out("Plotting variance diff c/nc")
-		plt.figure()
-		layer_str = [""]*DBM.n_layers
-		for i in range(DBM.n_layers):
-			diff = DBM.layer_diversity_c[i]/DBM.layer_diversity_nc[i]
-			layer_str[i] = get_layer_label(DBM.n_layers,i,short=True)
-			plt.bar(i,diff)
-		plt.xticks(range(DBM.n_layers),layer_str)
-		plt.xlabel("Layer")
-		plt.ylabel("Diversity")
-		save_fig(saveto_path+"/context_l_diversity.pdf",DO_SAVE_TO_FILE)
-	
-
-
-
-		# plot the unit variance c/nc
+		# plot the unit variance and firerate c/nc
 		fig,ax = plt.subplots(2,DBM.n_layers-2,figsize=(12,6))
-		biggest_change_ind = [None]*(DBM.n_layers-2)
-		for i in range(1,DBM.n_layers-1):
-			delta_sigma = DBM.unit_diversity_c[i]-DBM.unit_diversity_nc[i]
+		biggest_var_change_ind = [None]*(DBM.n_layers-2)
+		for l in range(1, DBM.n_layers-1):
+			delta_sigma = DBM.unit_diversity_c[l]-DBM.unit_diversity_nc[l]
 
-			# magic_number = 0.0001234567 # if this number is in clean data it means +inf
-			# delta_sigma = np.copy(delta_sigma)
-			# delta_sigma[np.isnan(delta_sigma)] = 0 
-			# delta_sigma[np.isinf(delta_sigma)] = magic_number
-			biggest_change_ind[i-1] = np.where((delta_sigma > (delta_sigma.std()+delta_sigma.mean())) | (delta_sigma < (delta_sigma.mean()-delta_sigma.std())))[0]
-			# print(np.mean(delta_sigma[np.isfinite(delta_sigma)]))
-			
+			biggest_var_change_ind[l-1] = np.where(delta_sigma > sorted(delta_sigma)[-11])[0]		
 
-			ax[1,i-1].hist(delta_sigma,bins=30,	linewidth = 0.2, 
-							edgecolor = "k")
+			big_var_change_hists_c  = calc_neuron_hist(biggest_var_change_ind[l-1],DBM.firerate_c[l-1],   test_label[index_for_number_gibbs[:]], 0.5, len(subspace))	
+			big_var_change_hists_nc = calc_neuron_hist(biggest_var_change_ind[l-1],DBM.firerate_nc[l-1],  test_label[index_for_number_gibbs[:]], 0.5, len(subspace))	
 
-			ax[0,i-1].hist(np.mean(DBM.firerates_c[i-1][:],0),bins=20,alpha=0.7,label = "With context",lw=0.2,edgecolor="k")
-			ax[0,i-1].hist(np.mean(DBM.firerates_nc[i-1][:],0),bins=20,alpha=0.7,label = "Without context",lw=0.2,edgecolor="k")
+			fig2, ax2 = plt.subplots(2,len(big_var_change_hists_c)/2,sharey="row")
+			fig2.suptitle("Layer %i"%l)
+			for j in range(2):
+				for i in range(len(big_var_change_hists_c)/2):
+					ax2[j,i].bar(subspace,big_var_change_hists_c[i], color="g", alpha=0.5)
+					ax2[j,i].bar(subspace,big_var_change_hists_nc[i], color="r", alpha =0.5)
+			fig2.tight_layout()
 
-			layer_str = get_layer_label(DBM.n_layers,i-1,short=True)
-			# plt.colorbar(ax=ax[i-1],mappable=mapp)#,cbarlabel="$\sigma_%s^c/\sigma_%s^{nc}$"%(layer_str,layer_str))
-			ax[1,i-1].set_xlabel(r"$\Delta \sigma_{%s}$"%layer_str[1:-1])
-			ax[1,i-1].set_ylabel("N",style= "italic")
-			ax[0,i-1].set_xlim([0,1])
-			ax[0,i-1].set_xlabel(r"$<f>_{batch}$")
-			ax[0,i-1].set_ylabel("N",style= "italic")
+			ax[1,l-1].hist(delta_sigma,bins=30, linewidth = 0.2, edgecolor = "k")
+
+			ax[0,l-1].hist(np.mean(DBM.firerate_c[l-1][:],0) , bins=20, alpha=0.7, label = "With context", lw=0.2,edgecolor="k")
+			ax[0,l-1].hist(np.mean(DBM.firerate_nc[l-1][:],0), bins=20, alpha=0.7, label = "Without context", lw=0.2,edgecolor="k")
+			# ax[0,l-1].hist(np.mean(DBM.firerate_test[l][:],0),bins=20,alpha=0.7,label = "Testrun",lw=0.2,edgecolor="k")
+
+			layer_str = get_layer_label(DBM.n_layers,l-1,short=True)
+			# plt.colorbar(ax=ax[l-1],mappable=mapp)#,cbarlabel="$\sigma_%s^c/\sigma_%s^{nc}$"%(layer_str,layer_str))
+			ax[1,l-1].set_xlabel(r"$\Delta \sigma_{%s}$"%layer_str[1:-1])
+			ax[1,l-1].set_ylabel("N",style= "italic")
+			ax[0,l-1].set_xlim([0,1])
+			ax[0,l-1].set_xlabel(r"$<f>_{batch}$")
+			ax[0,l-1].set_ylabel("N",style= "italic")
 			ax[0,-1].legend(loc="best")
 
-			# ax[i-1].xaxis.set_ticks_position("bottom")
-			# ax[i-1].set_xticks([])
-			# ax[i-1].set_yticks([])
-		plt.tight_layout()
-		save_fig(saveto_path+"/context_unit_div.pdf",DO_SAVE_TO_FILE)
+		fig.tight_layout()
+				save_fig(saveto_path+"/context_unit_div.pdf", DO_SAVE_TO_FILE)
 
 		# count how many neurons got more active during context and how mch more
 
-		# look at neuron hists for the neurons with biggest varianc change
-		h_layer      = 2
-		num_plots    = 5
-		neuron_index = w_test#np.where((np.mean(DBM.firerates_nc[2],0)>0.01) & (np.mean(DBM.firerates_nc[2],0)<0.25) )[0]# range(200)#biggest_change_ind[h_layer]
-		# max_len      = len(neuron_index)
-		# if max_len>num_plots**2:
-		# 	max_len = num_plots**2
 
-		hists_c  = calc_neuron_hist(neuron_index, DBM.firerates_c[h_layer],  test_label[index_for_number_gibbs[:]], 0.9, len(subspace))
-		hists_nc = calc_neuron_hist(neuron_index, DBM.firerates_nc[h_layer], test_label[index_for_number_gibbs[:]], 0.9, len(subspace))
-		hists_c = np.array(hists_c)
-		hists_nc = np.array(hists_nc)
-		# diffs = []
-		# for j in range(len(neuron_index)):
-		# 	diffs.append(np.mean(np.abs(hists_c[j]-hists_nc[j])))
-		# diffs = np.array(diffs)
-		# # get the 9 biggest diffs
-		# where_max_diffs = np.where(diffs>sorted(diffs)[-10])[0]
-		log.out("die mittelung aller hists (c/nc) ueber alle neurone plotten - evtl steigen die ja beim context (plot auch nur über subspace möglich)")
-		fig,ax = plt.subplots(1)
-		ax.bar(np.array(subspace)-0.25,np.mean(hists_c,0),color="g",width=0.5)
-		ax.bar(np.array(subspace)+0.25,np.mean(hists_nc,0),color="r",width=0.5)
-		ax.set_xticks(range(10))
-		# for j in range(num_plots):
-		# 	index = m#where_max_diffs[m]
-		# 	ax[i,j].bar(subspace,hists_c[index],alpha=0.7,color=[0.0, 1, 0.1])
-		# 	ax[i,j].bar(range(10),hists_nc[index],alpha=0.7,color=[1, 0.0, 0.0])
-		# 	ax[i,j].set_xticks(range(10))
-		# 	ax[i,j].set_title(str(index)+" | "+ str(diffs[index]))
-		# 	m+=1
-		log.out("neben die plots oder sonstwo die entsprechenden varianzen plotten, und wirklich mal sicherstellen das meine indexe noch richtig sind")
+		### look at neurons that where active outside subspace while testing and chekc if they got active during context
+		# look which hists have their  max outside supspace
+		log.out("Searching neurons that fired outside subspace while testing")
 
-		# plt.tight_layout()
+		max_neurons = 1000
+		outside_subspace_ind = [[]*i for i in range(DBM.n_layers)]
+		for l in range(1,DBM.n_layers-1):
+			# generate hisogramms for all neurons that fired reasonable often
+			hists_test = calc_neuron_hist(DBM.neuron_good_test_firerate_ind[l],DBM.firerate_test[l],test_label,0.5, 10)
+
+			# go through every hist and chekc if high values are outside subspace
+			for i in range(len(hists_test)):
+				where  =  np.where(hists_test[i]>hists_test[i].mean()+hists_test[i].std())[0]
+				for j in where:
+					if j not in subspace:
+						outside_subspace_ind[l].append(i)
+						break
+				if len(outside_subspace_ind[l]) >= max_neurons:
+					break
+
+
+		log.out("Calc hists for the found neurons ")
+		for l in range(1,DBM.n_layers-1):
+			hists_c  = calc_neuron_hist(outside_subspace_ind[l], DBM.firerate_c[l-1],  test_label[index_for_number_gibbs[:]], 0.5, len(subspace))
+			hists_nc = calc_neuron_hist(outside_subspace_ind[l], DBM.firerate_nc[l-1], test_label[index_for_number_gibbs[:]], 0.5, len(subspace))
+			hists_c = np.array(hists_c)
+			hists_nc = np.array(hists_nc)
+			log.out("Searching which of the found neurons also had a moderate firerate while gibbs sampling")
+			w_firerates = np.where((np.mean(DBM.firerate_c[l-1][:,outside_subspace_ind[l]],0)<0.4) & (np.mean(DBM.firerate_c[l-1][:,outside_subspace_ind[l]],0)>0.02))[0]
+
+			log.out("Plotting these neurons hists")
+			num_plots = int(sqrt(len(w_firerates)))
+			fig,ax = plt.subplots(num_plots,num_plots,sharex="col",sharey="row")
+			m=0
+			for i in range(num_plots):
+				for j in range(num_plots):
+					index = outside_subspace_ind[l][w_firerates[m]]
+					ax[i,j].bar(subspace,hists_c[w_firerates[m]],alpha=0.7,color=[0.0, 1, 0.5])
+					ax[i,j].bar(subspace,hists_nc[w_firerates[m]],alpha=0.7,color=[0.8, 0.3, 0.3],width=0.2)
+					ax[i,j].bar(range(10),hists_test[index],alpha=0.5,color=[1, 0.0, 0.0])
+					ax[i,j].set_xticks(range(10))
+					ax[-1,j].set_xlabel("Class")
+					ax[i,0].set_ylabel(r"$N$")
+					# ax[i,j].set_title(str(index)+" | "+ str(diffs[index]))
+					m+=1
+			fig.tight_layout()
 
 	log.end() #end session
 
@@ -2135,14 +2059,14 @@ if DO_TRAINING:
 	save_fig(saveto_path+"/weights_img.pdf", DO_SAVE_TO_FILE)
 
 	# plot layer diversity
-	plt.figure("Layer diversity")
+	plt.figure("Layer diversity train")
 	for i in range(DBM.n_layers):
 		label_str = get_layer_label(DBM.n_layers, i)
 		plt.plot(range(DBM.n_layers)[::10],smooth(np.array(DBM.layer_diversity_train)[::2,i],10),label=label_str,alpha=0.7)
 		plt.legend()
 	plt.xlabel("Update Number")
 	plt.ylabel("Deviation")
-	save_fig(saveto_path+"/layer_diversity.png", DO_SAVE_TO_FILE)	
+	save_fig(saveto_path+"/layer_diversity.png", DO_SAVE_TO_FILE)
 
 	plt.figure("Errors")
 	## train errors
@@ -2209,6 +2133,7 @@ if DO_TRAINING:
 	plt.ylabel("log("+r"$\Delta L$"+")")
 	plt.legend(ncol = 2, loc = "best")
 	plt.xlabel("Update")
+	save_fig(saeto_path+"/freerunn-diffs.png", DO_SAVE_TO_FILE)
 
 
 	# plot train data (temp, diffs, learnrate, ..)
@@ -2256,6 +2181,7 @@ if DO_TRAINING:
 	plt.ylabel("Train Layer Activity in %")
 	save_fig(saveto_path+"/layer_act_train.png", DO_SAVE_TO_FILE)
 
+
 if LOAD_MNIST and DO_TESTING:
 	
 	## plot layer activities % test run
@@ -2269,11 +2195,23 @@ if LOAD_MNIST and DO_TESTING:
 	save_fig(saveto_path+"/layer_act_test.pdf", DO_SAVE_TO_FILE)
 
 	# plot the layer diversity after test run
-	plt.figure("Layer stddeviation across test batch")
-	plt.bar(range(DBM.n_layers),DBM.layer_diversity_test)
-	plt.ylabel("Standard Deviation")
+	plt.figure("Layer stddeviation across test batch",figsize=(5,4))
+	plt.bar(range(DBM.n_layers),DBM.layer_diversity_test, yerr = DBM.layer_variance_test)
+	plt.ylabel(r"$<\sigma_i>_{layer}$")
 	plt.xlabel("Layer")
 	plt.xticks(range(DBM.n_layers),[get_layer_label(DBM.n_layers, i ,short=True) for i in range((DBM.n_layers))])
+	plt.tight_layout()
+
+	# firerates test run mean hist
+	fig,ax = plt.subplots(1,DBM.n_layers-1,figsize=(10,2.75),sharex="row")
+	for l in range(1,DBM.n_layers):
+		ax[l-1].hist(np.mean(DBM.firerate_test[l],0),lw=0.1,edgecolor="k")
+		ax[l-1].set_title(get_layer_label(DBM.n_layers,l))
+		ax[l-1].set_ylabel(r"$N$")
+		ax[l-1].set_xlabel("Firerate")
+	plt.tight_layout()
+	save_fig(saveto_path+"/firerates_testrun.pdf", DO_SAVE_TO_FILE)
+
 
 	# plot l_input_test
 	fig,ax = plt.subplots(1,1)
@@ -2310,7 +2248,7 @@ if LOAD_MNIST and DO_TESTING:
 		
 
 	# plot l_input_test as hist over all units
-	fig,ax = plt.subplots(DBM.n_layers,1,figsize=(8,10),sharex="col")
+	fig,ax = plt.subplots(DBM.n_layers,1,figsize=(7,10),sharex="col")
 	for i in range(DBM.n_layers):
 		# max_x = 0
 		ax_index = -(i+1)
@@ -2333,46 +2271,41 @@ if LOAD_MNIST and DO_TESTING:
 					linewidth = 0.2, 
 					edgecolor = "k",
 					alpha     = 0.8,
-					weights   = np.zeros_like(data)+1/data.size
+					# density   = True#np.zeros_like(data)+1/data.size
 					)
 
 				
 			except:
 				pass
 
-		# ax[i].set_ytick(ax[i].get_yticks())
-		
-		ax[ax_index].set_ylabel(r"$N/N_0$")
-		ax[ax_index].set_title(get_layer_label(DBM.n_layers,i,short=True))
-		ax[ax_index].legend()
+			# ax[i].set_ytick(ax[i].get_yticks())
+			
+			ax[ax_index].set_ylabel(r"$N$")
+			ax[ax_index].ticklabel_format(style = 'sci',scilimits=(-2,2))
+			ax[ax_index].set_title(get_layer_label(DBM.n_layers,i,short=True))
+			ax[ax_index].legend()
 	ax[-1].set_xlabel("Input Strength")
 	plt.tight_layout()
 	save_fig(saveto_path+"/layer_input_hist.pdf", DO_SAVE_TO_FILE)
 
 	# plot timeseries of every neuron while testrun (clamped v)
 	# layer_save_test has shape : [time][layer][image][neuron]
-	k = 0 #which example image to pick
-	if not os.path.isdir(saveto_path+"/timeseries_testrun"):
-		os.makedirs(saveto_path+"/timeseries_testrun")
-	for layer in range(1,DBM.n_layers):
-	# 	timeseries = []
-	# 	timeseries_average = []
-	# 	for i in range(len(DBM.layer_save_test)):
-	# 		timeseries.append(DBM.layer_save_test[i][layer][k])
-	# 		timeseries_average.append(np.mean(DBM.layer_save_test[i][layer],0))
-		# plot for image k
+	# k = 0 #which example image to pick
+	# if not os.path.isdir(saveto_path+"/timeseries_testrun"):
+	# 	os.makedirs(saveto_path+"/timeseries_testrun")
 
-		plt.matshow(DBM.layer_save_test[layer][:,k])
-		plt.xlabel("Time "+r"$t$")
-		plt.ylabel("Unit "+r"$i$")
-		save_fig(saveto_path+"/timeseries_testrun/timeseries_1image_layer_%i.png"%(layer+1),DO_SAVE_TO_FILE)
+	# for layer in range(1,DBM.n_layers):
+	# 	plt.matshow(DBM.layer_save_test[layer][:,k])
+	# 	plt.xlabel("Time "+r"$t$")
+	# 	plt.ylabel("Unit "+r"$i$")
+	# 	save_fig(saveto_path+"/timeseries_testrun/timeseries_1image_layer_%i.png"%(layer+1),DO_SAVE_TO_FILE)
 		
-		# plt the average over all test images
-		plt.matshow(np.mean(DBM.layer_save_test[layer][:,:],1))
-		plt.xlabel("Time "+r"$t$")
-		plt.ylabel("Unit "+r"$i$")
+	# 	# plt the average over all test images
+	# 	plt.matshow(np.mean(DBM.layer_save_test[layer][:,:],1))
+	# 	plt.xlabel("Time "+r"$t$")
+	# 	plt.ylabel("Unit "+r"$i$")
 		
-		save_fig(saveto_path+"/timeseries_testrun/timeseries_av_layer_%i.png"%(layer+1),DO_SAVE_TO_FILE)
+	# 	save_fig(saveto_path+"/timeseries_testrun/timeseries_av_layer_%i.png"%(layer+1),DO_SAVE_TO_FILE)
 
 
 	# plot some samples from the testdata 
@@ -2383,14 +2316,14 @@ if LOAD_MNIST and DO_TESTING:
 		ax3[0][i].set_yticks([])
 		ax3[0][i].set_xticks([])
 		# plot the reconstructed image		
-		ax3[1][i].matshow(np.mean(DBM.layer_save_test[0][-20:,i],0).reshape(int(sqrt(DBM.SHAPE[0])),int(sqrt(DBM.SHAPE[0]))))
+		ax3[1][i].matshow(DBM.firerate_test[0][i].reshape(int(sqrt(DBM.SHAPE[0])),int(sqrt(DBM.SHAPE[0]))))
 		ax3[1][i].set_yticks([])
 		ax3[1][i].set_xticks([])
 		
 		#plot hidden layer
 		for layer in range(1,len(DBM.SHAPE)-1):
 			try:
-				ax3[layer+1][i].matshow(DBM.layer_save_test[layer][-1][i].reshape(int(sqrt(DBM.SHAPE[layer])),int(sqrt(DBM.SHAPE[layer]))))
+				ax3[layer+1][i].matshow(DBM.firerate_test[layer][i].reshape(int(sqrt(DBM.SHAPE[layer])),int(sqrt(DBM.SHAPE[layer]))))
 				ax3[layer+1][i].set_yticks([])
 				ax3[layer+1][i].set_xticks([])
 			except:
@@ -2420,14 +2353,14 @@ if LOAD_MNIST and DO_TESTING:
 		ax3[0][m].set_yticks([])
 		ax3[0][m].set_xticks([])
 		# plot the reconstructed image		
-		ax3[1][m].matshow(np.mean(DBM.layer_save_test[0][-20:,i],0).reshape(int(sqrt(DBM.SHAPE[0])),int(sqrt(DBM.SHAPE[0]))))
+		ax3[1][m].matshow(DBM.firerate_test[0][i].reshape(int(sqrt(DBM.SHAPE[0])),int(sqrt(DBM.SHAPE[0]))))
 		ax3[1][m].set_yticks([])
 		ax3[1][m].set_xticks([])
 		
 		#plot hidden layer
 		for layer in range(1,len(DBM.SHAPE)-1):
 			try:
-				ax3[layer+1][m].matshow(DBM.layer_save_test[layer][-1][i].reshape(int(sqrt(DBM.SHAPE[layer])),int(sqrt(DBM.SHAPE[layer]))))
+				ax3[layer+1][m].matshow(DBM.firerate_test[layer][i].reshape(int(sqrt(DBM.SHAPE[layer])),int(sqrt(DBM.SHAPE[layer]))))
 				ax3[layer+1][m].set_yticks([])
 				ax3[layer+1][m].set_xticks([])
 			except:
@@ -2446,6 +2379,84 @@ if LOAD_MNIST and DO_TESTING:
 
 
 if DO_CONTEXT:
+	# plot the variance of the layers for c/nc normed to nc and the firerates as hist
+	log.out("Plotting variance diff c/nc")
+	plt.figure()
+	layer_str = [""]*DBM.n_layers
+	for i in range(DBM.n_layers):
+		diff = DBM.layer_diversity_c[i]/DBM.layer_diversity_nc[i]
+		layer_str[i] = get_layer_label(DBM.n_layers,i,short=True)
+		plt.bar(i,diff)
+	plt.xticks(range(DBM.n_layers),layer_str)
+	plt.xlabel("Layer")
+	plt.ylabel("Diversity")
+	save_fig(saveto_path+"/context_l_diversity.pdf",DO_SAVE_TO_FILE)
+	
+	### plt histograms for each used digit
+	fig,ax = plt.subplots(1,len(subspace),figsize=(12,7),sharey="row")
+	for i,digit in enumerate(subspace):
+		y_nc = np.mean(hist_data_nc[digit][1:],axis=0)
+		y_c  = np.mean(hist_data[digit][1:],axis=0)
+		for j in range(10):
+			if y_nc[j]>y_c[j]:
+				ax[i].bar(j,y_nc[j],color=[0.8,0.1,0.1],label="Without Context",linewidth=0.1,edgecolor="k")
+				ax[i].bar(j,y_c[j] ,color=[0.1,0.7,0.1],label="With Context",linewidth=0.1,edgecolor="k")
+			else:
+				ax[i].bar(j,y_c[j] ,color=[0.1,0.7,0.1],label="With Context",linewidth=0.1,edgecolor="k")
+				ax[i].bar(j,y_nc[j],color=[0.8,0.1,0.1],label="Without Context",linewidth=0.1,edgecolor="k")
+
+		plt.legend(loc="center left",bbox_to_anchor = (1.0,0.5))
+		ax[i].set_ylim([0,1])
+		ax[0].set_ylabel("Mean Predicted Label")
+		ax[i].set_title(str(digit))
+		ax[i].set_xticks(range(10))
+	plt.subplots_adjust(bottom=None, right=0.84, left=0.1, top=None,
+            wspace=None, hspace=None)
+
+	save_fig(saveto_path+"/context_hists.pdf",DO_SAVE_TO_FILE)
+
+	# plot time series
+	fig,ax = plt.subplots(1,3,figsize=(13,4));
+	for i in range(DBM.n_layers-1):
+		color = next(ax[0]._get_lines.prop_cycler)['color'];
+		# color="r"
+		ax[0].plot(DBM.activity_nc[i],"--",color = color)
+		ax[0].plot(DBM.activity_c[i],"-",color   = color)
+		label_str = get_layer_label(DBM.n_layers, i+1)
+		ax[0].plot(0,0,color=color,label=label_str)
+	ax[0].plot(1,1,"k--",label="No Context")
+	ax[0].plot(1,1,"k-",label="with Context")
+	ax[0].legend(loc="upper right")
+	ax[0].set_ylabel("Active Neurons in %")
+	ax[0].set_xlabel("Timestep")
+
+	for i in range(DBM.n_layers-1):
+		color = next(ax[1]._get_lines.prop_cycler)['color'];
+		# color="r"
+		
+		ax[1].plot(DBM.layer_diff_gibbs_c[i,1:],"-",color=color)
+		ax[1].plot(DBM.layer_diff_gibbs_nc[i,1:],"--",color=color)
+		label_str = get_layer_label(DBM.n_layers, i+1)
+		ax[1].plot(0,0,color=color,label=label_str)
+	ax[1].plot(0,0,"k--",label="No Context")
+	ax[1].plot(0,0,"k-",label="with Context")
+	ax[1].legend(loc="best")
+	ax[1].set_ylabel("|Layer(t) - Layer(t-1)|")
+	ax[1].set_xlabel("Timestep")
+
+	ax[2].plot(DBM.class_error_gibbs_c,"-",color=color)
+	ax[2].plot(DBM.class_error_gibbs_nc,"--",color=color)
+
+	ax[2].plot(0,0,"k--",label="No Context")
+	ax[2].plot(0,0,"k-",label="With Context")
+	ax[2].legend(loc="best")
+	ax[2].set_ylabel("Class Error")
+	ax[2].set_xlabel("Timestep")
+	# plt.subplots_adjust(bottom=None, right=0.73, left=0.1, top=None,
+	# 	            wspace=None, hspace=None)
+	plt.tight_layout()
+	save_fig(saveto_path+"/context_time_series.pdf",DO_SAVE_TO_FILE)	
+
 	# plot layer input with and without context
 	fig,ax  = plt.subplots(1,1)
 	color_m = 1
@@ -2528,6 +2539,7 @@ if DO_CONTEXT:
 			ax[i].legend()
 		ax[-1].set_xlabel("Input Strength")
 		save_fig(saveto_path+filename,DO_SAVE_TO_FILE)
+
 
 if DO_GEN_IMAGES:
 	# plot timeseries of every neuron while generate (clamped label)

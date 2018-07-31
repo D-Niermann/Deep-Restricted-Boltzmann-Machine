@@ -36,19 +36,20 @@ def save_fig(path,save_to_file):
         return None
 
 
-def calc_neuron_hist(neuron_index, activities, neuron_label, fire_thresh):
+def calc_neuron_hist(neuron_index, activities, neuron_label, fire_thresh, n_classes):
     """ calcs the ...
     neuron_index    :: array of neurons to compute the hist for
-    activities     :: where the activities (averages) for each image are stored,
+    activities      :: where the activities (averages) for each image are stored,
                         e.g. DBM.layer_save_test, shape [batchsize,neurons]
     neuron_label    :: corresponding labels to activities, e.g. test_label or 
                         subsets of labels for context
+    n_classes       :: how many classes are possible, sets the number of hist bins to this number
     """
     hist = [None]*len(neuron_index)
     for n in range(len(neuron_index)):
 
         # find images that have high fire rates for that neuron 
-        w = np.where(activities[:,neuron_index[n]]>fire_thresh)[1]
+        w = np.where(activities[:,neuron_index[n]]>fire_thresh)
 
         # get the corresponding label to the found images
         sublabel = neuron_label[w]
@@ -62,7 +63,7 @@ def calc_neuron_hist(neuron_index, activities, neuron_label, fire_thresh):
         label = np.array(label).astype(np.float)
 
         # calc the hist over the label array and add it t the list 
-        hist[n] = np.histogram(label, bins = len(set(label)))[0]
+        hist[n] = np.histogram(label, bins = n_classes)[0]
 
     return hist
 
@@ -71,7 +72,7 @@ def get_layer_label(n_layers,i,short=False):
     """ 
     construct a label string for each layer i. Used for plots.
     """
-    label_str = "Layer "+ r"$h^{(%i)}$"%(i+1)
+    label_str = "Layer "+ r"$h^{(%i)}$"%(i)
     if i==0:
         label_str = "Layer "+ r"$v^{(%i)}$"%(1)
     if i==n_layers-1:
