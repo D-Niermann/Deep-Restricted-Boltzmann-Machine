@@ -267,12 +267,12 @@ class DBM_class(object):
 		self.train_time            = 0	# counts train time in seconds
 		self.epochs                = 0	# epoch counter
 		self.update                = 0 	# update counter
-		self.recon_error_train     = np.zeros([N_BATCHES_TRAIN*N_EPOCHS_TRAIN/10, self.n_layers])	# save reconstructon error for every batch
-		self.class_error_train     = np.zeros([N_BATCHES_TRAIN*N_EPOCHS_TRAIN/10, self.n_layers])	# -"- train error -"-
-		self.layer_diversity_train = np.zeros([N_BATCHES_TRAIN*N_EPOCHS_TRAIN/10, self.n_layers])	# save layer variance across batch for every batch in train function
-		self.layer_act_train       = np.zeros([N_BATCHES_TRAIN*N_EPOCHS_TRAIN/10, self.n_layers])	# save how many units are active across one layer in % for every batch
+		self.recon_error_train     = np.zeros([N_BATCHES_TRAIN*N_EPOCHS_TRAIN//10, self.n_layers])	# save reconstructon error for every batch
+		self.class_error_train     = np.zeros([N_BATCHES_TRAIN*N_EPOCHS_TRAIN//10, self.n_layers])	# -"- train error -"-
+		self.layer_diversity_train = np.zeros([N_BATCHES_TRAIN*N_EPOCHS_TRAIN//10, self.n_layers])	# save layer variance across batch for every batch in train function
+		self.layer_act_train       = np.zeros([N_BATCHES_TRAIN*N_EPOCHS_TRAIN//10, self.n_layers])	# save how many units are active across one layer in % for every batch
 		
-		self.freerun_diff_train    = np.zeros([N_BATCHES_TRAIN*N_EPOCHS_TRAIN/10, self.n_layers])
+		self.freerun_diff_train    = np.zeros([N_BATCHES_TRAIN*N_EPOCHS_TRAIN//10, self.n_layers])
 
 
 		### save dictionary where time series data from test and train is stored
@@ -916,7 +916,7 @@ class DBM_class(object):
 
 		# shuffle test data and labels so that batches are not equal every epoch 
 		log.out("Shuffling TrainData")
-		self.seed   = rnd.randint(len(train_data),size=(int(len(train_data)/10),2))
+		self.seed   = rnd.randint(len(train_data),size=(len(train_data)/10,2))
 		train_data  = shuffle(train_data, self.seed)
 		if self.classification:
 			train_label = shuffle(train_label, self.seed)
@@ -1799,7 +1799,7 @@ if DO_CONTEXT:
 		if DO_LOAD_FROM_FILE and not DO_TRAINING:
 			DBM.load_from_file(workdir+"/data/"+PATHSUFFIX,override_params=1)
 
-		subspace = [0,1,2,3,4]
+		subspace = [0,3,5,6,8]
 		log.out("Subspace: ", subspace)
 
 	
@@ -1940,13 +1940,13 @@ if DO_CONTEXT:
 			big_var_change_hists_c  = calc_neuron_hist(biggest_var_change_ind[l-1],DBM.firerate_c[l-1],   test_label[index_for_number_gibbs[:]], 0.5, len(subspace))	
 			big_var_change_hists_nc = calc_neuron_hist(biggest_var_change_ind[l-1],DBM.firerate_nc[l-1],  test_label[index_for_number_gibbs[:]], 0.5, len(subspace))	
 
-			fig2, ax2 = plt.subplots(2,len(big_var_change_hists_c)/2,sharey="row")
-			fig2.suptitle("Layer %i"%l)
+			fig2, ax2 = plt.subplots(2,len(big_var_change_hists_c)//2,sharey="row")
 			for j in range(2):
-				for i in range(len(big_var_change_hists_c)/2):
+				for i in range(len(big_var_change_hists_c)//2):
 					ax2[j,i].bar(subspace,big_var_change_hists_c[i], color="g", alpha=0.5)
 					ax2[j,i].bar(subspace,big_var_change_hists_nc[i], color="r", alpha =0.5)
 			fig2.tight_layout()
+			save_fig(saveto_path+"/big_var_change_l%i.pdf"%l, DO_SAVE_TO_FILE)
 
 			ax[1,l-1].hist(delta_sigma,bins=30, linewidth = 0.2, edgecolor = "k")
 
@@ -1954,7 +1954,7 @@ if DO_CONTEXT:
 			ax[0,l-1].hist(np.mean(DBM.firerate_nc[l-1][:],0), bins=20, alpha=0.7, label = "Without context", lw=0.2,edgecolor="k")
 			# ax[0,l-1].hist(np.mean(DBM.firerate_test[l][:],0),bins=20,alpha=0.7,label = "Testrun",lw=0.2,edgecolor="k")
 
-			layer_str = get_layer_label(DBM.n_layers,l-1,short=True)
+			layer_str = get_layer_label(DBM.n_layers,l,short=True)
 			# plt.colorbar(ax=ax[l-1],mappable=mapp)#,cbarlabel="$\sigma_%s^c/\sigma_%s^{nc}$"%(layer_str,layer_str))
 			ax[1,l-1].set_xlabel(r"$\Delta \sigma_{%s}$"%layer_str[1:-1])
 			ax[1,l-1].set_ylabel("N",style= "italic")
@@ -1964,7 +1964,7 @@ if DO_CONTEXT:
 			ax[0,-1].legend(loc="best")
 
 		fig.tight_layout()
-				save_fig(saveto_path+"/context_unit_div.pdf", DO_SAVE_TO_FILE)
+		save_fig(saveto_path+"/context_unit_div_l%i.pdf"%l, DO_SAVE_TO_FILE)
 
 		# count how many neurons got more active during context and how mch more
 
@@ -2015,6 +2015,7 @@ if DO_CONTEXT:
 					# ax[i,j].set_title(str(index)+" | "+ str(diffs[index]))
 					m+=1
 			fig.tight_layout()
+			save_fig(saveto_path+"/outisde_subspace_hists_l%i"%l, DO_SAVE_TO_FILE)
 
 	log.end() #end session
 
@@ -2076,7 +2077,7 @@ if DO_TRAINING:
 		plt.plodt(range(DBM.n_layers)[::10],DBM.class_error_train[:],"-",label="Class Error Train",alpha=0.8)
 	## test errors
 	# calc number of updates per epoch
-	n_u_p_e = len(DBM.recon_error_train) / DBM.epochs
+	n_u_p_e = len(DBM.recon_error_train) // DBM.epochs
 	x = np.array(DBM.save_dict["Test_Epoch"])*n_u_p_e
 	plt.plot(x,DBM.save_dict["Recon_Error"],"o--",label="Recon Error Test")
 	if DBM.classification:
@@ -2201,6 +2202,7 @@ if LOAD_MNIST and DO_TESTING:
 	plt.xlabel("Layer")
 	plt.xticks(range(DBM.n_layers),[get_layer_label(DBM.n_layers, i ,short=True) for i in range((DBM.n_layers))])
 	plt.tight_layout()
+	save_fig(saveto_path+"/layer_std_test_batch,pdf", DO_SAVE_TO_FILE)
 
 	# firerates test run mean hist
 	fig,ax = plt.subplots(1,DBM.n_layers-1,figsize=(10,2.75),sharex="row")
@@ -2491,54 +2493,54 @@ if DO_CONTEXT:
 
 
 	# plot input  hist for context und no context	
-	for mode in range(2):
-		fig,ax = plt.subplots(DBM.n_layers,1,figsize=(8,10))
-		for i in range(DBM.n_layers):
-			max_x = 0
+	# for mode in range(2):
+	# 	fig,ax = plt.subplots(DBM.n_layers,1,figsize=(8,10))
+	# 	for i in range(DBM.n_layers):
+	# 		max_x = 0
 			
-			for direc in range(2):
-				color = next(ax[i]._get_lines.prop_cycler)['color'];
-				# color="r"
-				label = "bottom up" if direc == 0 else "top down"
-				if mode ==0:
-					data = np.array(DBM.hist_input_c[i][direc]).flatten()
-					filename = "/context_hist_input_c.pdf"
-				else:
-					data = np.array(DBM.hist_input_nc[i][direc]).flatten()
-					filename = "/context_hist_input_nc.pdf"
+	# 		for direc in range(2):
+	# 			color = next(ax[i]._get_lines.prop_cycler)['color'];
+	# 			# color="r"
+	# 			label = "bottom up" if direc == 0 else "top down"
+	# 			if mode ==0:
+	# 				data = np.array(DBM.hist_input_c[i][direc]).flatten()
+	# 				filename = "/context_hist_input_c.pdf"
+	# 			else:
+	# 				data = np.array(DBM.hist_input_nc[i][direc]).flatten()
+	# 				filename = "/context_hist_input_nc.pdf"
 
-				if i == DBM.n_layers-1 and direc == 0 and mode == 0:
-					eps = 0.0001
-					data = data[np.abs(data)>eps]
-					label = label + "\n(neglected zeros)"
-				try:
+	# 			if i == DBM.n_layers-1 and direc == 0 and mode == 0:
+	# 				eps = 0.0001
+	# 				data = data[np.abs(data)>eps]
+	# 				label = label + "\n(neglected zeros)"
+	# 			try:
 
-					max_x_ = data.max()
-					if max_x_>max_x:
-						max_x = max_x_
+	# 				max_x_ = data.max()
+	# 				if max_x_>max_x:
+	# 					max_x = max_x_
 
-					y,x,_ = ax[i].hist(data,
-						bins      = 60,
-						label     = label,
-						color     = color,
-						linewidth = 0.2, 
-						edgecolor = "k",
-						alpha     = 0.8,
-						weights   = np.zeros_like(data)+1/data.size
-						)
+	# 				y,x,_ = ax[i].hist(data,
+	# 					bins      = 60,
+	# 					label     = label,
+	# 					color     = color,
+	# 					linewidth = 0.2, 
+	# 					edgecolor = "k",
+	# 					alpha     = 0.8,
+	# 					weights   = np.zeros_like(data)+1/data.size
+	# 					)
 
-					if max_x!=0:
-						ax[i].set_xlim([-max_x*1.2,max_x*1.2])
+	# 				if max_x!=0:
+	# 					ax[i].set_xlim([-max_x*1.2,max_x*1.2])
 					
-				except:
-					pass
+	# 			except:
+	# 				pass
 
-			# ax[i].set_ytick(ax[i].get_yticks())
+	# 		# ax[i].set_ytick(ax[i].get_yticks())
 			
-			ax[i].set_ylabel(r"$N/N_0$")
-			ax[i].legend()
-		ax[-1].set_xlabel("Input Strength")
-		save_fig(saveto_path+filename,DO_SAVE_TO_FILE)
+	# 		ax[i].set_ylabel(r"$N/N_0$")
+	# 		ax[i].legend()
+	# 	ax[-1].set_xlabel("Input Strength")
+	# 	save_fig(saveto_path+filename,DO_SAVE_TO_FILE)
 
 
 if DO_GEN_IMAGES:
@@ -2568,9 +2570,10 @@ if DO_GEN_IMAGES:
 		
 		save_fig(saveto_path+"/timeseries_generated/timeseries_av_layer_%i.png"%(layer+1),DO_SAVE_TO_FILE)
 
-
+log.out("Finished")
 log.close()
 if DO_SHOW_PLOTS:
 	plt.show()
 else:
 	plt.close()
+
