@@ -267,6 +267,8 @@ class DBM_class(object):
 		self.train_time            = 0	# counts train time in seconds
 		self.epochs                = 0	# epoch counter
 		self.update                = 0 	# update counter
+		self.update_off            = 0	# offset for the update param if loaded from file (used in get temp function)
+		self.updates               = np.zeros([N_BATCHES_TRAIN*N_EPOCHS_TRAIN//10])	# save update
 		self.recon_error_train     = np.zeros([N_BATCHES_TRAIN*N_EPOCHS_TRAIN//10, self.n_layers])	# save reconstructon error for every batch
 		self.class_error_train     = np.zeros([N_BATCHES_TRAIN*N_EPOCHS_TRAIN//10, self.n_layers])	# -"- train error -"-
 		self.layer_diversity_train = np.zeros([N_BATCHES_TRAIN*N_EPOCHS_TRAIN//10, self.n_layers])	# save layer variance across batch for every batch in train function
@@ -476,7 +478,7 @@ class DBM_class(object):
 			self.epochs   = train_epoch_[-1]
 
 			try:
-				self.update = log_dict["Update"]
+				self.update_off = log_dict["Update"]
 			except:
 				log.info("No key 'update' in logfile found.")
 
@@ -916,7 +918,7 @@ class DBM_class(object):
 
 		# shuffle test data and labels so that batches are not equal every epoch 
 		log.out("Shuffling TrainData")
-		self.seed   = rnd.randint(len(train_data),size=(len(train_data)/10,2))
+		self.seed   = rnd.randint(len(train_data),size=(len(train_data)//10,2))
 		train_data  = shuffle(train_data, self.seed)
 		if self.classification:
 			train_label = shuffle(train_label, self.seed)
@@ -1002,23 +1004,25 @@ class DBM_class(object):
 
 
 			### calc errors and other things
-			if self.update%10==0:
-				self.recon_error_train[self.update/10] = (sess.run(self.error,{self.layer_ph[0] : batch}))
+			ii = self.update//10
+			if self.update%10==0 and ii < len(self.updates):
+				self.updates[ii] = self.update
+				self.recon_error_train[ii] = (sess.run(self.error,{self.layer_ph[0] : batch}))
 				if self.classification:
-					self.class_error_train[self.update/10] = (sess.run(self.class_error,{self.layer_ph[-1] : batch_label}))
-				self.layer_diversity_train[self.update/10] = (sess.run(self.layer_diversity))
-				self.layer_act_train[self.update/10] = (sess.run(self.layer_activities))
+					self.class_error_train[ii] = (sess.run(self.class_error,{self.layer_ph[-1] : batch_label}))
+				self.layer_diversity_train[ii] = (sess.run(self.layer_diversity))
+				self.layer_act_train[ii] = (sess.run(self.layer_activities))
 
 				self.l_mean += sess.run(self.layer_activities)
 				
 				# check if freerunning escaped fixpoint
-				self.freerun_diff_train[self.update/10] = sess.run(self.freerun_diff)
-			
+				self.freerun_diff_train[ii] = sess.run(self.freerun_diff)
+
 			
 			## update parameters
 			self.update += 1
 
-			temp = self.get_temp(self.update, TEMP_SLOPE, TEMP_START, TEMP_MIN)
+			temp = self.get_temp(self.update+self.update_off, TEMP_SLOPE, TEMP_START, TEMP_MIN)
 
 			### liveplot
 			if self.liveplot and plt.fignum_exists(fig.number) and start%40==0:
@@ -1584,15 +1588,15 @@ class DBM_class(object):
 N_BATCHES_PRETRAIN = 500 				# how many batches per epoch for pretraining
 N_BATCHES_TRAIN    = 500 				# how many batches per epoch for complete DBM training
 N_EPOCHS_PRETRAIN  = [0,0,0,0,0,0] 	# pretrain epochs for each RBM
-N_EPOCHS_TRAIN     = 2  				# how often to iter through the test images
-TEST_EVERY_EPOCH   = 10 			# how many epochs to train before testing on the test data
+N_EPOCHS_TRAIN     = 1  				# how often to iter through the test images
+TEST_EVERY_EPOCH   = 10 				# how many epochs to train before testing on the test data
 
 ### learnrates 
-LEARNRATE_PRETRAIN = 0.01				# learnrate for pretraining
-LEARNRATE_START    = [	0.01,
-						0.01,
-						0.01,
-						0.01,
+LEARNRATE_PRETRAIN = 0.001				# learnrate for pretraining
+LEARNRATE_START    = [	0.001,
+						0.001,
+						0.001,
+						0.001,
 						]				# starting learnrates for each weight. Biases always use the [0] entry
 LEARNRATE_SLOPE    = 1.					# bigger number -> smaller slope
 
@@ -1601,13 +1605,13 @@ lambda_learn = 0.00000 				# test param for sparsness, gets added to weight upda
 
 
 ### temperature
-TEMP_START    = 0.01				# starting temp
+TEMP_START    = 0.005				# starting temp
 TEMP_SLOPE    = 0 #10e-7			# linear decrease slope higher number -> fast cooling
-TEMP_MIN      = 0.01
+TEMP_MIN      = 0.005
 
 ### state vars 
-DO_PRETRAINING = 0		# if no pretrain then files are automatically loaded
-DO_TRAINING    = 0		# if to train the whole DBM
+DO_PRETRAINING = 1		# if no pretrain then files are automatically loaded
+DO_TRAINING    = 1		# if to train the whole DBM
 DO_TESTING     = 1		# if testing the DBM with test data
 DO_SHOW_PLOTS  = 1		# if plots will show on display - either way they get saved into saveto_path
 
@@ -1616,14 +1620,14 @@ DO_GEN_IMAGES = 0		# if to generate images (mode can be choosen at function call
 DO_NOISE_STAB = 0		# if to make a noise stability test
 
 USE_DROPOUT  = 0		# if to use synnaptic failure while training
-DROPOUT_RATE = 2		# multiplication of random uniform synaptic failure matrix (higher number -> less failure)
+DROPOUT_RATE = 3		# multiplication of random uniform synaptic failure matrix (higher number -> less failure)
 
 DO_NORM_W    = 1		# if to norm the weights and biases to 1 while training
 
 ### saving and loading
 DO_SAVE_TO_FILE       = 0 	# if to save plots and data to file
 DO_SAVE_PRETRAINED    = 0 	# if to save the pretrained weights seperately (for later use)
-DO_LOAD_FROM_FILE     = 1	# if to load weights and biases from datadir + pathsuffix
+DO_LOAD_FROM_FILE     = 0	# if to load weights and biases from datadir + pathsuffix
 PATHSUFFIX            = "Mon_Jun__4_15-55-25_2018_[784, 225, 225, 225, 10] - ['original'] 15%"
 						#"Mon_Jun__4_15-55-25_2018_[784, 225, 225, 225, 10] - ['original'] 15%"
 							#"Thu_Jun__7_16-21-28_2018_[784, 225, 225, 225, 10] - ['15cont4']"
@@ -1631,9 +1635,9 @@ PATHSUFFIX_PRETRAINED = "Thu_Jun__7_13-49-25_2018"
 
 
 DBM_SHAPE = [	int(sqrt(len(train_data[0])))*int(sqrt(len(train_data[0]))),
-				15*15,
-				15*15,
-				15*15,
+				5*5,
+				5*5,
+				5*5,
 				10]
 ###########################################################################################################
 
@@ -1716,13 +1720,13 @@ if DO_TRAINING:
 				log.out("Creating Backup of Parameters")
 				DBM.backup_params()
 
-				DBM.test(train_data[0:10000], train_label[0:10000] if LOAD_MNIST else None,
-						N               = 20,  # sample ist aus random werten, also mindestens 2 sample machen 
-						create_conf_mat = 0,
-						temp_start      = temp,
-						temp_end        = temp,
-						using_train_data = True,
-						)
+				# DBM.test(train_data[0:10000], train_label[0:10000] if LOAD_MNIST else None,
+				# 		N               = 20,  # sample ist aus random werten, also mindestens 2 sample machen 
+				# 		create_conf_mat = 0,
+				# 		temp_start      = temp,
+				# 		temp_end        = temp,
+				# 		using_train_data = True,
+				# 		)
 
 
 
@@ -1799,7 +1803,7 @@ if DO_CONTEXT:
 		if DO_LOAD_FROM_FILE and not DO_TRAINING:
 			DBM.load_from_file(workdir+"/data/"+PATHSUFFIX,override_params=1)
 
-		subspace = [0,3,5,6,8]
+		subspace = [0,1,2,3,4]
 		log.out("Subspace: ", subspace)
 
 	
@@ -1828,7 +1832,7 @@ if DO_CONTEXT:
 
 		# calculte h2 firerates over all gibbs_steps 
 		log.start("Sampling data")
-		h2_no_context = DBM.gibbs_sampling(test_data[index_for_number_gibbs[:]], 33, 
+		h2_no_context = DBM.gibbs_sampling(test_data[index_for_number_gibbs[:]], 50, 
 							temp , temp, 
 							999, 999,
 							mode     = "context",
@@ -1836,7 +1840,7 @@ if DO_CONTEXT:
 							liveplot = 0)
 
 		# # with context
-		h2_context = DBM.gibbs_sampling(test_data[index_for_number_gibbs[:]], 33, 
+		h2_context = DBM.gibbs_sampling(test_data[index_for_number_gibbs[:]], 50, 
 							temp , temp, 
 							999, 999,
 							mode     = "context",
@@ -1940,11 +1944,14 @@ if DO_CONTEXT:
 			big_var_change_hists_c  = calc_neuron_hist(biggest_var_change_ind[l-1],DBM.firerate_c[l-1],   test_label[index_for_number_gibbs[:]], 0.5, len(subspace))	
 			big_var_change_hists_nc = calc_neuron_hist(biggest_var_change_ind[l-1],DBM.firerate_nc[l-1],  test_label[index_for_number_gibbs[:]], 0.5, len(subspace))	
 
-			fig2, ax2 = plt.subplots(2,len(big_var_change_hists_c)//2,sharey="row")
+			fig2, ax2 = plt.subplots(2,len(big_var_change_hists_c)//2,sharey="row",sharex="col")
 			for j in range(2):
 				for i in range(len(big_var_change_hists_c)//2):
 					ax2[j,i].bar(subspace,big_var_change_hists_c[i], color="g", alpha=0.5)
 					ax2[j,i].bar(subspace,big_var_change_hists_nc[i], color="r", alpha =0.5)
+					ax2[-1,i].set_xlabel("Class")
+					ax2[j,0].set_ylabel(r"$N$")
+					ax2[j,i].set_xticks((subspace))
 			fig2.tight_layout()
 			save_fig(saveto_path+"/big_var_change_l%i.pdf"%l, DO_SAVE_TO_FILE)
 
@@ -1963,10 +1970,10 @@ if DO_CONTEXT:
 			ax[0,l-1].set_ylabel("N",style= "italic")
 			ax[0,-1].legend(loc="best")
 
-		fig.tight_layout()
-		save_fig(saveto_path+"/context_unit_div_l%i.pdf"%l, DO_SAVE_TO_FILE)
+			fig.tight_layout()
+			save_fig(saveto_path+"/context_unit_div_l%i.pdf"%l, DO_SAVE_TO_FILE)
 
-		# count how many neurons got more active during context and how mch more
+
 
 
 		### look at neurons that where active outside subspace while testing and chekc if they got active during context
@@ -1990,8 +1997,6 @@ if DO_CONTEXT:
 					break
 
 
-		log.out("Calc hists for the found neurons ")
-		for l in range(1,DBM.n_layers-1):
 			hists_c  = calc_neuron_hist(outside_subspace_ind[l], DBM.firerate_c[l-1],  test_label[index_for_number_gibbs[:]], 0.5, len(subspace))
 			hists_nc = calc_neuron_hist(outside_subspace_ind[l], DBM.firerate_nc[l-1], test_label[index_for_number_gibbs[:]], 0.5, len(subspace))
 			hists_c = np.array(hists_c)
@@ -2063,7 +2068,8 @@ if DO_TRAINING:
 	plt.figure("Layer diversity train")
 	for i in range(DBM.n_layers):
 		label_str = get_layer_label(DBM.n_layers, i)
-		plt.plot(range(DBM.n_layers)[::10],smooth(np.array(DBM.layer_diversity_train)[::2,i],10),label=label_str,alpha=0.7)
+		y = smooth(np.array(DBM.layer_diversity_train)[:,i],10)
+		plt.plot(DBM.updates[:len(y)],y,label=label_str,alpha=0.7)
 		plt.legend()
 	plt.xlabel("Update Number")
 	plt.ylabel("Deviation")
@@ -2071,10 +2077,10 @@ if DO_TRAINING:
 
 	plt.figure("Errors")
 	## train errors
-	plt.plot(range(DBM.n_layers)[::10],DBM.recon_error_train[:],"-",label="Recon Error Train",alpha=0.8)
+	plt.plot(DBM.updates,DBM.recon_error_train[:],"-",label="Recon Error Train",alpha=0.8)
 
 	if DBM.classification:
-		plt.plodt(range(DBM.n_layers)[::10],DBM.class_error_train[:],"-",label="Class Error Train",alpha=0.8)
+		plt.plot(DBM.updates,DBM.class_error_train[:],"-",label="Class Error Train",alpha=0.8)
 	## test errors
 	# calc number of updates per epoch
 	n_u_p_e = len(DBM.recon_error_train) // DBM.epochs
@@ -2082,7 +2088,10 @@ if DO_TRAINING:
 	plt.plot(x,DBM.save_dict["Recon_Error"],"o--",label="Recon Error Test")
 	if DBM.classification:
 		plt.plot(x,DBM.save_dict["Class_Error"],"o--",label="Class Error Test")
-		plt.plot(x[:-1],DBM.save_dict["Class_Error_Train_Data"],"o--",label="Class Error Test\nTrain Data")
+		try:
+			plt.plot(x[:-1],DBM.save_dict["Class_Error_Train_Data"],"o--",label="Class Error Test\nTrain Data")
+		except:
+			pass
 	plt.legend(loc="best")
 	plt.xlabel("Update Number")
 	plt.ylabel("Mean Square Error")
@@ -2130,11 +2139,11 @@ if DO_TRAINING:
 	fig,ax = plt.subplots(1,1)
 	for i in range(DBM.n_layers):
 		l_str = get_layer_label(DBM.n_layers,i)
-		ax.semilogy(range(DBM.update)[::10], DBM.freerun_diff_train[:,i], label = l_str)
+		ax.semilogy(DBM.updates, DBM.freerun_diff_train[:,i], label = l_str)
 	plt.ylabel("log("+r"$\Delta L$"+")")
 	plt.legend(ncol = 2, loc = "best")
 	plt.xlabel("Update")
-	save_fig(saeto_path+"/freerunn-diffs.png", DO_SAVE_TO_FILE)
+	save_fig(saveto_path+"/freerunn-diffs.png", DO_SAVE_TO_FILE)
 
 
 	# plot train data (temp, diffs, learnrate, ..)
@@ -2175,8 +2184,8 @@ if DO_TRAINING:
 	
 	plt.figure("Layer_activiations_train_run")
 	for i in range(DBM.n_layers):
-		label_str = get_layer_label(DBM.n_layers, i+1)
-		plt.plot(range(DBM.update)[::10],np.array(DBM.layer_act_train)[:,i],label = label_str)
+		label_str = get_layer_label(DBM.n_layers, i)
+		plt.plot(DBM.updates,np.array(DBM.layer_act_train)[:,i],label = label_str)
 	plt.legend()
 	plt.xlabel("Update Number")
 	plt.ylabel("Train Layer Activity in %")
@@ -2250,7 +2259,7 @@ if LOAD_MNIST and DO_TESTING:
 		
 
 	# plot l_input_test as hist over all units
-	fig,ax = plt.subplots(DBM.n_layers,1,figsize=(7,10),sharex="col")
+	fig,ax = plt.subplots(DBM.n_layers,1,figsize=(7,10))
 	for i in range(DBM.n_layers):
 		# max_x = 0
 		ax_index = -(i+1)
@@ -2358,7 +2367,7 @@ if LOAD_MNIST and DO_TESTING:
 		ax3[1][m].matshow(DBM.firerate_test[0][i].reshape(int(sqrt(DBM.SHAPE[0])),int(sqrt(DBM.SHAPE[0]))))
 		ax3[1][m].set_yticks([])
 		ax3[1][m].set_xticks([])
-		
+
 		#plot hidden layer
 		for layer in range(1,len(DBM.SHAPE)-1):
 			try:
@@ -2372,9 +2381,13 @@ if LOAD_MNIST and DO_TESTING:
 			ax3[-1][m].bar(range(DBM.SHAPE[-1]),DBM.last_layer_save[i])
 			ax3[-1][m].set_xticks(range(DBM.SHAPE[-1]))
 			ax3[-1][m].set_ylim(0,1)
-		#plot the reconstructed layer h1
-		# ax4[5][m].matshow(DBM.rec_h1[i:i+1].reshape(int(sqrt(DBM.SHAPE[1])),int(sqrt(DBM.SHAPE[1]))))
-		# plt.matshow(random_recon.reshape(int(sqrt(DBM.SHAPE[0])),int(sqrt(DBM.SHAPE[0]))))
+		else:
+			ax3[-1][m].matshow(DBM.last_layer_save[i].reshape(int(sqrt(DBM.SHAPE[-1])),int(sqrt(DBM.SHAPE[-1]))))
+			ax3[-1][m].set_xticks([])
+			ax3[-1][m].set_yticks([])
+			#plot the reconstructed layer h1
+			# ax4[5][m].matshow(DBM.rec_h1[i:i+1].reshape(int(sqrt(DBM.SHAPE[1])),int(sqrt(DBM.SHAPE[1]))))
+			# plt.matshow(random_recon.reshape(int(sqrt(DBM.SHAPE[0])),int(sqrt(DBM.SHAPE[0]))))
 		m+=1
 	plt.tight_layout(pad=0.0)
 	save_fig(saveto_path+"/examples_one_digit.pdf", DO_SAVE_TO_FILE)
