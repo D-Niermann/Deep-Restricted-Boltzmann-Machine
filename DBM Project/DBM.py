@@ -268,9 +268,9 @@ class DBM_class(object):
 		self.epochs                = 0	# epoch counter
 		self.update                = 0 	# update counter
 		self.update_off            = 0	# offset for the update param if loaded from file (used in get temp function)
-		self.updates               = np.zeros([N_BATCHES_TRAIN*N_EPOCHS_TRAIN//10])	# save update
-		self.recon_error_train     = np.zeros([N_BATCHES_TRAIN*N_EPOCHS_TRAIN//10, self.n_layers])	# save reconstructon error for every batch
-		self.class_error_train     = np.zeros([N_BATCHES_TRAIN*N_EPOCHS_TRAIN//10, self.n_layers])	# -"- train error -"-
+		self.updates               = np.arange(0,N_BATCHES_TRAIN*N_EPOCHS_TRAIN,10)	# save update
+		self.recon_error_train     = np.zeros([N_BATCHES_TRAIN*N_EPOCHS_TRAIN//10])	# save reconstructon error for every batch
+		self.class_error_train     = np.zeros([N_BATCHES_TRAIN*N_EPOCHS_TRAIN//10])	# -"- train error -"-
 		self.layer_diversity_train = np.zeros([N_BATCHES_TRAIN*N_EPOCHS_TRAIN//10, self.n_layers])	# save layer variance across batch for every batch in train function
 		self.layer_act_train       = np.zeros([N_BATCHES_TRAIN*N_EPOCHS_TRAIN//10, self.n_layers])	# save how many units are active across one layer in % for every batch
 		
@@ -1006,9 +1006,9 @@ class DBM_class(object):
 			### calc errors and other things
 			ii = self.update//10
 			if self.update%10==0 and ii < len(self.updates):
-				self.updates[ii] = self.update
+				# self.updates[ii] = self.update
 				self.recon_error_train[ii] = (sess.run(self.error,{self.layer_ph[0] : batch}))
-				if self.classification:
+				if self.classification: 
 					self.class_error_train[ii] = (sess.run(self.class_error,{self.layer_ph[-1] : batch_label}))
 				self.layer_diversity_train[ii] = (sess.run(self.layer_diversity))
 				self.layer_act_train[ii] = (sess.run(self.layer_activities))
@@ -1587,8 +1587,8 @@ class DBM_class(object):
 
 N_BATCHES_PRETRAIN = 500 				# how many batches per epoch for pretraining
 N_BATCHES_TRAIN    = 500 				# how many batches per epoch for complete DBM training
-N_EPOCHS_PRETRAIN  = [0,0,0,0,0,0] 	# pretrain epochs for each RBM
-N_EPOCHS_TRAIN     = 1  				# how often to iter through the test images
+N_EPOCHS_PRETRAIN  = [30,30,30,0,0,0] 	# pretrain epochs for each RBM
+N_EPOCHS_TRAIN     = 100  				# how often to iter through the test images
 TEST_EVERY_EPOCH   = 10 				# how many epochs to train before testing on the test data
 
 ### learnrates 
@@ -1605,9 +1605,9 @@ lambda_learn = 0.00000 				# test param for sparsness, gets added to weight upda
 
 
 ### temperature
-TEMP_START    = 0.005				# starting temp
+TEMP_START    = 0.05				# starting temp
 TEMP_SLOPE    = 0 #10e-7			# linear decrease slope higher number -> fast cooling
-TEMP_MIN      = 0.005
+TEMP_MIN      = 0.05
 
 ### state vars 
 DO_PRETRAINING = 1		# if no pretrain then files are automatically loaded
@@ -1619,13 +1619,13 @@ DO_CONTEXT    = 1		# if to test the context
 DO_GEN_IMAGES = 0		# if to generate images (mode can be choosen at function call)
 DO_NOISE_STAB = 0		# if to make a noise stability test
 
-USE_DROPOUT  = 0		# if to use synnaptic failure while training
-DROPOUT_RATE = 3		# multiplication of random uniform synaptic failure matrix (higher number -> less failure)
+USE_DROPOUT  = 1		# if to use synnaptic failure while training
+DROPOUT_RATE = 2		# multiplication of random uniform synaptic failure matrix (higher number -> less failure)
 
 DO_NORM_W    = 1		# if to norm the weights and biases to 1 while training
 
 ### saving and loading
-DO_SAVE_TO_FILE       = 0 	# if to save plots and data to file
+DO_SAVE_TO_FILE       = 1 	# if to save plots and data to file
 DO_SAVE_PRETRAINED    = 0 	# if to save the pretrained weights seperately (for later use)
 DO_LOAD_FROM_FILE     = 0	# if to load weights and biases from datadir + pathsuffix
 PATHSUFFIX            = "Mon_Jun__4_15-55-25_2018_[784, 225, 225, 225, 10] - ['original'] 15%"
@@ -1635,9 +1635,9 @@ PATHSUFFIX_PRETRAINED = "Thu_Jun__7_13-49-25_2018"
 
 
 DBM_SHAPE = [	int(sqrt(len(train_data[0])))*int(sqrt(len(train_data[0]))),
-				5*5,
-				5*5,
-				5*5,
+				15*15,
+				15*15,
+				15*15,
 				10]
 ###########################################################################################################
 
@@ -1711,7 +1711,7 @@ if DO_TRAINING:
 				# DBM.test(train_data[:1000], train_label[:1000], 50, 10)
 
 				DBM.test(test_data, test_label if LOAD_MNIST else None,
-						N               = 20,  # sample ist aus random werten, also mindestens 2 sample machen 
+						N               = 30,  # sample ist aus random werten, also mindestens 2 sample machen 
 						create_conf_mat = 0,
 						temp_start      = temp,
 						temp_end        = temp
@@ -1720,13 +1720,13 @@ if DO_TRAINING:
 				log.out("Creating Backup of Parameters")
 				DBM.backup_params()
 
-				# DBM.test(train_data[0:10000], train_label[0:10000] if LOAD_MNIST else None,
-				# 		N               = 20,  # sample ist aus random werten, also mindestens 2 sample machen 
-				# 		create_conf_mat = 0,
-				# 		temp_start      = temp,
-				# 		temp_end        = temp,
-				# 		using_train_data = True,
-				# 		)
+				DBM.test(train_data[0:10000], train_label[0:10000] if LOAD_MNIST else None,
+						N               = 30,  # sample ist aus random werten, also mindestens 2 sample machen 
+						create_conf_mat = 0,
+						temp_start      = temp,
+						temp_end        = temp,
+						using_train_data = True,
+						)
 
 
 
@@ -1739,7 +1739,7 @@ if DO_TRAINING:
 if DO_TESTING:
 	with tf.Session() as sess:
 		DBM.test(test_data, test_label if LOAD_MNIST else None,
-				N               = 10,  # sample ist aus random werten, also mindestens 2 sample machen 
+				N               = 50,  # sample ist aus random werten, also mindestens 2 sample machen 
 				create_conf_mat = 1,
 				temp_start      = temp,
 				temp_end        = temp)
@@ -1832,7 +1832,7 @@ if DO_CONTEXT:
 
 		# calculte h2 firerates over all gibbs_steps 
 		log.start("Sampling data")
-		h2_no_context = DBM.gibbs_sampling(test_data[index_for_number_gibbs[:]], 50, 
+		h2_no_context = DBM.gibbs_sampling(test_data[index_for_number_gibbs[:]], 99, 
 							temp , temp, 
 							999, 999,
 							mode     = "context",
@@ -1840,7 +1840,7 @@ if DO_CONTEXT:
 							liveplot = 0)
 
 		# # with context
-		h2_context = DBM.gibbs_sampling(test_data[index_for_number_gibbs[:]], 50, 
+		h2_context = DBM.gibbs_sampling(test_data[index_for_number_gibbs[:]], 99, 
 							temp , temp, 
 							999, 999,
 							mode     = "context",
@@ -1930,98 +1930,6 @@ if DO_CONTEXT:
 
 
 
-
-
-
-		# plot the unit variance and firerate c/nc
-		fig,ax = plt.subplots(2,DBM.n_layers-2,figsize=(12,6))
-		biggest_var_change_ind = [None]*(DBM.n_layers-2)
-		for l in range(1, DBM.n_layers-1):
-			delta_sigma = DBM.unit_diversity_c[l]-DBM.unit_diversity_nc[l]
-
-			biggest_var_change_ind[l-1] = np.where(delta_sigma > sorted(delta_sigma)[-11])[0]		
-
-			big_var_change_hists_c  = calc_neuron_hist(biggest_var_change_ind[l-1],DBM.firerate_c[l-1],   test_label[index_for_number_gibbs[:]], 0.5, len(subspace))	
-			big_var_change_hists_nc = calc_neuron_hist(biggest_var_change_ind[l-1],DBM.firerate_nc[l-1],  test_label[index_for_number_gibbs[:]], 0.5, len(subspace))	
-
-			fig2, ax2 = plt.subplots(2,len(big_var_change_hists_c)//2,sharey="row",sharex="col")
-			for j in range(2):
-				for i in range(len(big_var_change_hists_c)//2):
-					ax2[j,i].bar(subspace,big_var_change_hists_c[i], color="g", alpha=0.5)
-					ax2[j,i].bar(subspace,big_var_change_hists_nc[i], color="r", alpha =0.5)
-					ax2[-1,i].set_xlabel("Class")
-					ax2[j,0].set_ylabel(r"$N$")
-					ax2[j,i].set_xticks((subspace))
-			fig2.tight_layout()
-			save_fig(saveto_path+"/big_var_change_l%i.pdf"%l, DO_SAVE_TO_FILE)
-
-			ax[1,l-1].hist(delta_sigma,bins=30, linewidth = 0.2, edgecolor = "k")
-
-			ax[0,l-1].hist(np.mean(DBM.firerate_c[l-1][:],0) , bins=20, alpha=0.7, label = "With context", lw=0.2,edgecolor="k")
-			ax[0,l-1].hist(np.mean(DBM.firerate_nc[l-1][:],0), bins=20, alpha=0.7, label = "Without context", lw=0.2,edgecolor="k")
-			# ax[0,l-1].hist(np.mean(DBM.firerate_test[l][:],0),bins=20,alpha=0.7,label = "Testrun",lw=0.2,edgecolor="k")
-
-			layer_str = get_layer_label(DBM.n_layers,l,short=True)
-			# plt.colorbar(ax=ax[l-1],mappable=mapp)#,cbarlabel="$\sigma_%s^c/\sigma_%s^{nc}$"%(layer_str,layer_str))
-			ax[1,l-1].set_xlabel(r"$\Delta \sigma_{%s}$"%layer_str[1:-1])
-			ax[1,l-1].set_ylabel("N",style= "italic")
-			ax[0,l-1].set_xlim([0,1])
-			ax[0,l-1].set_xlabel(r"$<f>_{batch}$")
-			ax[0,l-1].set_ylabel("N",style= "italic")
-			ax[0,-1].legend(loc="best")
-
-			fig.tight_layout()
-			save_fig(saveto_path+"/context_unit_div_l%i.pdf"%l, DO_SAVE_TO_FILE)
-
-
-
-
-		### look at neurons that where active outside subspace while testing and chekc if they got active during context
-		# look which hists have their  max outside supspace
-		log.out("Searching neurons that fired outside subspace while testing")
-
-		max_neurons = 1000
-		outside_subspace_ind = [[]*i for i in range(DBM.n_layers)]
-		for l in range(1,DBM.n_layers-1):
-			# generate hisogramms for all neurons that fired reasonable often
-			hists_test = calc_neuron_hist(DBM.neuron_good_test_firerate_ind[l],DBM.firerate_test[l],test_label,0.5, 10)
-
-			# go through every hist and chekc if high values are outside subspace
-			for i in range(len(hists_test)):
-				where  =  np.where(hists_test[i]>hists_test[i].mean()+hists_test[i].std())[0]
-				for j in where:
-					if j not in subspace:
-						outside_subspace_ind[l].append(i)
-						break
-				if len(outside_subspace_ind[l]) >= max_neurons:
-					break
-
-
-			hists_c  = calc_neuron_hist(outside_subspace_ind[l], DBM.firerate_c[l-1],  test_label[index_for_number_gibbs[:]], 0.5, len(subspace))
-			hists_nc = calc_neuron_hist(outside_subspace_ind[l], DBM.firerate_nc[l-1], test_label[index_for_number_gibbs[:]], 0.5, len(subspace))
-			hists_c = np.array(hists_c)
-			hists_nc = np.array(hists_nc)
-			log.out("Searching which of the found neurons also had a moderate firerate while gibbs sampling")
-			w_firerates = np.where((np.mean(DBM.firerate_c[l-1][:,outside_subspace_ind[l]],0)<0.4) & (np.mean(DBM.firerate_c[l-1][:,outside_subspace_ind[l]],0)>0.02))[0]
-
-			log.out("Plotting these neurons hists")
-			num_plots = int(sqrt(len(w_firerates)))
-			fig,ax = plt.subplots(num_plots,num_plots,sharex="col",sharey="row")
-			m=0
-			for i in range(num_plots):
-				for j in range(num_plots):
-					index = outside_subspace_ind[l][w_firerates[m]]
-					ax[i,j].bar(subspace,hists_c[w_firerates[m]],alpha=0.7,color=[0.0, 1, 0.5])
-					ax[i,j].bar(subspace,hists_nc[w_firerates[m]],alpha=0.7,color=[0.8, 0.3, 0.3],width=0.2)
-					ax[i,j].bar(range(10),hists_test[index],alpha=0.5,color=[1, 0.0, 0.0])
-					ax[i,j].set_xticks(range(10))
-					ax[-1,j].set_xlabel("Class")
-					ax[i,0].set_ylabel(r"$N$")
-					# ax[i,j].set_title(str(index)+" | "+ str(diffs[index]))
-					m+=1
-			fig.tight_layout()
-			save_fig(saveto_path+"/outisde_subspace_hists_l%i"%l, DO_SAVE_TO_FILE)
-
 	log.end() #end session
 
 
@@ -2077,14 +1985,11 @@ if DO_TRAINING:
 
 	plt.figure("Errors")
 	## train errors
-	plt.plot(DBM.updates,DBM.recon_error_train[:],"-",label="Recon Error Train",alpha=0.8)
-
+	plt.plot(DBM.updates,DBM.recon_error_train,".",label="Recon Error Train",alpha=0.8)
 	if DBM.classification:
-		plt.plot(DBM.updates,DBM.class_error_train[:],"-",label="Class Error Train",alpha=0.8)
+		plt.plot(DBM.updates,DBM.class_error_train,".",label="Class Error Train",alpha=0.8)
 	## test errors
-	# calc number of updates per epoch
-	n_u_p_e = len(DBM.recon_error_train) // DBM.epochs
-	x = np.array(DBM.save_dict["Test_Epoch"])*n_u_p_e
+	x = np.array(DBM.save_dict["Test_Epoch"])*N_BATCHES_TRAIN
 	plt.plot(x,DBM.save_dict["Recon_Error"],"o--",label="Recon Error Test")
 	if DBM.classification:
 		plt.plot(x,DBM.save_dict["Class_Error"],"o--",label="Class Error Test")
@@ -2211,7 +2116,7 @@ if LOAD_MNIST and DO_TESTING:
 	plt.xlabel("Layer")
 	plt.xticks(range(DBM.n_layers),[get_layer_label(DBM.n_layers, i ,short=True) for i in range((DBM.n_layers))])
 	plt.tight_layout()
-	save_fig(saveto_path+"/layer_std_test_batch,pdf", DO_SAVE_TO_FILE)
+	save_fig(saveto_path+"/layer_std_test_batch.pdf", DO_SAVE_TO_FILE)
 
 	# firerates test run mean hist
 	fig,ax = plt.subplots(1,DBM.n_layers-1,figsize=(10,2.75),sharex="row")
@@ -2394,6 +2299,7 @@ if LOAD_MNIST and DO_TESTING:
 
 
 if DO_CONTEXT:
+
 	# plot the variance of the layers for c/nc normed to nc and the firerates as hist
 	log.out("Plotting variance diff c/nc")
 	plt.figure()
@@ -2406,7 +2312,9 @@ if DO_CONTEXT:
 	plt.xlabel("Layer")
 	plt.ylabel("Diversity")
 	save_fig(saveto_path+"/context_l_diversity.pdf",DO_SAVE_TO_FILE)
-	
+
+
+
 	### plt histograms for each used digit
 	fig,ax = plt.subplots(1,len(subspace),figsize=(12,7),sharey="row")
 	for i,digit in enumerate(subspace):
@@ -2426,9 +2334,12 @@ if DO_CONTEXT:
 		ax[i].set_title(str(digit))
 		ax[i].set_xticks(range(10))
 	plt.subplots_adjust(bottom=None, right=0.84, left=0.1, top=None,
-            wspace=None, hspace=None)
+	        wspace=None, hspace=None)
 
 	save_fig(saveto_path+"/context_hists.pdf",DO_SAVE_TO_FILE)
+
+
+
 
 	# plot time series
 	fig,ax = plt.subplots(1,3,figsize=(13,4));
@@ -2472,6 +2383,8 @@ if DO_CONTEXT:
 	plt.tight_layout()
 	save_fig(saveto_path+"/context_time_series.pdf",DO_SAVE_TO_FILE)	
 
+
+
 	# plot layer input with and without context
 	fig,ax  = plt.subplots(1,1)
 	color_m = 1
@@ -2505,56 +2418,96 @@ if DO_CONTEXT:
 	save_fig(saveto_path+filename, DO_SAVE_TO_FILE)
 
 
-	# plot input  hist for context und no context	
-	# for mode in range(2):
-	# 	fig,ax = plt.subplots(DBM.n_layers,1,figsize=(8,10))
-	# 	for i in range(DBM.n_layers):
-	# 		max_x = 0
-			
-	# 		for direc in range(2):
-	# 			color = next(ax[i]._get_lines.prop_cycler)['color'];
-	# 			# color="r"
-	# 			label = "bottom up" if direc == 0 else "top down"
-	# 			if mode ==0:
-	# 				data = np.array(DBM.hist_input_c[i][direc]).flatten()
-	# 				filename = "/context_hist_input_c.pdf"
-	# 			else:
-	# 				data = np.array(DBM.hist_input_nc[i][direc]).flatten()
-	# 				filename = "/context_hist_input_nc.pdf"
 
-	# 			if i == DBM.n_layers-1 and direc == 0 and mode == 0:
-	# 				eps = 0.0001
-	# 				data = data[np.abs(data)>eps]
-	# 				label = label + "\n(neglected zeros)"
-	# 			try:
 
-	# 				max_x_ = data.max()
-	# 				if max_x_>max_x:
-	# 					max_x = max_x_
+	# plot the unit variance and firerate c/nc
+	fig,ax = plt.subplots(2,DBM.n_layers-2,figsize=(10,5))
+	biggest_var_change_ind = [None]*(DBM.n_layers-2)
+	for l in range(1, DBM.n_layers-1):
+		delta_sigma = DBM.unit_diversity_c[l]-DBM.unit_diversity_nc[l]
+		delta_f     = np.mean(DBM.firerate_c[l-1],0) - np.mean(DBM.firerate_nc[l-1],0)
 
-	# 				y,x,_ = ax[i].hist(data,
-	# 					bins      = 60,
-	# 					label     = label,
-	# 					color     = color,
-	# 					linewidth = 0.2, 
-	# 					edgecolor = "k",
-	# 					alpha     = 0.8,
-	# 					weights   = np.zeros_like(data)+1/data.size
-	# 					)
+		biggest_var_change_ind[l-1] = np.where(delta_sigma > sorted(delta_sigma)[-11] )[0]		
 
-	# 				if max_x!=0:
-	# 					ax[i].set_xlim([-max_x*1.2,max_x*1.2])
-					
-	# 			except:
-	# 				pass
+		big_var_change_hists_c  = calc_neuron_hist(biggest_var_change_ind[l-1], DBM.firerate_c[l-1],   test_label[index_for_number_gibbs[:]], 0.5, len(subspace))	
+		big_var_change_hists_nc = calc_neuron_hist(biggest_var_change_ind[l-1], DBM.firerate_nc[l-1],  test_label[index_for_number_gibbs[:]], 0.5, len(subspace))	
 
-	# 		# ax[i].set_ytick(ax[i].get_yticks())
-			
-	# 		ax[i].set_ylabel(r"$N/N_0$")
-	# 		ax[i].legend()
-	# 	ax[-1].set_xlabel("Input Strength")
-	# 	save_fig(saveto_path+filename,DO_SAVE_TO_FILE)
+		fig2, ax2 = plt.subplots(2,len(big_var_change_hists_c)//2,figsize=(8,4),sharey="row")
+		m=0
+		for j in range(2):
+			for i in range(len(big_var_change_hists_c)//2):
+				ax2[j,i].bar(np.array(subspace)-0.17,big_var_change_hists_c[m], width = 0.35, color="g")
+				ax2[j,i].bar(np.array(subspace)+0.17,big_var_change_hists_nc[m], width = 0.35, color="r")
+				ax2[-1,i].set_xlabel("Class")
+				ax2[j,0].set_ylabel(r"$N$")
+				ax2[j,i].set_xticks((subspace))
+				m+=1
+		fig2.tight_layout()
+		save_fig(saveto_path+"/big_var_change_l%i.pdf"%l, DO_SAVE_TO_FILE)
 
+		ax[1,l-1].hist(delta_sigma, bins=30, lw = 0.2, edgecolor = "k")
+
+		ax[0,l-1].hist(delta_f ,    bins=30, lw = 0.2, edgecolor="k")
+		# ax[0,l-1].hist(np.mean(DBM.firerate_nc[l-1][:],0), bins=20, alpha=0.7, label = "Without context", lw=0.2,edgecolor="k")
+		# ax[0,l-1].hist(np.mean(DBM.firerate_test[l][:],0),bins=20,alpha=0.7,label = "Testrun",lw=0.2,edgecolor="k")
+
+		layer_str = get_layer_label(DBM.n_layers,l,short=True)
+		# plt.colorbar(ax=ax[l-1],mappable=mapp)#,cbarlabel="$\sigma_%s^c/\sigma_%s^{nc}$"%(layer_str,layer_str))
+		ax[1,l-1].set_xlabel(r"$\Delta \sigma_{%s}$"%layer_str[1:-1])
+		ax[1,l-1].set_ylabel("N",style= "italic")
+		# ax[0,l-1].set_xlim([0,1])
+		ax[0,l-1].set_xlabel(r"$<f>_{batch}$")
+		ax[0,l-1].set_ylabel("N",style= "italic")
+		ax[0,-1].legend(loc="best")
+
+		fig.tight_layout()
+		save_fig(saveto_path+"/context_unit_div_l%i.pdf"%l, DO_SAVE_TO_FILE)
+
+	### look at neurons that where active outside subspace while testing and chekc if they got active during context
+	# look which hists have their  max outside supspace
+	log.out("Searching neurons that fired outside subspace while testing")
+
+	max_neurons = 1000
+	outside_subspace_ind = [[]*i for i in range(DBM.n_layers)]
+	for l in range(1,DBM.n_layers-1):
+		# generate hisogramms for all neurons that fired reasonable often
+		hists_test = calc_neuron_hist(DBM.neuron_good_test_firerate_ind[l],DBM.firerate_test[l],test_label,0.5, 10)
+
+		# go through every hist and chekc if high values are outside subspace
+		for i in range(len(hists_test)):
+			where  =  np.where(hists_test[i]>hists_test[i].mean()+hists_test[i].std())[0]
+			for j in where:
+				if j not in subspace:
+					outside_subspace_ind[l].append(i)
+					break
+			if len(outside_subspace_ind[l]) >= max_neurons:
+				break
+
+
+		hists_c  = calc_neuron_hist(outside_subspace_ind[l], DBM.firerate_c[l-1],  test_label[index_for_number_gibbs[:]], 0.5, len(subspace))
+		hists_nc = calc_neuron_hist(outside_subspace_ind[l], DBM.firerate_nc[l-1], test_label[index_for_number_gibbs[:]], 0.5, len(subspace))
+		hists_c = np.array(hists_c)
+		hists_nc = np.array(hists_nc)
+		log.out("Searching which of the found neurons also had a moderate firerate while gibbs sampling")
+		w_firerates = np.where((np.mean(DBM.firerate_c[l-1][:,outside_subspace_ind[l]],0)<0.4) & (np.mean(DBM.firerate_c[l-1][:,outside_subspace_ind[l]],0)>0.02))[0]
+
+		log.out("Plotting these neurons hists")
+		num_plots = int(sqrt(len(w_firerates)))
+		fig,ax = plt.subplots(num_plots,num_plots,sharex="col",sharey="row")
+		m=0
+		for i in range(num_plots):
+			for j in range(num_plots):
+				index = outside_subspace_ind[l][w_firerates[m]]
+				ax[i,j].bar(subspace,hists_c[w_firerates[m]],alpha=0.7,color=[0.0, 1, 0.5])
+				ax[i,j].bar(subspace,hists_nc[w_firerates[m]],alpha=0.7,color=[0.8, 0.3, 0.3],width=0.2)
+				ax[i,j].bar(range(10),hists_test[index],alpha=0.5,color=[1, 0.0, 0.0])
+				ax[i,j].set_xticks(range(10))
+				ax[-1,j].set_xlabel("Class")
+				ax[i,0].set_ylabel(r"$N$")
+				# ax[i,j].set_title(str(index)+" | "+ str(diffs[index]))
+				m+=1
+		fig.tight_layout()
+		save_fig(saveto_path+"/outisde_subspace_hists_l%i"%l, DO_SAVE_TO_FILE)
 
 if DO_GEN_IMAGES:
 	# plot timeseries of every neuron while generate (clamped label)
