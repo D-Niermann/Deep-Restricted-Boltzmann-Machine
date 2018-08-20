@@ -1640,7 +1640,7 @@ DBM_SHAPE = [	int(sqrt(len(train_data[0])))*int(sqrt(len(train_data[0]))),
 				10]
 ###########################################################################################################
 
-
+ 
 
 
 saveto_path=data_dir+"/"+time_now+"_"+str(DBM_SHAPE)
