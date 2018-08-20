@@ -9,57 +9,100 @@ mean_img = np.mean(train_data[:10000],0)
 ## user variables
 layer       = 3
 fire_thresh = 0.9
+w_thresh    = 0.04
 min_mean    = 0.05
-max_mean    = 0.4
+max_mean    = 0.2
 
+np.mean()
 
 # os.chdir("/Users/Niermann/Desktop/Plots/Layer_%i"%layer)
-means = [None]*DBM.n_layers
-for l in range(DBM.n_layers):
-	means_test[l] = np.mean(DBM.firerate_test[l],0)
-	means_nc[l]   = np.mean(DBM.firerate_c[l],0)
-	means_c[l]    = np.mean(DBM.firerate_nc[l],0)
+means_c = [None]*DBM.n_layers
+means_nc = [None]*DBM.n_layers
+for l in range(1,DBM.n_layers-1):
+	means_c[l] = np.mean(DBM.firerate_c[l],0)
+	means_nc[l] = np.mean(DBM.firerate_nc[l],0)
 
-fig,ax=plt.subplots(3,1,sharex="col")
-for l in range(1,4):
-	ax[l-1].hist(means[l],bins=30,alpha=0.3)
-	ax[l-1].set_title("Average Fire Rate Layer %i"%l)
+# fig,ax=plt.subplots(3,1,sharex="col")
+# for l in range(1,4):
+# 	ax[l-1].hist(means[l],bins=30,alpha=0.3)
+# 	ax[l-1].set_title("Average Fire Rate Layer %i"%l)
 
-# neuron_number_ = []
-# neuron_means_ =[]
-# for i in range(DBM.SHAPE[layer]):
-# 	m = means[layer][i]
-# 	if m>min_mean and m<max_mean:
-# 		neuron_number_.append(np.where(means[layer]==m)[0][0])
-# 		neuron_means_.append(m)
-# 	if len(neuron_number_)>20:
-# 		break
+neuron_number_ = []
+neuron_means_ =[]
+for neuron in range(DBM.SHAPE[layer]):
+	m_c = means_c[layer-1][neuron]
+	m_nc = means_nc[layer-1][neuron]
+	if m_c<m_nc/2.2:
+	# if m>min_mean and m<max_mean:
+		neuron_number_.append(np.where(means_c[layer-1]==m_c)[0][0])
+		neuron_means_.append(m)
+	if len(neuron_number_)>20:
+		break
 
-# neuron_number_ = list(set(neuron_number_))
-# DBM.n_layers
-neuron_number_ = np.where(np.abs(DBM.w_np[-1])>0.04)[0]
-target_class = np.where(np.abs(DBM.w_np[-1])>0.04)[1]
-# neuron_number_ = [3]
+neuron_number_ = list(set(neuron_number_))
 
 
-for neuron in range(len(neuron_number_)):
+## get neurons based on their weight strength
+neuron_number_ = np.where(np.abs(DBM.w_np[-1][:,5:])>w_thresh)[0]
+target_class = np.where(np.abs(DBM.w_np[-1][:,5:])>w_thresh)[1]
+
+
+
+def get_neuron_subdata(neuron,firerates,fire_thresh,context):
+	""" 
+	gets the images with corresponding labels on which the given neuron fired 
+	more often than fire_thresh.
+	subdata contains the full image vectos.
+	label contains the true label value (from 0-9) and not the vectors.
+	context [bool] :: weather context data was used or the full test data
+	"""
+
+	neurons = np.where(firerates[:,neuron]>fire_thresh)[0]
+
+	if not len(neurons)<4:
+		if context==False:
+			subdata     = test_data[neurons]
+			sublabel    = test_label[neurons]
+		else:
+			subdata     = test_data[index_for_number_gibbs[:]][neurons]
+			sublabel    = test_label[index_for_number_gibbs[:]][neurons]
+
+
+		# label = []
+		# for i in range(len(sublabel)):
+		label = np.where(sublabel==1)[1]
+			# label.append(where)
+		# label = np.array(label).astype(np.float)
+		
+		return subdata,label
+	else:
+		return None,None
+hist_diff  = np.zeros(255)
+for neuron in range(10):#range(len(neuron_number_)):
 	
-	neuron_number = neuron_number_[neuron]
+	neuron_number = neuron# = neuron_number_[neuron]
 	log.out("Neuron:" , neuron_number)
 
-	index_neuron = np.where(DBM.firerate_test[layer][:,neuron_number]>fire_thresh)[0]
-	if len(index_neuron)<4:
-		continue
 
+	subdata,label = get_neuron_subdata(neuron_number,DBM.firerate_test[layer],fire_thresh,False)
+	subdata_c,label_c = get_neuron_subdata(neuron_number,DBM.firerate_c[layer-1],fire_thresh,True)
+	subdata_nc,label_nc = get_neuron_subdata(neuron_number,DBM.firerate_nc[layer-1],fire_thresh,True)
+	try:
+		if label_c==None:
+			log.info("Skipped")
+			continue
+	except:
+		pass
+	hist_label_c    = np.histogram(label_c,bins=len(subspace))[0]
+	hist_label_nc   = np.histogram(label_nc,bins=len(subspace))[0]
 
-	subdata     = test_data[index_neuron]
-	sublabel    = test_label[index_neuron]
+	hist_diff[neuron]=np.mean(hist_label_nc - hist_label_c)
 
-	subdata_c   = test_data[index_for_number_gibbs[:]]
-	sublabel_c  = test_label[index_for_number_gibbs[:]]
-
-	subdata_nc  = test_data[index_neuroindex_for_number_gibbs[:]n]
-	sublabel_nc = test_label[index_neuron]
+	if np.abs(hist_diff[neuron])>20:
+		plt.figure()
+		plt.bar(subspace,hist_label_c,alpha=0.5,label="context")
+		plt.bar(subspace,hist_label_nc,alpha=0.5,label="no context")
+		plt.legend(loc="best")
 
 	mean_subdata = np.mean(subdata,0)
 
@@ -67,12 +110,6 @@ for neuron in range(len(neuron_number_)):
 	trans = pca.transform(subdata)
 	# kmeans.fit(subdata)
 	
-
-	label = []
-	for i in range(len(sublabel)):
-		where = np.where(sublabel[i]==1)[0][0]
-		label.append(where)
-	label = np.array(label).astype(np.float)
 
 
 	fig,ax = plt.subplots(1,5,figsize=(13,2.9))
@@ -104,13 +141,18 @@ for neuron in range(len(neuron_number_)):
 		ax[1].set_xticks([])
 		ax[1].set_yticks([])
 	else:
-		ax[1].set_title("")
-
+		ax[1].set_title("Firerates")
+		ax[1].bar(1,np.mean(DBM.firerate_test[layer][:,neuron_number]))
+		ax[1].bar(2,np.mean(DBM.firerate_c[layer-1][:,neuron_number]))
+		ax[1].bar(3,np.mean(DBM.firerate_nc[layer-1][:,neuron_number]))
+		ax[1].set_xticks([1,2,3])
+		ax[1].set_xticklabels(["Test","Context","No Context"],rotation=20)
 					### old k means plot 
 					# mapp2 = ax[1].matshow(kmeans.cluster_centers_[0].reshape(28,28))
 					# plt.colorbar(ax=ax[1], mappable=mapp2)
 					# ax[1].set_xticks([])
 					# ax[1].set_yticks([])
+
 
 
 	mapp3 = ax[2].scatter(trans[::2,0], trans[::2,1], c = label[::2],cmap=plt.cm.get_cmap('gist_rainbow', 10),alpha=0.5,vmin=0,vmax=9)
@@ -119,20 +161,31 @@ for neuron in range(len(neuron_number_)):
 	ax[2].set_ylabel("")
 	ax[2].set_xlabel("")
 
+
+
 	ax[3].set_title("Histogram of "+r"$V^{(s)}$")
-	ax[3].hist(label,bins=10,align="mid",lw=0.2,edgecolor="k")
+	
+	hist_label_test = np.histogram(label,bins=10)[0]
+
+
+	ax[3].bar(range(10),  hist_label_test, lw=0.2, edgecolor="k", alpha=0.7, label="Test")
+	ax[3].bar(subspace,  hist_label_c,    lw=0.2, edgecolor="k", alpha=0.5, width=0.6, label="Context")
+	ax[3].bar(subspace,  hist_label_nc,   lw=0.2, edgecolor="k", alpha=0.5, width=0.2, label="No Context")
 	ax[3].set_xticks(range(10))
 	ax[3].set_ylabel("N")
 	ax[3].set_xlabel("Class")
+	# ax[3].legend(loc="best")
 
-	aa[4].set_title("Weight strength")
+
+
+	ax[4].set_title("Weight strength")
 	ax[4].bar(range(10),DBM.w_np[-1][neuron_number,:])
 	ax[4].set_xticks(range(10))
 	# plt.savefig(str(neuron),dpi=250)
 	# mapp = ax[1,1].matshow(pca.components_[2].reshape(28,28))
 	# plt.colorbar(ax=ax[1,1], mappable=mapp)
 
-	plt.subplots_adjust(top=0.65, bottom = 0.17, wspace=0.4, left=0.04, right=0.97)
+	plt.subplots_adjust(top=0.65, bottom = 0.19, wspace=0.4, left=0.04, right=0.97)
 	            # wspace=None, hspace=None)
 
 
