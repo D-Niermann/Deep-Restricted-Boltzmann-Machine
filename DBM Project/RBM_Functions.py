@@ -31,7 +31,7 @@ def abs_norm_np(array,axis):
 
 def save_fig(path,save_to_file):
     if save_to_file:
-        return savefig(path,dpi=200)
+        return savefig(path, dpi=200)
     else:
         return None
 

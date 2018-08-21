@@ -1,7 +1,6 @@
 # -*- coding: utf-8 -*-
 #### Imports
 if True:
-	# -*- coding: utf-8 -*-
 	print ("Starting")
 
 	import matplotlib as mpl
@@ -64,10 +63,10 @@ if True:
 
 	log=Logger(True)
 
-from tensorflow.examples.tutorials.mnist import input_data
-time_now = time.asctime()
-time_now = time_now.replace(":", "-")
-time_now = time_now.replace(" ", "_")
+	from tensorflow.examples.tutorials.mnist import input_data
+	time_now = time.asctime()
+	time_now = time_now.replace(":", "-")
+	time_now = time_now.replace(" ", "_")
 
 #### Load T Data
 LOAD_MNIST = 1
@@ -79,7 +78,7 @@ if "train_data" not in globals():
 		train_data, train_label, test_data, test_label = mnist.train.images, mnist.train.labels, mnist.test.images, mnist.test.labels
 
 
-		#get test data of only one number class:
+		# get test data of only one number class:
 		index_for_number_test  = np.zeros([10,1200])
 		where = np.zeros(10).astype(np.int)
 		index_for_number_train = []
@@ -139,9 +138,9 @@ if "train_data" not in globals():
 			else:
 				log.info("Skipped %s"%f)
 
-#### Get the arguments list from terminal
-additional_args=sys.argv[1:]
 
+#### Get the arguments list from terminal
+additional_args = sys.argv[1:]
 
 
 ################################################################################################################################################
@@ -150,7 +149,7 @@ class RBM(object):
 	""" defines a 2 layer restricted boltzmann machine - first layer = input, second
 	layer = output. Training with contrastive divergence """
 
-	def __init__(self,vu,hu,forw_mult,back_mult,learnrate,liveplot=0):
+	def __init__(self,vu,hu,forw_mult,back_mult,learnrate,liveplot,temp):
 		#### User Variables
 
 		self.hidden_units  = hu
@@ -178,7 +177,7 @@ class RBM(object):
 
 
 		# get the probabilities of the hidden units in w
-		self.h_prob  = sigmoid(tf.matmul(self.v,self.forw_mult*self.w) + self.bias_h,temp)
+		self.h_prob  = sigmoid(tf.matmul(self.v,self.forw_mult*self.w) + self.bias_h, temp)
 		# h has shape [number of images per batch, number of hidden units]
 		# get the actual activations for h {0,1}
 		# self.h       = tf.nn.relu(
@@ -240,41 +239,69 @@ class RBM(object):
 		self.w_i, self.error_i = sess.run([self.update_w,self.error],feed_dict={self.v:self.my_input_data})
 		sess.run([self.update_bias_h,self.update_bias_v],feed_dict={self.v:self.my_input_data})
 
-		return self.w_i,self.error_i
-
-
 
 ################################################################################################################################################
 ### Class Deep BM
 class DBM_class(object):
-	"""defines a deep boltzmann machine
 	"""
-	def __init__(self,shape,liveplot,classification):
+	defines a deep boltkzmann machine.
+	"""
+	def __init__(self,shape, liveplot, classification, UserSettings):
+
+		### load UserSettings into self
+		for key in UserSettings:
+			self.__dict__[key] = UserSettings[key]
+
+
+		### "global" state vars
+		# temperature of DBM
+		self.temp          = self.TEMP_START;
+		# learnrate of DBM
+		self.learnrate     = self.LEARNRATE_START;	
+		# how many freerun steps in train
+		self.freerun_steps = self.N_FREERUN_START;
+
+
 		self.n_layers       = len(shape)
-		self.liveplot       = liveplot # if true will open a lifeplot of the weight matrix
-		self.SHAPE          = shape  # contains the number of  neurons in a list from v layer to h1 to h2
-		self.classification = classification #weather the machine uses a label layer
+		# if true will open a lifeplot of the weight matrix
+		self.liveplot       = liveplot
+		# contains the number of  neurons in a list from v layer to h1 to h2
+		self.SHAPE          = shape 
+		# weather the machine uses a label layer
+		self.classification = classification
 
+		# weather or not the graph init function was called
 		self.init_state     = 0
+		# if export function was called or not
 		self.exported       = 0
+		# if tested function was called or not (while training)
 		self.tested         = 0
-		self.l_mean         = np.zeros([self.n_layers])
+		# counts train time in seconds
+		self.train_time     = 0	
+		# epoch counter
+		self.epochs         = 0	
+		# update counter
+		self.update         = 0 	
+		# offset for the update param if loaded from file (used in get temp function)
+		self.update_off     = 0	
 
-		# self.n_particles = 0; # not in use
-
-		self.train_time            = 0	# counts train time in seconds
-		self.epochs                = 0	# epoch counter
-		self.update                = 0 	# update counter
-		self.update_off            = 0	# offset for the update param if loaded from file (used in get temp function)
-		self.updates               = np.arange(0,N_BATCHES_TRAIN*N_EPOCHS_TRAIN,10)	# save update
-		self.recon_error_train     = np.zeros([N_BATCHES_TRAIN*N_EPOCHS_TRAIN//10])	# save reconstructon error for every batch
-		self.class_error_train     = np.zeros([N_BATCHES_TRAIN*N_EPOCHS_TRAIN//10])	# -"- train error -"-
-		self.layer_diversity_train = np.zeros([N_BATCHES_TRAIN*N_EPOCHS_TRAIN//10, self.n_layers])	# save layer variance across batch for every batch in train function
-		self.layer_act_train       = np.zeros([N_BATCHES_TRAIN*N_EPOCHS_TRAIN//10, self.n_layers])	# save how many units are active across one layer in % for every batch
-
-		self.freerun_diff_train    = np.zeros([N_BATCHES_TRAIN*N_EPOCHS_TRAIN//10, self.n_layers])
-
-
+		#### arrays to store train and test results
+		# save update
+		self.updates               = np.arange(0,self.N_BATCHES_TRAIN*self.N_EPOCHS_TRAIN,10)	
+		# save reconstructon error for every batch
+		self.recon_error_train     = np.zeros([self.N_BATCHES_TRAIN*self.N_EPOCHS_TRAIN//10])	
+		# -"- train error -"-
+		self.class_error_train     = np.zeros([self.N_BATCHES_TRAIN*self.N_EPOCHS_TRAIN//10])	
+		# save layer variance across batch for every batch in train function
+		self.layer_diversity_train = np.zeros([self.N_BATCHES_TRAIN*self.N_EPOCHS_TRAIN//10, self.n_layers])	
+		# save how many units are active across one layer in % for every batch
+		self.layer_act_train       = np.zeros([self.N_BATCHES_TRAIN*self.N_EPOCHS_TRAIN//10, self.n_layers])	
+		# save how diffrerent the freerun vs the clamp run while training is
+		self.freerun_diff_train    = np.zeros([self.N_BATCHES_TRAIN*self.N_EPOCHS_TRAIN//10, self.n_layers])
+		# layer activities while training (does not get plottet)
+		self.l_mean                = np.zeros([self.n_layers])
+		# not used
+		# self.n_particles = 0; 
 		### save dictionary where time series data from test and train is stored
 		self.save_dict ={	"Test_Epoch":    [],
 							"Train_Epoch":   [],
@@ -294,45 +321,33 @@ class DBM_class(object):
 			self.save_dict["Layer_Activity_%i"%i] = []
 			self.save_dict["Layer_Diversity_%i"%i] = []
 
-		### log list where all constants are saved
-		self.log_list =	[["SHAPE",                self.SHAPE],
-						["N_EPOCHS_PRETRAIN",     N_EPOCHS_PRETRAIN],
-						["N_BATCHES_PRETRAIN",    N_BATCHES_PRETRAIN],
-						["N_BATCHES_TRAIN",       N_BATCHES_TRAIN],
-						["LEARNRATE_PRETRAIN",    LEARNRATE_PRETRAIN],
-						["LEARNRATE_START",       LEARNRATE_START],
-						["LEARNRATE_SLOPE",       LEARNRATE_SLOPE],
-						["TEMP_START",            TEMP_START],
-						["TEMP_SLOPE",            TEMP_SLOPE],
-						["PATHSUFFIX_PRETRAINED", PATHSUFFIX_PRETRAINED],
-						["PATHSUFFIX",            PATHSUFFIX],
-						["DO_LOAD_FROM_FILE",      DO_LOAD_FROM_FILE],
-						["TEST_EVERY_EPOCH",      TEST_EVERY_EPOCH],
-						["USE_DROPOUT",			  USE_DROPOUT],
-						["DROPOUT_RATE", 		  DROPOUT_RATE],
-						["DO_NORM_W", 			  DO_NORM_W],
-						]## append variables that change during training in the write_to_file function
 
+
+		### log list where all constants are saved
+		## append variables that change during training in the write_to_file function
+		self.log_list =	UserSettings
+
+
+		## setting random seed 
+		
+		# tf.set_random_seed(self.SEED)
 
 		log.out("Creating RBMs")
 		self.RBMs    = [None]*(self.n_layers-1)
 		for i in range(len(self.RBMs)):
 			if i == 0 and len(self.RBMs)>1:
-				self.RBMs[i] = RBM(self.SHAPE[i],self.SHAPE[i+1], forw_mult= 1, back_mult = 1, learnrate = LEARNRATE_PRETRAIN, liveplot=0)
+				self.RBMs[i] = RBM(self.SHAPE[i],self.SHAPE[i+1], forw_mult= 1, back_mult = 1, learnrate = self.LEARNRATE_PRETRAIN, liveplot=0, temp = self.temp)
 				log.out("2,1")
 			elif i==len(self.RBMs)-1 and len(self.RBMs)>1:
-				self.RBMs[i] = RBM(self.SHAPE[i],self.SHAPE[i+1], forw_mult= 1, back_mult = 1, learnrate = LEARNRATE_PRETRAIN, liveplot=0)
+				self.RBMs[i] = RBM(self.SHAPE[i],self.SHAPE[i+1], forw_mult= 1, back_mult = 1, learnrate = self.LEARNRATE_PRETRAIN, liveplot=0, temp = self.temp)
 				log.out("1,2")
 			else:
 				if len(self.RBMs) == 1:
-					self.RBMs[i] = RBM(self.SHAPE[i],self.SHAPE[i+1], forw_mult= 1, back_mult = 1, learnrate = LEARNRATE_PRETRAIN, liveplot=0)
+					self.RBMs[i] = RBM(self.SHAPE[i],self.SHAPE[i+1], forw_mult= 1, back_mult = 1, learnrate = self.LEARNRATE_PRETRAIN, liveplot=0, temp = self.temp)
 					log.out("1,1")
 				else:
-					self.RBMs[i] = RBM(self.SHAPE[i],self.SHAPE[i+1], forw_mult= 1, back_mult = 1, learnrate = LEARNRATE_PRETRAIN, liveplot=0)
+					self.RBMs[i] = RBM(self.SHAPE[i],self.SHAPE[i+1], forw_mult= 1, back_mult = 1, learnrate = self.LEARNRATE_PRETRAIN, liveplot=0, temp = self.temp)
 					log.out("2,2")
-
-		# self.RBMs[1] = RBM(self.SHAPE[1],self.SHAPE[2], forw_mult= 1, back_mult = 1, learnrate = LEARNRATE_PRETRAIN, liveplot=0)
-		# self.RBMs[2] = RBM(self.SHAPE[2],self.SHAPE[3], forw_mult= 1, back_mult = 1, learnrate = LEARNRATE_PRETRAIN, liveplot=0)
 
 	def pretrain(self):
 		""" this function will pretrain the RBMs and define a self.weights list where every
@@ -340,14 +355,14 @@ class DBM_class(object):
 		to be loaded into the DBM for further training.
 		"""
 
-		if DO_PRETRAINING:
+		if self.DO_PRETRAINING:
 			for rbm in self.RBMs:
 				if rbm.liveplot:
 					log.info("Liveplot is open!")
 					fig,ax=plt.subplots(1,1,figsize=(15,10))
 					break
 
-		batchsize_pretrain = int(len(train_data)/N_BATCHES_PRETRAIN)
+		batchsize_pretrain = int(len(train_data)/self.N_BATCHES_PRETRAIN)
 
 		with tf.Session() as sess:
 			# train session - v has batchsize length
@@ -355,16 +370,16 @@ class DBM_class(object):
 
 
 			#iterate through the RBMs , each iteration is a RBM
-			if DO_PRETRAINING:
+			if self.DO_PRETRAINING:
 				sess.run(tf.global_variables_initializer())
 
 				for RBM_i, RBM in enumerate(self.RBMs):
 					log.start("Pretraining ",str(RBM_i+1)+".", "RBM")
 
 
-					for epoch in range(N_EPOCHS_PRETRAIN[RBM_i]):
+					for epoch in range(self.N_EPOCHS_PRETRAIN[RBM_i]):
 
-						log.start("Epoch:",epoch+1,"/",N_EPOCHS_PRETRAIN[RBM_i])
+						log.start("Epoch:",epoch+1,"/",self.N_EPOCHS_PRETRAIN[RBM_i])
 
 						for start, end in zip( range(0, len(train_data), batchsize_pretrain), range(batchsize_pretrain, len(train_data), batchsize_pretrain)):
 							#### define a batch
@@ -380,7 +395,7 @@ class DBM_class(object):
 								plt.pause(0.00001)
 
 
-						log.info("Learnrate:",round(LEARNRATE_PRETRAIN,4))
+						log.info("Learnrate:",round(self.LEARNRATE_PRETRAIN,4))
 						log.info("error",round(error_i,4))
 						log.end() #ending the epoch
 
@@ -394,24 +409,24 @@ class DBM_class(object):
 				for i in range(len(self.RBMs)):
 					self.weights.append(self.RBMs[i].w.eval())
 
-				if DO_SAVE_PRETRAINED:
+				if self.DO_SAVE_PRETRAINED:
 					for i in range(len(self.weights)):
 						np.savetxt(workdir+"/pretrain_data/"+"Pretrained-"+" %i "%i+str(time_now)+".txt", self.weights[i])
 					log.out("Saved Pretrained under "+str(time_now))
 			else:
-				if not DO_LOAD_FROM_FILE:
+				if not self.DO_LOAD_FROM_FILE:
 					### load the pretrained weights
 					self.weights=[]
 					log.out("Loading Pretrained from file")
 					for i in range(self.n_layers-1):
-						self.weights.append(np.loadtxt(workdir+"/pretrain_data/"+"Pretrained-"+" %i "%i+PATHSUFFIX_PRETRAINED+".txt").astype(np.float32))
+						self.weights.append(np.loadtxt(workdir+"/pretrain_data/"+"Pretrained-"+" %i "%i+self.PATHSUFFIX_PRETRAINED+".txt").astype(np.float32))
 				else:
 					### if loading from file is active the pretrained weights would get
 					### reloaded anyway so directly load them here
 					self.weights=[]
 					log.out("Loading from file")
 					for i in range(self.n_layers-1):
-						self.weights.append(np.loadtxt(data_dir+"/"+PATHSUFFIX+"/"+"w%i.txt"%(i)).astype(np.float32))
+						self.weights.append(np.loadtxt(data_dir+"/"+self.PATHSUFFIX+"/"+"w%i.txt"%(i)).astype(np.float32))
 			log.end()
 			log.reset()
 
@@ -435,11 +450,10 @@ class DBM_class(object):
 			log_dict[key] = value
 		return log_dict
 
-	def load_from_file(self,path,override_params=0):
+	def load_from_file(self, path, override_params=0):
 		""" loads weights and biases from folder and sets
 		variables like learnrate and temperature to the values
 		that were used in the last epoch"""
-		global learnrate, temp, freerun_steps
 		os.chdir(path)
 		log.out("Loading data from:","...",path[-20:])
 
@@ -470,10 +484,10 @@ class DBM_class(object):
 			n_ = sd["Freerun_Steps"].values[[sd["Freerun_Steps"].notnull()]]
 			train_epoch_ = sd["Train_Epoch"].values[[sd["Train_Epoch"].notnull()]]
 
-			freerun_steps = n_[-1]
-			temp          = t_[-1]
-			learnrate     = l_
-			self.epochs   = train_epoch_[-1]
+			self.freerun_steps = n_[-1]
+			self.temp          = t_[-1]
+			self.learnrate     = l_
+			self.epochs        = train_epoch_[-1]
 
 			try:
 				self.update_off = log_dict["Update"]
@@ -482,9 +496,9 @@ class DBM_class(object):
 
 
 			log.info("Epoch = ",self.epochs)
-			log.info("l = ",learnrate)
-			log.info("T = ",round(temp,5))
-			log.info("N = ",freerun_steps)
+			log.info("l = ",self.learnrate)
+			log.info("T = ",round(self.temp,5))
+			log.info("N = ",self.freerun_steps)
 			# except:
 			# 	log.error("Error overriding: Could not find save_dict.csv")
 		os.chdir(workdir)
@@ -505,20 +519,20 @@ class DBM_class(object):
 		"""
 		if layer_i == 0:
 			w = self.w[layer_i];
-			if USE_DROPOUT:
+			if self.USE_DROPOUT:
 				w *= self.dropout_matrix[layer_i]
 			_input_ = sigmoid(tf.matmul(self.layer[layer_i+1], w,transpose_b=True) + self.bias[layer_i], self.temp_tf)
 
 		elif layer_i == self.n_layers-1:
 			w = self.w[layer_i-1];
-			if USE_DROPOUT:
+			if self.USE_DROPOUT:
 				w *= self.dropout_matrix[layer_i-1]
 			_input_ = sigmoid(tf.matmul(self.layer[layer_i-1],w) + self.bias[layer_i], self.temp_tf)
 
 		else:
 			w0 = self.w[layer_i-1];
 			w1 = self.w[layer_i];
-			if USE_DROPOUT:
+			if self.USE_DROPOUT:
 				w0 *= self.dropout_matrix[layer_i-1]
 				w1 *= self.dropout_matrix[layer_i]
 			_input_ = sigmoid(tf.matmul(self.layer[layer_i-1],w0)
@@ -537,7 +551,7 @@ class DBM_class(object):
 		# return tf.cast(x > tf.random_uniform(tf.shape(x)),tf.float32)
 		return	tf.nn.relu(
 					tf.sign(
-						x - tf.random_uniform(tf.shape(x), seed = SEED)
+						x - tf.random_uniform(tf.shape(x), seed = self.SEED)
 					)
 				)
 
@@ -590,7 +604,7 @@ class DBM_class(object):
 
 		# return layer
 
-	def get_learnrate(self,epoch,a,y_off):
+	def get_learnrate(self, epoch, a, y_off):
 		""" calculate the learnrate dependend on parameters
 		epoch :: current epoch
 		a :: slope
@@ -601,7 +615,7 @@ class DBM_class(object):
 			L[i] = a / (float(a)/y_off[i]+epoch)
 		return L
 
-	def get_temp(self,update,a,y_off, t_min):
+	def get_temp(self, update, a, y_off,  t_min):
 		""" calculate the Temperature dependend on parameters
 		update :: current update
 		a :: slope
@@ -624,9 +638,9 @@ class DBM_class(object):
 		if mode=="training":
 			# append all data to save_dict
 			self.save_dict["Train_Epoch"].append(self.epochs)
-			self.save_dict["Temperature"].append(temp)
-			self.save_dict["Learnrate"].append(learnrate)
-			self.save_dict["Freerun_Steps"].append(freerun_steps)
+			self.save_dict["Temperature"].append(self.temp)
+			self.save_dict["Learnrate"].append(self.learnrate)
+			self.save_dict["Freerun_Steps"].append(self.freerun_steps)
 
 			for i in range(self.n_layers-1):
 				w_mean = sess.run(self.len_w[i])
@@ -678,7 +692,7 @@ class DBM_class(object):
 			hist_input[i][1].append(right_input)
 		return hist_input
 
-	def graph_init(self,graph_mode):
+	def graph_init(self, graph_mode):
 		""" sets the graph up and loads the pretrained weights in , these are given
 		at class definition
 		graph_mode  :: "training" if the graph is used in training - this will define more variables that are used in training - is slower
@@ -688,7 +702,7 @@ class DBM_class(object):
 
 
 		if graph_mode=="training":
-			self.learnrate = tf.placeholder(tf.float32,[self.n_layers-1],name="Learnrate")
+			self.learnrate_tf = tf.placeholder(tf.float32,[self.n_layers-1],name="Learnrate")
 
 		#### temperature
 		self.temp_tf = tf.placeholder(tf.float32, [], name="Temperature")
@@ -742,8 +756,8 @@ class DBM_class(object):
 
 		### layer vars
 		for i in range(len(self.layer)):
-			self.layer[i]      = tf.Variable(tf.random_uniform([self.batchsize,self.SHAPE[i]], minval=-1e-3, maxval=1e-3, seed = SEED), name="Layer_%i"%i)
-			self.layer_save[i] = tf.Variable(tf.random_uniform([self.batchsize,self.SHAPE[i]], minval=-1e-3, maxval=1e-3, seed = SEED), name="Layer_save_%i"%i)
+			self.layer[i]      = tf.Variable(tf.random_uniform([self.batchsize,self.SHAPE[i]], minval=-1e-3, maxval=1e-3, seed = self.SEED), name="Layer_%i"%i)
+			self.layer_save[i] = tf.Variable(tf.random_uniform([self.batchsize,self.SHAPE[i]], minval=-1e-3, maxval=1e-3, seed = self.SEED), name="Layer_save_%i"%i)
 			# self.layer_particles[i] = tf.Variable(tf.zeros([self.batchsize,self.SHAPE[i]]),name="Layer_particle_%i"%i)
 			self.layer_ph[i]   = tf.placeholder(tf.float32, [self.batchsize,self.SHAPE[i]], name="layer_%i_PH"%i)
 
@@ -758,7 +772,7 @@ class DBM_class(object):
 				self.update_neg_grad[i] = self.neg_grad[i].assign(tf.matmul(self.layer[i], self.layer[i+1], transpose_a=True))
 				self.CD[i]              = self.pos_grad[i] - self.neg_grad[i]
 				self.CD_abs_mean[i]     = tf.reduce_mean(tf.abs(self.CD[i]))
-				self.update_w[i]        = self.w[i].assign_add(self.learnrate[i]*temp/self.batchsize*self.CD[i]-lambda_learn)
+				self.update_w[i]        = self.w[i].assign_add(self.learnrate[i]*self.temp/self.batchsize*self.CD[i])
 				self.w_mean_[i]         = tf.Variable(tf.zeros([N_EPOCHS_TRAIN]))
 				self.len_w[i]          = tf.sqrt(tf.reduce_sum(tf.square(self.w[i])))
 
@@ -766,16 +780,16 @@ class DBM_class(object):
 				self.do_norm_w[i] = self.w[i].assign(self.w[i]/self.len_w[i])
 
 				# droprate is constant- used for training
-				self.dropout_matrix[i]  = tf.round(tf.clip_by_value(tf.random_uniform(tf.shape(self.w[i]), seed = SEED)*DROPOUT_RATE,0,1))
+				self.dropout_matrix[i]  = tf.round(tf.clip_by_value(tf.random_uniform(tf.shape(self.w[i]), seed = self.SEED)*DROPOUT_RATE,0,1))
 			else:
 				# droprate is variable and can be decreased over time
-				self.dropout_matrix[i] = tf.round(tf.clip_by_value(tf.random_uniform(tf.shape(self.w[i]), seed = SEED)*self.droprate_tf,0,1))
+				self.dropout_matrix[i] = tf.round(tf.clip_by_value(tf.random_uniform(tf.shape(self.w[i]), seed = self.SEED)*self.droprate_tf,0,1))
 
 		### bias calculations and assignments
 		for i in range(len(self.bias)):
 			self.bias[i] = tf.Variable(tf.zeros([self.SHAPE[i]]),name="Bias%i"%i)
 			if graph_mode == "training":
-				self.update_bias[i] = self.bias[i].assign_add(self.learnrate[0]*temp*tf.reduce_mean(tf.subtract(self.layer_save[i],self.layer[i]),0)-lambda_learn)
+				self.update_bias[i] = self.bias[i].assign_add(self.learnrate[0]*self.temp*tf.reduce_mean(tf.subtract(self.layer_save[i],self.layer[i]),0))
 				self.mean_bias[i]   = tf.sqrt(tf.reduce_sum(tf.square(self.bias[i])))
 				bias_len            = abs_norm(self.bias[i],0)
 
@@ -824,10 +838,10 @@ class DBM_class(object):
 		sess.run(tf.global_variables_initializer())
 		self.init_state = 1
 
-	def test_noise_stability(self,input_data,input_label,steps):
+	def test_noise_stability(self, input_data, input_label, steps):
 		self.batchsize=len(input_data)
-		if DO_LOAD_FROM_FILE:
-			self.load_from_file(workdir+"/data/"+PATHSUFFIX)
+		if self.DO_LOAD_FROM_FILE:
+			self.load_from_file(workdir+"/data/"+self.PATHSUFFIX)
 		self.graph_init("testing")
 		self.import_()
 
@@ -840,23 +854,22 @@ class DBM_class(object):
 		v_noise = sample_np(v_noise)
 
 		sess.run(self.assign_l[0] , {self.layer_ph[0] : v_noise})
-		sess.run(self.update_l_p[1], {self.temp_tf : temp})
-		sess.run(self.update_l_p[2], {self.temp_tf : temp})
+		sess.run(self.update_l_p[1], {self.temp_tf : self.temp})
+		sess.run(self.update_l_p[2], {self.temp_tf : self.temp})
 
 		for i in range(steps):
 
-			layer = sess.run(self.update_l_s, {self.temp_tf : temp})
+			layer = sess.run(self.update_l_s, {self.temp_tf : self.temp})
 
 
 			if self.classification:
 				h2_.append(layer[-1])
 
 
-		v_noise_recon = sess.run(self.update_l_p[0], {self.temp_tf : temp})
+		v_noise_recon = sess.run(self.update_l_p[0], {self.temp_tf : self.temp})
 		return np.array(h2_),v_noise_recon,v_noise
 
-	def train(self,train_data,train_label,num_batches,cont):
-		global learnrate, temp, freerun_steps
+	def train(self, train_data, train_label, num_batches, cont):
 		""" training the DBM with given h2 as labels and v as input images
 		train_data  :: images
 		train_label :: corresponding label
@@ -880,9 +893,9 @@ class DBM_class(object):
 		# self.F=[]
 		# self.F_test=[]
 
-		if DO_LOAD_FROM_FILE and not cont:
+		if self.DO_LOAD_FROM_FILE and not cont:
 			# load data from the file
-			self.load_from_file(workdir+"/data/"+PATHSUFFIX,override_params=1)
+			self.load_from_file(workdir+"/data/"+self.PATHSUFFIX,override_params=1)
 			self.graph_init("training")
 			self.import_()
 
@@ -945,12 +958,12 @@ class DBM_class(object):
 			# calc hidden layer samples (not the visible & label layer)
 			for hidden in range(M):
 				if self.classification:
-					sess.run(self.update_l_s[1:-1],{self.temp_tf : temp})#self.glauber_step(clamp="v+l",temp=temp) #sess.run(self.update_l_s[1:-1],{self.temp_tf : temp})
+					sess.run(self.update_l_s[1:-1],{self.temp_tf : self.temp})#self.glauber_step(clamp="v+l",self.temp=self.temp) #sess.run(self.update_l_s[1:-1],{self.temp_tf : self.temp})
 				else:
-					sess.run(self.update_l_s[1:],{self.temp_tf : temp})#self.glauber_step(clamp="v",temp=temp) #sess.run(self.update_l_s[1:],{self.temp_tf : temp})
+					sess.run(self.update_l_s[1:],{self.temp_tf : self.temp})#self.glauber_step(clamp="v",self.temp=self.temp) #sess.run(self.update_l_s[1:],{self.temp_tf : self.temp})
 
 			# last run calc only the probs to reduce noise
-			sess.run(self.update_l_p[1:-1],{self.temp_tf : temp})
+			sess.run(self.update_l_p[1:-1],{self.temp_tf : self.temp})
 			# save all layer for bias update
 			sess.run(self.assign_save_layer)
 			# update the positive gradients
@@ -968,13 +981,13 @@ class DBM_class(object):
 					# 		sess.run(self.assign_l[i+1], {self.layer_ph[i+1]   : ls_[i]})
 					# 	sess.run(self.assign_l[-1],{self.layer_ph[-1]  : batch_label})
 
-			for n in range(freerun_steps):
-				sess.run(self.update_l_s,{self.temp_tf : temp})#self.glauber_step(clamp = "None",temp=temp) #sess.run(self.update_l_s,{self.temp_tf : temp})
+			for n in range(self.freerun_steps):
+				sess.run(self.update_l_s,{self.temp_tf : self.temp})#self.glauber_step(clamp = "None",self.temp=self.temp) #sess.run(self.update_l_s,{self.temp_tf : self.temp})
 
 
 
 			# calc probs for noise cancel
-			sess.run(self.update_l_p,{self.temp_tf : temp})
+			sess.run(self.update_l_p,{self.temp_tf : self.temp})
 			# sess.run(self.update_particles)
 
 
@@ -983,11 +996,11 @@ class DBM_class(object):
 
 
 			#### run all parameter updates
-			sess.run([self.update_w, self.update_bias], {self.learnrate : learnrate})
+			sess.run([self.update_w, self.update_bias], {self.learnrate_tf : self.learnrate})
 
 
 			#### norm the weights
-			if DO_NORM_W:
+			if self.DO_NORM_W:
 				## simple method
 				for i in range(self.n_layers):
 					# weights
@@ -1021,7 +1034,7 @@ class DBM_class(object):
 			## update parameters
 			self.update += 1
 
-			temp = self.get_temp(self.update+self.update_off, TEMP_SLOPE, TEMP_START, TEMP_MIN)
+			self.temp = self.get_temp(self.update+self.update_off, TEMP_SLOPE, TEMP_START, TEMP_MIN)
 
 			### liveplot
 			if self.liveplot and plt.fignum_exists(fig.number) and start%40==0:
@@ -1059,17 +1072,17 @@ class DBM_class(object):
 		# increase epoch counter
 		self.epochs += 1
 
-		# change learnrate
-		log.info("Learnrate: ",np.round(learnrate,6))
-		learnrate = self.get_learnrate(self.epochs, LEARNRATE_SLOPE, LEARNRATE_START)
+		# change self.learnrate
+		log.info("Learnrate: ",np.round(self.learnrate,6))
+		self.learnrate = self.get_learnrate(self.epochs, self.LEARNRATE_SLOPE, self.LEARNRATE_START)
 
-		# print temp
-		log.info("Temp: ",np.round(temp,5))
-			# learnrate change is inside batch loop
+		# print self.temp
+		log.info("Temp: ",np.round(self.temp,5))
+			# self.temp change is inside batch loop
 
 		# change freerun_steps
-		log.info("freerun_steps: ",freerun_steps)
-		freerun_steps = self.get_N(self.epochs)
+		log.info("freerun_steps: ",self.freerun_steps)
+		self.freerun_steps = self.get_N(self.epochs)
 
 		# average layer activities over epochs
 		self.l_mean *= 1.0/num_batches
@@ -1087,10 +1100,9 @@ class DBM_class(object):
 
 		"""
 
-
 		### init the vars and reset the weights and biases
 		self.batchsize       = len(my_test_data)
-		self.learnrate       = LEARNRATE_START
+		self.learnrate       = self.LEARNRATE_START
 
 		layer_save_test = [[None] for i in range(self.n_layers)]   # save layers while N hidden updates
 		for layer in range(len(layer_save_test)):
@@ -1098,14 +1110,14 @@ class DBM_class(object):
 		self.layer_act_test  = np.zeros([N,self.n_layers])  # layer activities while N hidden updates
 
 		#temp decrease
-		temp                 = temp_start
-		temp_delta           = (temp_end-temp_start)/float(N)
+		mytemp                 = temp_start
+		temp_delta             = (temp_end-temp_start)/float(N)
 
 		droprate = 100 # 100 => basically no dropout
 
 		### init the graph
-		if DO_LOAD_FROM_FILE and not DO_TRAINING:
-			self.load_from_file(workdir+"/data/"+PATHSUFFIX,override_params=1)
+		if self.DO_LOAD_FROM_FILE and not self.DO_TRAINING:
+			self.load_from_file(workdir+"/data/"+self.PATHSUFFIX,override_params=1)
 		self.graph_init("testing") # "testing" because this graph creates the testing variables where only v is given, not h2
 		self.import_()
 
@@ -1118,17 +1130,17 @@ class DBM_class(object):
 			log.info("Using test data")
 
 		# give input to v layer
-		sess.run(self.assign_l[0], {self.layer_ph[0] : my_test_data, self.temp_tf : temp})
+		sess.run(self.assign_l[0], {self.layer_ph[0] : my_test_data, self.temp_tf : mytemp})
 
 		# update hidden and label N times
 		log.start("Sampling hidden %i times "%N)
 		log.info("temp: %f -> %f"%(np.round(temp_start,5),np.round(temp_end,5)))
 		# make N clamped updates
 		for n in range(N):
-			self.layer_act_test[n,:] = sess.run(self.layer_activities, {self.temp_tf : temp})
-			self.glauber_step("visible", temp, droprate, layer_save_test, n) # sess.run(self.update_l_s[1:], {self.temp_tf : temp})
-			# increment temp
-			temp+=temp_delta
+			self.layer_act_test[n,:] = sess.run(self.layer_activities, {self.temp_tf : mytemp})
+			self.glauber_step("visible", mytemp, droprate, layer_save_test, n) # sess.run(self.update_l_s[1:], {self.mytemp_tf : mytemp})
+			# increment mytemp
+			mytemp+=temp_delta
 
 		# calc layer variance across batch
 		self.layer_diversity_test = sess.run(self.layer_diversity)
@@ -1139,7 +1151,7 @@ class DBM_class(object):
 		log.end()
 
 		## get firerates of every unit
-		self.firerate_test = sess.run(self.update_l_p, {self.temp_tf : temp, self.droprate_tf : droprate})
+		self.firerate_test = sess.run(self.update_l_p, {self.temp_tf : mytemp, self.droprate_tf : droprate})
 		# were firerates are around 0.1
 		self.neuron_good_test_firerate_ind=[None]*DBM.n_layers
 		for l in range(1,DBM.n_layers-1):
@@ -1159,7 +1171,7 @@ class DBM_class(object):
 		self.last_layer_save = layer_save_test[-1][-1]
 
 		for i in range(N):
-			layer_save_test[0][i] = sess.run(self.update_l_s[0],{self.temp_tf : temp, self.droprate_tf: droprate})
+			layer_save_test[0][i] = sess.run(self.update_l_s[0],{self.temp_tf : mytemp, self.droprate_tf: droprate})
 
 
 
@@ -1511,7 +1523,7 @@ class DBM_class(object):
 		log.info("Saved Weights and Biases as NumPy Arrays.")
 
 	def backup_params(self):
-		if DO_TRAINING:
+		if self.DO_TRAINING:
 			new_path = saveto_path+"/Backups/Backup_%i-Error_%f"%(self.epochs,np.round(self.class_error_test, 3))
 			if not os.path.isdir(new_path):
 				os.makedirs(new_path)
@@ -1538,125 +1550,88 @@ class DBM_class(object):
 		os.chdir(workdir)
 
 	def write_to_file(self):
-		new_path = saveto_path
-		if not os.path.isdir(saveto_path):
-			os.makedirs(new_path)
-		os.chdir(new_path)
+			new_path = saveto_path
+			if not os.path.isdir(saveto_path):
+				os.makedirs(new_path)
+			os.chdir(new_path)
 
-		if DO_TRAINING:
-			if self.exported!=1:
-				self.export()
+			if self.DO_TRAINING:
+				if self.exported!=1:
+					self.export()
 
-			# save weights
-			for i in range(self.n_layers-1):
-				np.savetxt("w%i.txt"%i, self.w_np[i])
+				# save weights
+				for i in range(self.n_layers-1):
+					np.savetxt("w%i.txt"%i, self.w_np[i])
 
-			##  save bias
-			for i in range(self.n_layers):
-				np.savetxt("bias%i.txt"%i, self.bias_np[i])
+				##  save bias
+				for i in range(self.n_layers):
+					np.savetxt("bias%i.txt"%i, self.bias_np[i])
 
-			## save save_dict
-			try:
-				save_df = DataFrame(dict([ (k,Series(v)) for k,v in self.save_dict.iteritems() ]))
-			except:
-				log.out("using dataframe items conversion for python 3.x")
-				save_df = DataFrame(dict([ (k,Series(v)) for k,v in self.save_dict.items() ]))
-			save_df.to_csv("save_dict.csv")
-
-
-		## save log
-		self.log_list.append(["train_time",self.train_time])
-		self.log_list.append(["Epochs",self.epochs])
-
-		## logfile
-		with open("logfile.txt","w") as log_file:
-				for i in range(len(self.log_list)):
-					log_file.write(self.log_list[i][0]+","+str(self.log_list[i][1])+"\n")
-				log_file.write("Update"+","+str(self.update)+"\n")
+				## save save_dict
+				try:
+					save_df = DataFrame(dict([ (k,Series(v)) for k,v in self.save_dict.iteritems() ]))
+				except:
+					log.out("using dataframe items conversion for python 3.x")
+					save_df = DataFrame(dict([ (k,Series(v)) for k,v in self.save_dict.items() ]))
+				save_df.to_csv("save_dict.csv")
 
 
-		log.info("Saved data and log to:",new_path)
-		os.chdir(workdir)
+			## save log
+			self.log_list["Train_Time"] = self.train_time
+			self.log_list["Epochs"]     = self.epochs
+			self.log_list["Update"]     = self.update
+			## wrte to file
+			with open("logfile.txt","w") as log_file:
+					for key in self.log_list:
+						log_file.write(key+","+str(self.log_list[key])+"\n")
+					
+
+
+			log.info("Saved data and log to:", new_path)
+			os.chdir(workdir)
+
+
+################################################################################################################################################
+### Class Extra Unit DBM
+class DBM_extra_class(DBM_class):
+
+	def __init__ (self,shape, liveplot, classification, UserSettings):
+		super(DBM_extra_class, self).__init__(shape, liveplot, classification, UserSettings)
+
+
+	def graph_init(self):
+		pass
+
 
 
 ###########################################################################################################
 #### User Settings ###
-
-N_BATCHES_PRETRAIN = 500 				# how many batches per epoch for pretraining
-N_BATCHES_TRAIN    = 500 				# how many batches per epoch for complete DBM training
-N_EPOCHS_PRETRAIN  = [30,30,30,0,0,0] 	# pretrain epochs for each RBM
-N_EPOCHS_TRAIN     = 100  				# how often to iter through the test images
-TEST_EVERY_EPOCH   = 10 				# how many epochs to train before testing on the test data
-
-### learnrates
-LEARNRATE_PRETRAIN = 0.001				# learnrate for pretraining
-LEARNRATE_START    = [	0.001,
-						0.001,
-						0.001,
-						0.001,
-						]				# starting learnrates for each weight. Biases always use the [0] entry
-LEARNRATE_SLOPE    = 1.					# bigger number -> smaller slope
+import Settings
+reload(Settings)
 
 
-lambda_learn = 0.00000 					# test param for sparsness, gets added to weight update
-
-SEED = 1
-rnd.seed(SEED)
-
-### temperature
-TEMP_START    = 0.01				# starting temp
-TEMP_SLOPE    = 0 #10e-7			# linear decrease slope higher number -> fast cooling
-TEMP_MIN      = 0.01
-
-### state vars
-DO_PRETRAINING = 0		# if no pretrain then files are automatically loaded
-DO_TRAINING    = 0		# if to train the whole DBM
-DO_TESTING     = 0		# if testing the DBM with test data
-DO_SHOW_PLOTS  = 1		# if plots will show on display - either way they get saved into saveto_path
-
-DO_CONTEXT    = 1		# if to test the context
-DO_GEN_IMAGES = 0		# if to generate images (mode can be choosen at function call)
-DO_NOISE_STAB = 0		# if to make a noise stability test
-
-USE_DROPOUT  = 1		# if to use synnaptic failure while training
-DROPOUT_RATE = 2		# multiplication of random uniform synaptic failure matrix (higher number -> less failure)
-
-DO_NORM_W    = 1		# if to norm the weights and biases to 1 while training
-
-### saving and loading
-DO_SAVE_TO_FILE       = 0 	# if to save plots and data to file
-DO_SAVE_PRETRAINED    = 0 	# if to save the pretrained weights seperately (for later use)
-DO_LOAD_FROM_FILE     = 1	# if to load weights and biases from datadir + pathsuffix
-PATHSUFFIX            = "Mon_Jun__4_15-55-25_2018_[784, 225, 225, 225, 10] - ['original'] 15%"
-						#"Mon_Jun__4_15-55-25_2018_[784, 225, 225, 225, 10] - ['original'] 15%"
-							#"Thu_Jun__7_16-21-28_2018_[784, 225, 225, 225, 10] - ['15cont4']"
-PATHSUFFIX_PRETRAINED = "Thu_Jun__7_13-49-25_2018"
+UserSetting = Settings.UserSettings
 
 
-DBM_SHAPE = [	int(sqrt(len(train_data[0])))*int(sqrt(len(train_data[0]))),
-				15*15,
-				15*15,
-				15*15,
-				10]
 ###########################################################################################################
+## set the seed for numpy.random
+rnd.seed(UserSettings["SEED"])
 
 
+# load UserSettings into globals
+log.out("For now, copying UserSettings into globals()")
+for key in UserSettings:
+	globals()[key] = UserSettings[key]
 
-saveto_path=data_dir+"/"+time_now+"_"+str(DBM_SHAPE)
+
+saveto_path = data_dir+"/"+time_now+"_"+str(DBM_SHAPE)
 
 ### modify the parameters with additional_args
 if len(additional_args) > 0:
 	# first_param = int(additional_args[0])
-	# T = [0.001, 0.005, 0.01, 0.05, 0.1, 0.5, 1]
-	# # LEARNRATE_START = [ l[first_param], l[first_param]]
-	# TEMP_START = T[first_param]
 	saveto_path  += " - " + str(additional_args)
 
 
-### globals (to be set as DBM self values)
-freerun_steps = 2 					# global number of freerun steps for training
-learnrate     = LEARNRATE_START		# global learnrate
-temp          = TEMP_START			# global temp state
 
 ## open the logger-file
 if DO_SAVE_TO_FILE:
@@ -1672,11 +1647,14 @@ if len(LEARNRATE_START)!= len(DBM_SHAPE)-1 and not DO_LOAD_FROM_FILE:
 if DO_LOAD_FROM_FILE and np.any(np.fromstring(PATHSUFFIX[26:].split("]")[0],sep=",",dtype=int) != DBM_SHAPE):
 	log.out("Error: DBM Shape != Loaded Shape!")
 	raise ValueError("DBM Shape != Loaded Shape!")
+
+
 ######### DBM #############################################################################################
 DBM = DBM_class(	shape = DBM_SHAPE,
 					liveplot = 0,
 					classification = 1,
-			)
+					UserSettings = Settings.UserSettings,
+				)
 
 ###########################################################################################################
 #### Sessions ####
@@ -1739,8 +1717,8 @@ if DO_TESTING:
 		DBM.test(test_data, test_label if LOAD_MNIST else None,
 				N               = 30,  # sample ist aus random werten, also mindestens 2 sample machen
 				create_conf_mat = 0,
-				temp_start      = temp,
-				temp_end        = temp)
+				temp_start      = DBM.temp,
+				temp_end        = DBM.temp)
 
 if DO_GEN_IMAGES:
 	with tf.Session() as sess:
@@ -1795,35 +1773,38 @@ if DO_GEN_IMAGES:
 		log.end()
 
 if DO_CONTEXT:
+
+	log.start("Context Session with SEED: %i"%DBM.SEED)
+
+	if DO_LOAD_FROM_FILE and not DO_TRAINING:
+		DBM.load_from_file(workdir+"/data/"+PATHSUFFIX,override_params=1)
+
+	subspace = [0,1,2,3,4]
+	log.info("Subspace: ", subspace)
+
+
+	# loop through images from all wrong classsified images and find al images that are <5
+	index_for_number_gibbs=[]
+	for i in range(10000):
+
+		## find the digit that was presented
+		digit=np.where(test_label[i])[0][0]
+
+		## set desired digit range
+		if digit in subspace:
+			index_for_number_gibbs.append(i)
+
+	log.info("Found %i Images"%len(index_for_number_gibbs))
+
+	
+	# create graph
+	DBM.batchsize=len(index_for_number_gibbs)
+	if DBM.batchsize==0:
+		raise ValueError("No Images found")
+
+
 	with tf.Session() as sess:
-		log.start("Context Session")
-
-		if DO_LOAD_FROM_FILE and not DO_TRAINING:
-			DBM.load_from_file(workdir+"/data/"+PATHSUFFIX,override_params=1)
-
-		subspace = [0,1,2,3,4]
-		log.out("Subspace: ", subspace)
-
-
-		# loop through images from all wrong classsified images and find al images that are <5
-		index_for_number_gibbs=[]
-		for i in range(10000):
-
-			## find the digit that was presented
-			digit=np.where(test_label[i])[0][0]
-
-			## set desired digit range
-			if digit in subspace:
-				index_for_number_gibbs.append(i)
-
-		log.info("Found %i Images"%len(index_for_number_gibbs))
-
-		
-		# create graph
-		DBM.batchsize=len(index_for_number_gibbs)
-		if DBM.batchsize==0:
-			raise ValueError("No Images found")
-
+		# first session with no context applied (see param "subspace" = "all")
 		DBM.graph_init("gibbs")
 		DBM.import_()
 
@@ -1831,24 +1812,24 @@ if DO_CONTEXT:
 		# calculte h2 firerates over all gibbs_steps
 		log.start("Sampling data")
 		h2_no_context = DBM.gibbs_sampling(test_data[index_for_number_gibbs[:]], 30,
-							temp , temp,
+							DBM.temp , DBM.temp,
 							999, 999,
 							mode     = "context",
 							subspace = "all",
 							liveplot = 0)
-	
 
 	with tf.Session() as sess:
-
-		# DBM.graph_init("gibbs")
-		# DBM.import_()
+		# second session (random vars are the same as 1. session) with context applied (see param "subspace")
+		DBM.graph_init("gibbs")
+		DBM.import_()
+		rnd.seed(UserSettings["SEED"])
 
 		# # with context
 		h2_context = DBM.gibbs_sampling(test_data[index_for_number_gibbs[:]], 30,
-							temp , temp,
+							DBM.temp , DBM.temp,
 							999, 999,
 							mode     = "context",
-							subspace = "all",
+							subspace = subspace,
 							liveplot = 0)
 		# log.end()
 		# DBM.export()
