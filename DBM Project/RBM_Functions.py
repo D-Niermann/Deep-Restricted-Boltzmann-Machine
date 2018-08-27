@@ -68,16 +68,23 @@ def calc_neuron_hist(neuron_index, activities, neuron_label, fire_thresh, n_clas
     return hist
 
 
-def get_layer_label(n_layers,i,short=False):
+def get_layer_label(DBM_type,n_layers,i,short=False):
     """ 
     construct a label string for each layer i. Used for plots.
     """
     label_str = "Layer "+ r"$h^{(%i)}$"%(i)
     if i==0:
         label_str = "Layer "+ r"$v^{(%i)}$"%(1)
-    if i==n_layers-1:
-        label_str = "Layer "+ r"$v^{(%i)}$"%(2)
 
+    if DBM_type == "DBM":
+        if i==n_layers-1:
+            label_str = "Layer "+ r"$v^{(%i)}$"%(2)
+    elif DBM_type == "DBM_context":
+        if i==n_layers-1:
+            label_str = "Layer "+ r"$v^{(%i)}$"%(3)
+        if i==n_layers-2:
+            label_str = "Layer "+ r"$v^{(%i)}$"%(2)
+            
     if short:
         return label_str.replace("Layer ","")
     return label_str
