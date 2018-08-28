@@ -682,6 +682,7 @@ class DBM_class(object):
 		if mode == "testing":
 			if self.classification:
 					self.save_dict["Class_Error"].append(self.class_error_test)
+					self.save_dict["Context_Error"].append(self.context_error_test)
 			self.save_dict["Recon_Error"].append(self.recon_error)
 			self.save_dict["Test_Epoch"].append(self.epochs)
 
@@ -1657,6 +1658,8 @@ class DBM_context_class(DBM_class):
 		# how many label layer the system has
 		self.n_label_layer     = 2
 
+		self.save_dict["Context_Error"] = []
+
 	def type(self):
 		return "DBM_context"
 
@@ -2101,6 +2104,8 @@ class DBM_context_class(DBM_class):
 		if self.classification:
 			## error of classifivation labels
 			self.class_error_test = np.mean(np.abs(self.label_l_save-my_test_label[:,:10]))
+			self.context_error_test = np.mean(np.abs(self.context_l_save-test_label_context[:,:]))
+
 
 			for i in range(len(self.label_l_save)):
 				digit   = np.where(my_test_label[i]==1)[0][0]
@@ -2150,6 +2155,7 @@ class DBM_context_class(DBM_class):
 		# if self.n_layers==2: log.info("Reconstr. error reverse: ",np.round(self.recon_error_reverse,5))
 		if self.classification:
 			log.info("Class error: ",np.round(self.class_error_test, 5))
+			log.info("Context Error: ", np.round(self.context_error_test,5))
 			log.info("Wrong Digits: ",n_wrongs," with average: ",round(np.mean(wrong_maxis),3))
 			log.info("Correct Digits: ",len(right_maxis)," with average: ",round(np.mean(right_maxis),3))
 		log.reset()
@@ -3050,7 +3056,7 @@ if LOAD_MNIST and DO_TESTING:
 		ax3[1][i].set_xticks([])
 
 		#plot hidden layer
-		for layer in range(1,len(DBM.SHAPE)-1):
+		for layer in DBM.get_hidden_layer_ind():
 			try:
 				ax3[layer+1][i].matshow(DBM.firerate_test[layer][i].reshape(int(sqrt(DBM.SHAPE[layer])),int(sqrt(DBM.SHAPE[layer]))))
 				ax3[layer+1][i].set_yticks([])
@@ -3059,9 +3065,12 @@ if LOAD_MNIST and DO_TESTING:
 				pass
 		# plot the last layer
 		if DBM.classification:
-			ax3[-1][i].bar(range(DBM.SHAPE[-1]),DBM.label_l_save[i])
-			ax3[-1][i].set_xticks(range(DBM.SHAPE[-1]))
-			ax3[-1][i].set_ylim(0,1)
+			ax3[-DBM.n_label_layer][i].bar(range(DBM.SHAPE[-DBM.n_label_layer]),DBM.label_l_save[i])
+			ax3[-DBM.n_label_layer][i].set_xticks(range(DBM.SHAPE[-DBM.n_label_layer]))
+			ax3[-DBM.n_label_layer][i].set_ylim(0,1)
+
+			if DBM.type() == "DBM_context":
+				ax3[-1][i].bar(range(DBM.SHAPE[-1]),DBM.context_l_save[i])
 		else:
 			ax3[-1][i].matshow(DBM.label_l_save[i].reshape(int(sqrt(DBM.SHAPE[-1])),int(sqrt(DBM.SHAPE[-1]))))
 			ax3[-1][i].set_xticks([])
@@ -3087,7 +3096,7 @@ if LOAD_MNIST and DO_TESTING:
 		ax3[1][m].set_xticks([])
 
 		#plot hidden layer
-		for layer in range(1,len(DBM.SHAPE)-1):
+		for layer in DBM.get_hidden_layer_ind():
 			try:
 				ax3[layer+1][m].matshow(DBM.firerate_test[layer][i].reshape(int(sqrt(DBM.SHAPE[layer])),int(sqrt(DBM.SHAPE[layer]))))
 				ax3[layer+1][m].set_yticks([])
@@ -3096,9 +3105,12 @@ if LOAD_MNIST and DO_TESTING:
 				pass
 		# plot the last layer
 		if DBM.classification:
-			ax3[-1][m].bar(range(DBM.SHAPE[-1]),DBM.label_l_save[i])
-			ax3[-1][m].set_xticks(range(DBM.SHAPE[-1]))
-			ax3[-1][m].set_ylim(0,1)
+			ax3[-DBM.n_label_layer][m].bar(range(DBM.SHAPE[-DBM.n_label_layer]),DBM.label_l_save[i])
+			ax3[-DBM.n_label_layer][m].set_xticks(range(DBM.SHAPE[-DBM.n_label_layer]))
+			ax3[-DBM.n_label_layer][m].set_ylim(0,1)
+
+			if DBM.type() == "DBM_context":
+				ax3[-1][m].bar(range(DBM.SHAPE[-1]),DBM.context_l_save[i])
 		else:
 			ax3[-1][m].matshow(DBM.label_l_save[i].reshape(int(sqrt(DBM.SHAPE[-1])),int(sqrt(DBM.SHAPE[-1]))))
 			ax3[-1][m].set_xticks([])
