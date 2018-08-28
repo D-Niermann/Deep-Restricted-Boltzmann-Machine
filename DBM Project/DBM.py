@@ -878,10 +878,8 @@ class DBM_class(object):
 			else:
 				self.layer_energy[i] = tf.einsum("ij,ij->i",self.layer[i+1], tf.matmul(self.layer[i],self.w[i]))+tf.reduce_sum(self.layer[i]*self.bias[i],1)+tf.reduce_sum(self.layer[i+1]*self.bias[i+1],1)
 			self.update_l_s[i]   = self.layer[i].assign(self.layer_samp[i])
-		self.update_l_s[-1] = self.layer[-1].assign(self.layer_prob[-1])#self.layer[-1].assign(self.layer_prob[-1])
-
-		# modification array size 10 that gehts multiplied to the label vector for context
-		# self.modification_tf = tf.Variable(tf.ones([self.batchsize,self.SHAPE[-1]]),name="Modification")
+		self.update_l_s[-2] = self.layer[-2].assign(self.layer_prob[-2])
+		self.update_l_s[-1] = self.layer[-1].assign(self.layer_prob[-1])
 
 
 		### Error and stuff
@@ -1588,11 +1586,11 @@ class DBM_class(object):
 				self.export()
 
 			# save weights
-			for i in range(self.n_layers-1):
+			for i in range(len(self.w_np)):
 				np.savetxt("w%i.txt"%i, self.w_np[i])
 
 			##  save bias
-			for i in range(self.n_layers):
+			for i in range(len(self.bias_np)):
 				np.savetxt("bias%i.txt"%i, self.bias_np[i])
 
 			## save save_dict
@@ -2985,7 +2983,7 @@ if LOAD_MNIST and DO_TESTING:
 	# plot l_input_test as hist over all units
 	fig,ax = plt.subplots(DBM.n_layers,1,figsize=(7,10))
 	for i in range(DBM.n_layers):
-		# max_x = 0
+		max_x = 0
 		ax_index = -(i+1)
 		for direc in range(2):
 			color = next(ax[i]._get_lines.prop_cycler)['color'];
@@ -2995,9 +2993,9 @@ if LOAD_MNIST and DO_TESTING:
 
 			try:
 
-				# max_x_ = data.max()
-				# if max_x_>max_x:
-				# 	max_x = max_x_
+				max_x_ = data.max()
+				if max_x_>max_x:
+					max_x = max_x_
 
 				y,x,_ = ax[ax_index].hist(data,
 					bins      = 50,
@@ -3013,12 +3011,12 @@ if LOAD_MNIST and DO_TESTING:
 			except:
 				pass
 
-			# ax[i].set_ytick(ax[i].get_yticks())
-
-			ax[ax_index].set_ylabel(r"$N$")
-			ax[ax_index].ticklabel_format(style = 'sci',scilimits=(-2,2))
-			ax[ax_index].set_title(get_layer_label(DBM.type(), DBM.n_layers,i,short=True))
-			ax[ax_index].legend()
+		# ax[ax_index].set_ytick(ax[i].get_yticks())
+		ax[ax_index].set_xlim(-max_x,max_x)
+		ax[ax_index].set_ylabel(r"$N$")
+		ax[ax_index].ticklabel_format(style = 'sci',scilimits=(-2,2))
+		ax[ax_index].set_title(get_layer_label(DBM.type(), DBM.n_layers,i,short=True))
+		ax[ax_index].legend()
 	ax[-1].set_xlabel("Input Strength")
 	plt.tight_layout()
 	save_fig(saveto_path+"/layer_input_hist.pdf", DO_SAVE_TO_FILE)
@@ -3044,7 +3042,7 @@ if LOAD_MNIST and DO_TESTING:
 
 
 	# plot some samples from the testdata
-	fig3,ax3 = plt.subplots(len(DBM.SHAPE)+1,13,figsize=(16,5),sharey="row")
+	fig3,ax3 = plt.subplots(len(DBM.SHAPE)+1,13,figsize=(16,8),sharey="row")
 	for i in range(13):
 		# plot the input
 		ax3[0][i].matshow(test_data[i:i+1].reshape(int(sqrt(DBM.SHAPE[0])),int(sqrt(DBM.SHAPE[0]))))
@@ -3083,7 +3081,7 @@ if LOAD_MNIST and DO_TESTING:
 	save_fig(saveto_path+"/examples.pdf", DO_SAVE_TO_FILE)
 
 	# plot only one digit
-	fig3,ax3 = plt.subplots(len(DBM.SHAPE)+1,10,figsize=(16,5),sharey="row")
+	fig3,ax3 = plt.subplots(len(DBM.SHAPE)+1,10,figsize=(16,8),sharey="row")
 	m=0
 	for i in index_for_number_test.astype(np.int)[8][0:10]:
 		# plot the input
@@ -3119,7 +3117,7 @@ if LOAD_MNIST and DO_TESTING:
 			# ax4[5][m].matshow(DBM.rec_h1[i:i+1].reshape(int(sqrt(DBM.SHAPE[1])),int(sqrt(DBM.SHAPE[1]))))
 			# plt.matshow(random_recon.reshape(int(sqrt(DBM.SHAPE[0])),int(sqrt(DBM.SHAPE[0]))))
 		m+=1
-	plt.tight_layout(pad=0.0)
+	plt.tight_layout()
 	save_fig(saveto_path+"/examples_one_digit.pdf", DO_SAVE_TO_FILE)
 
 
