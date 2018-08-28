@@ -10,11 +10,14 @@ if True:
 		workdir="/Users/Niermann/Google Drive/Masterarbeit/Python/DBM Project"
 		os.chdir(workdir)
 		import_seaborn = True
+		OS = "Mac"
 	except: #else on university machine
 		workdir="/home/dario/Dokumente/DBM Project"
 		os.chdir(workdir)
 		mpl.use("Agg") #use this to not display plots but save them
 		import_seaborn = True
+		OS = "Linux"
+		import importlib
 
 	data_dir=workdir+"/data"
 
@@ -482,7 +485,7 @@ class DBM_class(object):
 		self.w_np     = []
 		self.w_np_old = []
 		r = self.n_layers-1
-		if self.type():
+		if self.type() == "DBM_context":
 			r = self.n_layers-1 + len(self.layers_to_connect)
 		for i in range(r):
 			self.w_np.append(np.loadtxt("w%i.txt"%(i)))
@@ -668,7 +671,7 @@ class DBM_class(object):
 			self.save_dict["Learnrate"].append(self.learnrate)
 			self.save_dict["Freerun_Steps"].append(self.freerun_steps)
 
-			for i in range(self.n_layers-1):
+			for i in range(len(self.w)):
 				w_mean = sess.run(self.len_w[i])
 				CD_mean = sess.run(self.CD_abs_mean[i])
 				w_diff_mean = np.mean(self.weights_diff[i])
@@ -1561,7 +1564,7 @@ class DBM_class(object):
 				self.export()
 
 			# save weights
-			for i in range(self.n_layers-1):
+			for i in range(len(self.w_np)):
 				np.savetxt("w%i.txt"%i, self.w_np[i])
 
 			##  save bias
@@ -2049,12 +2052,19 @@ class DBM_context_class(DBM_class):
 		# update hidden and label N times
 		log.start("Sampling hidden %i times "%N)
 		log.info("temp: %f -> %f"%(np.round(temp_start,5),np.round(temp_end,5)))
+		
 		# make N clamped updates
 		for n in range(N):
+			# get layer activities 
 			self.layer_act_test[n,:] = sess.run(self.layer_activities, {self.temp_tf : mytemp})
+
+			# update layer 
 			self.glauber_step("visible", mytemp, droprate, layer_save_test, n) # sess.run(self.update_l_s[1:], {self.mytemp_tf : mytemp})
+			
 			# increment mytemp
 			mytemp+=temp_delta
+
+
 
 		# calc layer variance across batch
 		self.layer_diversity_test = sess.run(self.layer_diversity)
@@ -2430,7 +2440,10 @@ class DBM_context_class(DBM_class):
 ###########################################################################################################
 #### User Settings ###
 import Settings
-reload(Settings)
+if OS == "Mac":
+	reload(Settings)
+else:
+	importlib.reload(Settings)
 
 
 UserSettings = Settings.UserSettings
@@ -2878,7 +2891,7 @@ if DO_TRAINING:
 	ax[1].set_ylabel("Learnrate")
 
 	ax[2].set_ylabel("Mean")
-	for i in range(len(DBM.SHAPE)-1):
+	for i in range(len(DBM.w)):
 		ax[2].plot(DBM.save_dict["W_mean_%i"%i],label="W %i"%i)
 	ax[2].legend(loc="center left",bbox_to_anchor = (1.0,0.5))
 

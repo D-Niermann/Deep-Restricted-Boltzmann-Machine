@@ -1,0 +1,10 @@
+2.      Creating RBMs
+3.      2,1
+4.      2,2
+5.      2,2
+6.      1,2
+------------------------------------------------
+Info     Tue_Aug_28_12-19-34_2018 
+
+1.-v    Pretrain Session
+2.      	Loading from file
