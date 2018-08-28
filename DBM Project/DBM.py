@@ -481,7 +481,10 @@ class DBM_class(object):
 
 		self.w_np     = []
 		self.w_np_old = []
-		for i in range(self.n_layers-1):
+		r = self.n_layers-1
+		if self.type():
+			r = self.n_layers-1 + len(self.layers_to_connect)
+		for i in range(r):
 			self.w_np.append(np.loadtxt("w%i.txt"%(i)))
 			self.w_np_old.append(self.w_np[i])  #save weights for later comparison
 
@@ -878,7 +881,6 @@ class DBM_class(object):
 			else:
 				self.layer_energy[i] = tf.einsum("ij,ij->i",self.layer[i+1], tf.matmul(self.layer[i],self.w[i]))+tf.reduce_sum(self.layer[i]*self.bias[i],1)+tf.reduce_sum(self.layer[i+1]*self.bias[i+1],1)
 			self.update_l_s[i]   = self.layer[i].assign(self.layer_samp[i])
-		self.update_l_s[-2] = self.layer[-2].assign(self.layer_prob[-2])
 		self.update_l_s[-1] = self.layer[-1].assign(self.layer_prob[-1])
 
 
@@ -1766,8 +1768,11 @@ class DBM_context_class(DBM_class):
 		return _input_
 
 	def graph_init(self, graph_mode):
-
+		# parent graph init (also creates new matrices used for contex layer)
 		self.parent.graph_init(graph_mode)
+
+		# sample the label layer
+		self.update_l_s[-2] = self.layer[-2].assign(self.layer_prob[-2])
 
 		self.context_error_tf = tf.reduce_mean(tf.square(self.layer_ph[-1]-self.layer[-1]))
 		self.class_error = tf.reduce_mean(tf.square(self.layer_ph[-2]-self.layer[-2]))
