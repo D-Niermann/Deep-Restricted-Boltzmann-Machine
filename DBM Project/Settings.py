@@ -24,8 +24,8 @@ UserSettings = {
 	"SEED" : None,							# random seed for tf and np
 
 	### state vars
-	"DO_PRETRAINING" : 1,		# if no pretrain then files are automatically loaded
-	"DO_TRAINING"    : 1,		# if to train the whole DBM
+	"DO_PRETRAINING" : 0,		# if no pretrain then files are automatically loaded
+	"DO_TRAINING"    : 0,		# if to train the whole DBM
 	"DO_TESTING"     : 1,		# if testing the DBM with test data
 	"DO_SHOW_PLOTS"  : 1,		# if plots will show on display - either way they get saved into saveto_path
 
@@ -53,5 +53,7 @@ UserSettings = {
 					15*15,
 					15*15,
 					10,
-					2] 
+					2],
+
+	"LAYERS_TO_CONNECT" : [-3],
 }

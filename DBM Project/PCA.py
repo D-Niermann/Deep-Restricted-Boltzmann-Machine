@@ -13,7 +13,6 @@ w_thresh    = 0.04
 min_mean    = 0.05
 max_mean    = 0.2
 
-np.mean()
 
 # os.chdir("/Users/Niermann/Desktop/Plots/Layer_%i"%layer)
 means_c = [None]*DBM.n_layers
@@ -45,6 +44,9 @@ neuron_number_ = list(set(neuron_number_))
 ## get neurons based on their weight strength
 neuron_number_ = np.where(np.abs(DBM.w_np[-1][:,5:])>w_thresh)[0]
 target_class = np.where(np.abs(DBM.w_np[-1][:,5:])>w_thresh)[1]
+
+# get neurons by max weights from weights to context layer
+neuron_number_ = ind[0]
 
 
 

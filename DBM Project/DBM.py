@@ -537,9 +537,9 @@ class DBM_class(object):
 		""" setting up the graph and setting the weights and biases tf variables to the
 		saved numpy arrays """
 		log.out("loading numpy vars into graph")
-		for i in range(self.n_layers-1):
+		for i in range(len(self.w_np)):
 			sess.run(self.w[i].assign(self.w_np[i]))
-		for i in range(self.n_layers):
+		for i in range(len(self.bias_np)):
 			sess.run(self.bias[i].assign(self.bias_np[i]))
 
 	def layer_input(self, layer_i):
@@ -1637,7 +1637,7 @@ class DBM_context_class(DBM_class):
 	classification on the normal labels.
 	"""
 
-	def __init__ (self, shape, liveplot, classification, UserSettings, layers_to_connect):
+	def __init__ (self, shape, liveplot, classification, UserSettings):
 		""" 
 		Inherits many things from DBM_class.
 
@@ -1652,7 +1652,7 @@ class DBM_context_class(DBM_class):
 		self.parent.__init__(shape, liveplot, classification, UserSettings)
 
 		# hich layer to connect the context layer to
-		self.layers_to_connect = np.array(layers_to_connect)
+		self.layers_to_connect = np.array(self.LAYERS_TO_CONNECT)
 		# how many connected layers to context layer
 		self.n_context_con     = len(self.layers_to_connect)
 		# how many units in context layer
@@ -2495,7 +2495,7 @@ DBM = DBM_context_class(DBM_SHAPE,
 						liveplot = 0, 
 						classification = 1,
 						UserSettings = UserSettings,
-						layers_to_connect = [-3])
+						)
 
 
 ###########################################################################################################
