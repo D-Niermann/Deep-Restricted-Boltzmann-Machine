@@ -1661,6 +1661,11 @@ class DBM_context_class(DBM_class):
 		self.n_label_layer     = 2
 
 		self.save_dict["Context_Error"] = []
+		for j in range(len(self.layers_to_connect)):
+			i = j+len(self.DBM_SHAPE)-1
+			self.save_dict["W_mean_%i"%i] = []
+			self.save_dict["W_diff_%i"%i] = []
+			self.save_dict["CD_abs_mean_%i"%i] = []
 
 	def type(self):
 		return "DBM_context"
@@ -1757,7 +1762,6 @@ class DBM_context_class(DBM_class):
 			correct_extra_index = self.layers_to_connect+len(DBM.SHAPE)
 			if layer_i in correct_extra_index:
 				w_index = DBM.n_layers-1 + np.where(correct_extra_index == layer_i)[0][0]
-				log.info("w_index", w_index)
 				w2 = self.w[w_index]
 				if self.USE_DROPOUT:
 					w2 *= self.dropout_matrix[w_index]
@@ -1843,9 +1847,9 @@ class DBM_context_class(DBM_class):
 		## save the old weights and biases
 		w_old = []
 		b_old = []
-		for i in range(self.n_layers):
-			if i < self.n_layers-1:
-				w_old.append(np.copy(self.w[i].eval()))
+		for i in range(len(self.w)):
+			w_old.append(np.copy(self.w[i].eval()))
+		for i in range(len(self.bias)):
 			b_old.append(np.copy(self.bias[i].eval()))
 
 		# starting the training
@@ -1987,9 +1991,9 @@ class DBM_context_class(DBM_class):
 		log.out("Calculation weights diff")
 		self.weights_diff = []
 		self.bias_diff    = []
-		for i in range(self.n_layers):
-			if i < self.n_layers-1:
-				self.weights_diff.append(np.abs(self.w_np[i]-w_old[i]))
+		for i in range(len(self.w_np)):
+			self.weights_diff.append(np.abs(self.w_np[i]-w_old[i]))
+		for i in range(len(self.bias_np)):
 			self.bias_diff.append(np.abs(self.bias_np[i]-b_old[i]))
 
 
