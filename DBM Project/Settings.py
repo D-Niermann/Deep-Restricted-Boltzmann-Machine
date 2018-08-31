@@ -26,10 +26,10 @@ UserSettings = {
 	### state vars
 	"DO_PRETRAINING" : 0,		# if no pretrain then files are automatically loaded
 	"DO_TRAINING"    : 0,		# if to train the whole DBM
-	"DO_TESTING"     : 1,		# if testing the DBM with test data
+	"DO_TESTING"     : 0,		# if testing the DBM with test data
 	"DO_SHOW_PLOTS"  : 1,		# if plots will show on display - either way they get saved into saveto_path
 
-	"DO_CONTEXT"    : 0,		# if to test the context
+	"DO_CONTEXT"    : 1,		# if to test the context
 	"DO_GEN_IMAGES" : 0,		# if to generate images (mode can be choosen at function call)
 	"DO_NOISE_STAB" : 0,		# if to make a noise stability test,
 
@@ -42,15 +42,16 @@ UserSettings = {
 	"DO_SAVE_TO_FILE"       : 1, 	# if to save plots and data to file
 	"DO_SAVE_PRETRAINED"    : 0, 	# if to save the pretrained weights seperately (for later use)
 	"DO_LOAD_FROM_FILE"     : 1, 	# if to load weights and biases from datadir + pathsuffix
-	"PATHSUFFIX"            : "Tue_Aug_28_11-49-14_2018_[784, 64, 64, 10, 2]", 
+	"PATHSUFFIX"            : "Tue_Aug_28_14-11-00_2018_[784, 225, 225, 225, 10, 2]", 
 							#"Mon_Jun__4_15-55-25_2018_[784, 225, 225, 225, 10] - ['original'] 15%"
 								#"Thu_Jun__7_16-21-28_2018_[784, 225, 225, 225, 10] - ['15cont4']"
 	"PATHSUFFIX_PRETRAINED" : "Thu_Jun__7_13-49-25_2018",
 
 
 	"DBM_SHAPE" : [	28*28,
-					8*8,
-					8*8,
+					15*15,
+					15*15,
+					15*15,
 					10,
 					2] 
 }

@@ -1335,7 +1335,6 @@ class DBM_class(object):
 
 			# set the weights to 0 if context is enebaled and subspace is not "all"
 			if subspace == "all":
-				pass
 				self.activity_nc  = np.zeros([self.n_layers-1,gibbs_steps]);
 				self.layer_diff_gibbs_nc = np.zeros([self.n_layers-1,gibbs_steps])
 				self.class_error_gibbs_nc = np.zeros([gibbs_steps]);
@@ -1744,16 +1743,28 @@ class DBM_context_class(DBM_class):
 
 		# hidden and v(2) layer 
 		else:
+			# normal layer bottom up and top down adjacend 
 			w0 = self.w[layer_i-1];
 			w1 = self.w[layer_i];
 			if self.USE_DROPOUT:
 				w0 *= self.dropout_matrix[layer_i-1]
 				w1 *= self.dropout_matrix[layer_i]
-			_input_ = sigmoid(tf.matmul(self.layer[layer_i-1],w0)
+			_input_buff_ = (tf.matmul(self.layer[layer_i-1],w0)
 								+ tf.matmul(self.layer[layer_i+1],w1,transpose_b=True)
-								+ self.bias[layer_i],
-						       self.temp_tf
-							  )
+								+ self.bias[layer_i])
+
+			# extra layer input :
+			correct_extra_index = self.layers_to_connect+len(DBM.SHAPE)
+			if layer_i in correct_extra_index:
+				w_index = DBM.n_layers-1 + np.where(correct_extra_index == layer_i)[0][0]
+				log.info("w_index", w_index)
+				w2 = self.w[w_index]
+				if self.USE_DROPOUT:
+					w2 *= self.dropout_matrix[w_index]
+				_input_buff_ += tf.matmul(self.layer[-1], w2, transpose_b = True)				
+
+			_input_ = sigmoid(_input_buff_, self.temp_tf)			
+
 		return _input_
 
 	def layer_input_context(self):
@@ -2019,7 +2030,7 @@ class DBM_context_class(DBM_class):
 
 		### init the vars and reset the weights and biases
 		self.batchsize       = len(my_test_data)
-		self.learnrate       = self.LEARNRATE_START
+		self.learnrate       = self.get_learnrate(self.epochs, self.LEARNRATE_SLOPE, self.LEARNRATE_START)
 
 		layer_save_test = [[None] for i in range(self.n_layers)]   # save layers while N hidden updates
 		for layer in range(len(layer_save_test)):
@@ -2223,7 +2234,7 @@ class DBM_context_class(DBM_class):
 
 		if mode=="context":
 			sess.run(self.assign_l[0],{self.layer_ph[0] : v_input})
-			if subspace != "all" and self.type() == "DBM_context":
+			if subspace != "all":
 				sess.run(self.assign_l[-1], {self.layer_ph[-1] : test_label_context[index_for_number_gibbs[:]]})
 
 			for i in range(1,self.n_layers):
@@ -2235,7 +2246,6 @@ class DBM_context_class(DBM_class):
 
 			# set the weights to 0 if context is enebaled and if DBM type and subspace is not "all"
 			if subspace == "all":
-				pass
 				self.activity_nc  = np.zeros([self.n_layers-1,gibbs_steps]);
 				self.layer_diff_gibbs_nc = np.zeros([self.n_layers-1,gibbs_steps])
 				self.class_error_gibbs_nc = np.zeros([gibbs_steps]);
@@ -2245,22 +2255,11 @@ class DBM_context_class(DBM_class):
 				self.layer_diff_gibbs_c = np.zeros([self.n_layers-1,gibbs_steps])
 				self.class_error_gibbs_c = np.zeros([gibbs_steps]);
 				# get all numbers that are not in subspace
-				subspace_anti = []
-				for i in range(10):
-					if i not in subspace:
-						subspace_anti.append(i)
+				# subspace_anti = []
+				# for i in range(10):
+				# 	if i not in subspace:
+				# 		subspace_anti.append(i)
 
-				if self.type() == "DBM":
-					log.out("Setting Weights to 0")
-					# get the weights as numpy arrays
-					w_ = self.w[-1].eval()
-					b_ = self.bias[-1].eval()
-					# set values to 0
-					w_[:,subspace_anti] = 0
-					b_[subspace_anti] = -1000
-					# assign to tf variables
-					sess.run(self.w[-1].assign(w_))
-					sess.run(self.bias[-1].assign(b_))
 
 
 
