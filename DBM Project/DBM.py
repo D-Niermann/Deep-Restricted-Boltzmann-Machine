@@ -907,7 +907,7 @@ class DBM_class(object):
 		sess.run(tf.global_variables_initializer())
 		self.init_state = 1
 
-	def train(self, train_data, train_label, num_batches, cont):
+	def train(self, train_data, train_label, train_label_context, num_batches, cont):
 		""" training the DBM with given h2 as labels and v as input images
 		train_data  :: images
 		train_label :: corresponding label
@@ -1415,7 +1415,7 @@ class DBM_class(object):
 				self.hist_input_nc             = self.get_units_input()
 				self.unit_diversity_nc         = sess.run(self.unit_diversity)
 				self.layer_diversity_nc        = sess.run(self.layer_diversity)
-				
+
 				# save to file	
 				save_firerates_to_file(self.firerate_nc,saveto_path+"/FireratesNoContext")
 
@@ -2039,7 +2039,7 @@ class DBM_context_class(DBM_class):
 
 		log.reset()
 
-	def test(self, my_test_data, my_test_label, my_test_label_context, N, create_conf_mat, temp_start, temp_end, using_train_data = False):
+	def test(self, my_test_data, my_test_label, N, create_conf_mat, temp_start, temp_end, using_train_data = False):
 		"""
 		testing runs without giving h2 , only v is given and h2 has to be infered
 		by the DBM
@@ -2503,17 +2503,17 @@ if DO_LOAD_FROM_FILE and np.any(np.fromstring(PATHSUFFIX[26:].split("]")[0],sep=
 
 
 ######### DBM #############################################################################################
-DBM = DBM_class(	shape = DBM_SHAPE,
-					liveplot = 0,
-					classification = 1,
-					UserSettings = UserSettings,
-				)
+# DBM = DBM_class(	shape = DBM_SHAPE,
+# 					liveplot = 0,
+# 					classification = 1,
+# 					UserSettings = UserSettings,
+# 				)
 
-# DBM = DBM_context_class(DBM_SHAPE, 
-# 						liveplot = 0, 
-# 						classification = 1,
-# 						UserSettings = UserSettings,
-# 						)
+DBM = DBM_context_class(DBM_SHAPE, 
+						liveplot = 0, 
+						classification = 1,
+						UserSettings = UserSettings,
+						)
 
 
 ###########################################################################################################
@@ -2546,7 +2546,8 @@ if DO_TRAINING:
 				# wrong_classified_id = np.loadtxt("wrongs.txt").astype(np.int)
 				# DBM.test(train_data[:1000], train_label[:1000], 50, 10)
 
-				DBM.test(test_data, test_label if LOAD_MNIST else None, test_label_context if LOAD_MNIST else None,
+				DBM.test(test_data, 
+						test_label if LOAD_MNIST else None, 
 						N               = 30,  # sample ist aus random werten, also mindestens 2 sample machen
 						create_conf_mat = 0,
 						temp_start      = DBM.temp,
@@ -2576,7 +2577,6 @@ if DO_TESTING:
 	with tf.Session() as sess:
 		DBM.test(test_data,
 				test_label if LOAD_MNIST else None, 
-				# test_label_context if LOAD_MNIST else None,
 				N               = 40,  # sample ist aus random werten, also mindestens 2 sample machen
 				create_conf_mat = 0,
 				temp_start      = DBM.temp,

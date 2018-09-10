@@ -24,12 +24,12 @@ UserSettings = {
 	"SEED" : 1,							# random seed for tf and np
 
 	### state vars
-	"DO_PRETRAINING" : 0,		# if no pretrain then files are automatically loaded
-	"DO_TRAINING"    : 0,		# if to train the whole DBM
-	"DO_TESTING"     : 0,		# if testing the DBM with test data
+	"DO_PRETRAINING" : 1,		# if no pretrain then files are automatically loaded
+	"DO_TRAINING"    : 1,		# if to train the whole DBM
+	"DO_TESTING"     : 1,		# if testing the DBM with test data
 	"DO_SHOW_PLOTS"  : 1,		# if plots will show on display - either way they get saved into saveto_path
 
-	"DO_CONTEXT"    : 1,		# if to test the context
+	"DO_CONTEXT"    : 0,		# if to test the context
 	"DO_GEN_IMAGES" : 0,		# if to generate images (mode can be choosen at function call)
 	"DO_NOISE_STAB" : 0,		# if to make a noise stability test,
 
@@ -41,7 +41,7 @@ UserSettings = {
 	### saving and loading
 	"DO_SAVE_TO_FILE"       : 1, 	# if to save plots and data to file
 	"DO_SAVE_PRETRAINED"    : 0, 	# if to save the pretrained weights seperately (for later use)
-	"DO_LOAD_FROM_FILE"     : 1, 	# if to load weights and biases from datadir + pathsuffix
+	"DO_LOAD_FROM_FILE"     : 0, 	# if to load weights and biases from datadir + pathsuffix
 	"PATHSUFFIX"            : "Mon_Jun__4_15-55-25_2018_[784, 225, 225, 225, 10] - ['original'] 15%", 
 							#"Mon_Jun__4_15-55-25_2018_[784, 225, 225, 225, 10] - ['original'] 15%"
 								#"Thu_Jun__7_16-21-28_2018_[784, 225, 225, 225, 10] - ['15cont4']"
@@ -52,7 +52,7 @@ UserSettings = {
 					15*15,
 					15*15,
 					15*15,
-					10],
+					10,2],
 
 	## only used in DBM_context class
 	"LAYERS_TO_CONNECT" : [-3],		# layer index of which layer to connect the context layer to (v2 label layer is always connected)
