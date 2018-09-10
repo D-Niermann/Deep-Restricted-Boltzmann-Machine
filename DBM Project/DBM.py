@@ -89,8 +89,14 @@ if "train_data" not in globals():
 
 		# get the context label based on the sum to the border of the subspace 
 		# subspace needs to be a closed set for this method
-		train_label_context = np.sum(train_label[:,:5], 1) == 1
-		test_label_context  = np.sum(test_label[:,:5], 1)  == 1
+		# train_label_context = np.sum(train_label[:,:5], 1) == 1
+		# test_label_context  = np.sum(test_label[:,:5], 1)  == 1
+		
+		### label context is even / odd numbers 
+		train_label_context = np.sum(train_label[:,(0,2,4,6,8)], 1) == 1
+		test_label_context  = np.sum(train_label[:,(0,2,4,6,8)], 1) == 1
+		################
+
 		# expand axis
 		train_label_context = np.expand_dims(train_label_context, axis=1)
 		test_label_context  = np.expand_dims(test_label_context, axis=1)
@@ -2557,7 +2563,7 @@ if DO_TRAINING:
 if DO_TESTING:
 	with tf.Session() as sess:
 		DBM.test(test_data, test_label if LOAD_MNIST else None, test_label_context if LOAD_MNIST else None,
-				N               = 30,  # sample ist aus random werten, also mindestens 2 sample machen
+				N               = 40,  # sample ist aus random werten, also mindestens 2 sample machen
 				create_conf_mat = 0,
 				temp_start      = DBM.temp,
 				temp_end        = DBM.temp)
@@ -3326,51 +3332,51 @@ if DO_CONTEXT:
 
 	### look at neurons that where active outside subspace while testing and chekc if they got active during context
 	# look which hists have their  max outside supspace
-	if DO_TESTING:
-		log.out("Searching neurons that fired outside subspace while testing")
-		max_neurons = 20
-		outside_subspace_ind = [[]*i for i in range(DBM.n_layers)]
-		for l in DBM.get_hidden_layer_ind():
-			# generate hisogramms for all neurons that fired reasonable often
-			hists_test = calc_neuron_hist(DBM.neuron_good_test_firerate_ind[l],DBM.firerate_test[l],test_label,0.5, 10)
+	# if DO_TESTING:
+	# 	log.out("Searching neurons that fired outside subspace while testing")
+	# 	max_neurons = 20
+	# 	outside_subspace_ind = [[]*i for i in range(DBM.n_layers)]
+	# 	for l in DBM.get_hidden_layer_ind():
+	# 		# generate hisogramms for all neurons that fired reasonable often
+	# 		hists_test = calc_neuron_hist(DBM.neuron_good_test_firerate_ind[l],DBM.firerate_test[l],test_label,0.5, 10)
 
-			# go through every hist and chekc if high values are outside subspace
-			for i in range(len(hists_test)):
-				where  =  np.where(hists_test[i]>hists_test[i].mean()+hists_test[i].std())[0]
-				for j in where:
-					if j not in subspace:
-						outside_subspace_ind[l].append(i)
-						break
-				if len(outside_subspace_ind[l]) >= max_neurons:
-					break
+	# 		# go through every hist and chekc if high values are outside subspace
+	# 		for i in range(len(hists_test)):
+	# 			where  =  np.where(hists_test[i]>hists_test[i].mean()+hists_test[i].std())[0]
+	# 			for j in where:
+	# 				if j not in subspace:
+	# 					outside_subspace_ind[l].append(i)
+	# 					break
+	# 			if len(outside_subspace_ind[l]) >= max_neurons:
+	# 				break
 
 
-			hists_c  = calc_neuron_hist(outside_subspace_ind[l], DBM.firerate_c[l-1],  test_label[index_for_number_gibbs[:]], 0.5, len(subspace))
-			hists_nc = calc_neuron_hist(outside_subspace_ind[l], DBM.firerate_nc[l-1], test_label[index_for_number_gibbs[:]], 0.5, len(subspace))
-			hists_t = calc_neuron_hist(outside_subspace_ind[l], DBM.firerate_test[l], test_label, 0.5, 10)
-			hists_c = np.array(hists_c)
-			hists_nc = np.array(hists_nc)
-			hists_t = np.array(hists_t)
-			log.out("Searching which of the found neurons also had a moderate firerate while gibbs sampling")
-			w_firerates = np.where((np.mean(DBM.firerate_c[l-1][:,outside_subspace_ind[l]],0)<0.4) & (np.mean(DBM.firerate_c[l-1][:,outside_subspace_ind[l]],0)>0.02))[0]
+	# 		hists_c  = calc_neuron_hist(outside_subspace_ind[l], DBM.firerate_c[l-1],  test_label[index_for_number_gibbs[:]], 0.5, len(subspace))
+	# 		hists_nc = calc_neuron_hist(outside_subspace_ind[l], DBM.firerate_nc[l-1], test_label[index_for_number_gibbs[:]], 0.5, len(subspace))
+	# 		hists_t = calc_neuron_hist(outside_subspace_ind[l], DBM.firerate_test[l], test_label, 0.5, 10)
+	# 		hists_c = np.array(hists_c)
+	# 		hists_nc = np.array(hists_nc)
+	# 		hists_t = np.array(hists_t)
+	# 		log.out("Searching which of the found neurons also had a moderate firerate while gibbs sampling")
+	# 		w_firerates = np.where((np.mean(DBM.firerate_c[l-1][:,outside_subspace_ind[l]],0)<0.4) & (np.mean(DBM.firerate_c[l-1][:,outside_subspace_ind[l]],0)>0.02))[0]
 
-			log.out("Plotting these neurons hists")
-			num_plots = int(sqrt(len(w_firerates)))
-			fig,ax = plt.subplots(num_plots,num_plots,sharex="col",sharey="row")
-			m=0
-			for i in range(num_plots):
-				for j in range(num_plots):
-					index = outside_subspace_ind[l][w_firerates[m]]
-					ax[i,j].bar(subspace,hists_c[w_firerates[m]],alpha=0.7,color=[0.0, 1, 0.5])
-					ax[i,j].bar(subspace,hists_nc[w_firerates[m]],alpha=0.7,color=[0.8, 0.3, 0.3],width=0.2)
-					ax[i,j].bar(range(10),hists_t[index],alpha=0.5,color=[1, 0.0, 0.0])
-					ax[i,j].set_xticks(range(10))
-					ax[-1,j].set_xlabel("Class")
-					ax[i,0].set_ylabel(r"$N$")
-					# ax[i,j].set_title(str(index)+" | "+ str(diffs[index]))
-					m+=1
-			fig.tight_layout()
-			save_fig(saveto_path+"/outisde_subspace_hists_l%i"%l, DO_SAVE_TO_FILE)
+	# 		log.out("Plotting these neurons hists")
+	# 		num_plots = int(sqrt(len(w_firerates)))
+	# 		fig,ax = plt.subplots(num_plots,num_plots,sharex="col",sharey="row")
+	# 		m=0
+	# 		for i in range(num_plots):
+	# 			for j in range(num_plots):
+	# 				index = outside_subspace_ind[l][w_firerates[m]]
+	# 				ax[i,j].bar(subspace,hists_c[w_firerates[m]],alpha=0.7,color=[0.0, 1, 0.5])
+	# 				ax[i,j].bar(subspace,hists_nc[w_firerates[m]],alpha=0.7,color=[0.8, 0.3, 0.3],width=0.2)
+	# 				ax[i,j].bar(range(10),hists_t[index],alpha=0.5,color=[1, 0.0, 0.0])
+	# 				ax[i,j].set_xticks(range(10))
+	# 				ax[-1,j].set_xlabel("Class")
+	# 				ax[i,0].set_ylabel(r"$N$")
+	# 				# ax[i,j].set_title(str(index)+" | "+ str(diffs[index]))
+	# 				m+=1
+	# 		fig.tight_layout()
+	# 		save_fig(saveto_path+"/outisde_subspace_hists_l%i"%l, DO_SAVE_TO_FILE)
 
 if DO_GEN_IMAGES:
 	# plot timeseries of every neuron while generate (clamped label)

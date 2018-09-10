@@ -21,7 +21,7 @@ UserSettings = {
 	"TEMP_MIN"      : 0.01 ,			# how low temp can fall at minimum
 
 	# seed for random number generation, set None to have no seed 
-	"SEED" : None,							# random seed for tf and np
+	"SEED" : 2,							# random seed for tf and np
 
 	### state vars
 	"DO_PRETRAINING" : 0,		# if no pretrain then files are automatically loaded
@@ -42,7 +42,7 @@ UserSettings = {
 	"DO_SAVE_TO_FILE"       : 1, 	# if to save plots and data to file
 	"DO_SAVE_PRETRAINED"    : 0, 	# if to save the pretrained weights seperately (for later use)
 	"DO_LOAD_FROM_FILE"     : 1, 	# if to load weights and biases from datadir + pathsuffix
-	"PATHSUFFIX"            : "Tue_Aug_28_14-11-00_2018_[784, 225, 225, 225, 10, 2]", 
+	"PATHSUFFIX"            : "Backup_81-Error_0.156000", 
 							#"Mon_Jun__4_15-55-25_2018_[784, 225, 225, 225, 10] - ['original'] 15%"
 								#"Thu_Jun__7_16-21-28_2018_[784, 225, 225, 225, 10] - ['15cont4']"
 	"PATHSUFFIX_PRETRAINED" : "Thu_Jun__7_13-49-25_2018",
@@ -55,5 +55,6 @@ UserSettings = {
 					10,
 					2],
 
-	"LAYERS_TO_CONNECT" : [-3],
+	## only used in DBM_context class
+	"LAYERS_TO_CONNECT" : [-3],		# layer index of which layer to connect the context layer to (v2 label layer is always connected)
 }
