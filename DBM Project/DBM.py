@@ -83,7 +83,7 @@ if "train_data" not in globals():
 		test_label_context = np.zeros([len(test_label),2])
 
 		# global subspace set 
-		subspace = [0,1,2,3,4]
+		subspace = [0,2,4,6,8]
 		# better name for this:
 		subset = subspace 
 
@@ -94,7 +94,7 @@ if "train_data" not in globals():
 		
 		### label context is even / odd numbers 
 		train_label_context = np.sum(train_label[:,(0,2,4,6,8)], 1) == 1
-		test_label_context  = np.sum(train_label[:,(0,2,4,6,8)], 1) == 1
+		test_label_context  = np.sum(test_label[:,(0,2,4,6,8)], 1) == 1
 		################
 
 		# expand axis
@@ -694,7 +694,8 @@ class DBM_class(object):
 		if mode == "testing":
 			if self.classification:
 					self.save_dict["Class_Error"].append(self.class_error_test)
-					self.save_dict["Context_Error"].append(self.context_error_test)
+					if self.type() == "DBM_context":
+						self.save_dict["Context_Error"].append(self.context_error_test)
 			self.save_dict["Recon_Error"].append(self.recon_error)
 			self.save_dict["Test_Epoch"].append(self.epochs)
 
@@ -1189,10 +1190,13 @@ class DBM_class(object):
 
 		## get firerates of every unit
 		self.firerate_test = sess.run(self.update_l_p, {self.temp_tf : mytemp, self.droprate_tf : droprate})
+		save_firerates_to_file(self.firerate_test,saveto_path+"FirerateTest")
+
+
 		# were firerates are around 0.1
-		self.neuron_good_test_firerate_ind=[None]*DBM.n_layers
-		for l in range(1,DBM.n_layers-1):
-			self.neuron_good_test_firerate_ind[l] = np.where((np.mean(self.firerate_test[l],0)>0.02) & (np.mean(self.firerate_test[l],0)<0.4))[0]
+		# self.neuron_good_test_firerate_ind=[None]*DBM.n_layers
+		# for l in range(1,DBM.n_layers-1):
+		# 	self.neuron_good_test_firerate_ind[l] = np.where((np.mean(self.firerate_test[l],0)>0.02) & (np.mean(self.firerate_test[l],0)<0.4))[0]
 
 
 		# ### layer input measure from each adjacent layer
@@ -1406,18 +1410,24 @@ class DBM_class(object):
 			## gather input data # calc layer variance across batch
 			if subspace=="all":
 				## calc layer probs and set these to the layer vars to smooth later calcs
-				self.firerate_nc              = sess.run(self.update_l_p[1:],{self.temp_tf : temp, self.droprate_tf : droprate})
+				self.firerate_nc               = sess.run(self.update_l_p[:],{self.temp_tf : temp, self.droprate_tf : droprate})
 				self.l_input_nc, self.l_var_nc = self.get_total_layer_input()
 				self.hist_input_nc             = self.get_units_input()
 				self.unit_diversity_nc         = sess.run(self.unit_diversity)
 				self.layer_diversity_nc        = sess.run(self.layer_diversity)
+				
+				# save to file	
+				save_firerates_to_file(self.firerate_nc,saveto_path+"/FireratesNoContext")
+
 			else:
-				self.firerate_c             = sess.run(self.update_l_p[1:],{self.temp_tf : temp, self.droprate_tf : droprate})
+				self.firerate_c              = sess.run(self.update_l_p[:],{self.temp_tf : temp, self.droprate_tf : droprate})
 				self.l_input_c, self.l_var_c = self.get_total_layer_input()
 				self.hist_input_c            = self.get_units_input()
 				self.unit_diversity_c        = sess.run(self.unit_diversity)
 				self.layer_diversity_c       = sess.run(self.layer_diversity)
 
+				## save to file
+				save_firerates_to_file(self.firerate_c,saveto_path+"/FireratesContext")
 
 		if mode=="generate":
 			sess.run(self.assign_l_rand)
@@ -2097,10 +2107,12 @@ class DBM_context_class(DBM_class):
 
 		## get firerates of every unit
 		self.firerate_test = sess.run(self.update_l_p, {self.temp_tf : mytemp, self.droprate_tf : droprate})
+		save_firerates_to_file(self.firerate_test,saveto_path+"/FirerateTest")
+
 		# were firerates are around 0.1
-		self.neuron_good_test_firerate_ind=[None]*DBM.n_layers
-		for l in range(1,DBM.n_layers-1):
-			self.neuron_good_test_firerate_ind[l] = np.where((np.mean(self.firerate_test[l],0)>0.02) & (np.mean(self.firerate_test[l],0)<0.4))[0]
+		# self.neuron_good_test_firerate_ind=[None]*DBM.n_layers
+		# for l in range(1,DBM.n_layers-1):
+		# 	self.neuron_good_test_firerate_ind[l] = np.where((np.mean(self.firerate_test[l],0)>0.02) & (np.mean(self.firerate_test[l],0)<0.4))[0]
 
 
 		# ### layer input measure from each adjacent layer
@@ -2316,13 +2328,13 @@ class DBM_context_class(DBM_class):
 			## gather input data # calc layer variance across batch
 			if subspace=="all":
 				## calc layer probs and set these to the layer vars to smooth later calcs
-				self.firerate_nc              = sess.run(self.update_l_p[1:],{self.temp_tf : temp, self.droprate_tf : droprate})
+				self.firerate_nc               = sess.run(self.update_l_p[:],{self.temp_tf : temp, self.droprate_tf : droprate})
 				self.l_input_nc, self.l_var_nc = self.get_total_layer_input()
 				self.hist_input_nc             = self.get_units_input()
 				self.unit_diversity_nc         = sess.run(self.unit_diversity)
 				self.layer_diversity_nc        = sess.run(self.layer_diversity)
 			else:
-				self.firerate_c             = sess.run(self.update_l_p[1:],{self.temp_tf : temp, self.droprate_tf : droprate})
+				self.firerate_c              = sess.run(self.update_l_p[:],{self.temp_tf : temp, self.droprate_tf : droprate})
 				self.l_input_c, self.l_var_c = self.get_total_layer_input()
 				self.hist_input_c            = self.get_units_input()
 				self.unit_diversity_c        = sess.run(self.unit_diversity)
@@ -2491,17 +2503,17 @@ if DO_LOAD_FROM_FILE and np.any(np.fromstring(PATHSUFFIX[26:].split("]")[0],sep=
 
 
 ######### DBM #############################################################################################
-# DBM = DBM_class(	shape = DBM_SHAPE,
-# 					liveplot = 0,
-# 					classification = 1,
-# 					UserSettings = UserSettings,
-# 				)
+DBM = DBM_class(	shape = DBM_SHAPE,
+					liveplot = 0,
+					classification = 1,
+					UserSettings = UserSettings,
+				)
 
-DBM = DBM_context_class(DBM_SHAPE, 
-						liveplot = 0, 
-						classification = 1,
-						UserSettings = UserSettings,
-						)
+# DBM = DBM_context_class(DBM_SHAPE, 
+# 						liveplot = 0, 
+# 						classification = 1,
+# 						UserSettings = UserSettings,
+# 						)
 
 
 ###########################################################################################################
@@ -2562,7 +2574,9 @@ if DO_TRAINING:
 # last test session
 if DO_TESTING:
 	with tf.Session() as sess:
-		DBM.test(test_data, test_label if LOAD_MNIST else None, test_label_context if LOAD_MNIST else None,
+		DBM.test(test_data,
+				test_label if LOAD_MNIST else None, 
+				# test_label_context if LOAD_MNIST else None,
 				N               = 40,  # sample ist aus random werten, also mindestens 2 sample machen
 				create_conf_mat = 0,
 				temp_start      = DBM.temp,
@@ -3278,12 +3292,12 @@ if DO_CONTEXT:
 		layer_str = get_layer_label(DBM.type(), DBM.n_layers,l,short=True)
 
 		delta_sigma = DBM.unit_diversity_c[l]-DBM.unit_diversity_nc[l]
-		delta_f     = np.mean(DBM.firerate_c[l-1],0) - np.mean(DBM.firerate_nc[l-1],0)
+		delta_f     = np.mean(DBM.firerate_c[l],0) - np.mean(DBM.firerate_nc[l],0)
 
 		biggest_var_change_ind[l-1] = np.where(delta_sigma > sorted(delta_sigma)[-11] )[0]
 
-		big_var_change_hists_c  = calc_neuron_hist(biggest_var_change_ind[l-1], DBM.firerate_c[l-1],   test_label[index_for_number_gibbs[:]], 0.5, len(subspace))
-		big_var_change_hists_nc = calc_neuron_hist(biggest_var_change_ind[l-1], DBM.firerate_nc[l-1],  test_label[index_for_number_gibbs[:]], 0.5, len(subspace))
+		big_var_change_hists_c  = calc_neuron_hist(biggest_var_change_ind[l-1], DBM.firerate_c[l],   test_label[index_for_number_gibbs[:]], 0.5, len(subspace))
+		big_var_change_hists_nc = calc_neuron_hist(biggest_var_change_ind[l-1], DBM.firerate_nc[l],  test_label[index_for_number_gibbs[:]], 0.5, len(subspace))
 
 		fig2, ax2 = plt.subplots(2,len(big_var_change_hists_c)//2,figsize=(8,4),sharey="row")
 		m=0
@@ -3300,7 +3314,7 @@ if DO_CONTEXT:
 		if DO_SAVE_TO_FILE:
 			plt.close(fig2)
 
-		ax_f[0,l-1].hist(np.mean(DBM.firerate_nc[l-1],0),bins=30, lw = 0.2, edgecolor = "k")
+		ax_f[0,l-1].hist(np.mean(DBM.firerate_nc[l],0),bins=30, lw = 0.2, edgecolor = "k")
 		ax_f[1,l-1].hist(delta_f,bins=30, lw = 0.2, edgecolor = "k")
 
 		ax_f[0,l-1].set_xlabel(r"$<f_{%s}^{\mathrm{nc}}>_{batch}$"%layer_str[1:-1])
