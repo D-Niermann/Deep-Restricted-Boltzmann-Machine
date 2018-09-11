@@ -1190,7 +1190,6 @@ class DBM_class(object):
 
 		## get firerates of every unit
 		self.firerate_test = sess.run(self.update_l_p, {self.temp_tf : mytemp, self.droprate_tf : droprate})
-		save_firerates_to_file(self.firerate_test,saveto_path+"FirerateTest")
 
 
 		# were firerates are around 0.1
@@ -2581,6 +2580,8 @@ if DO_TESTING:
 				create_conf_mat = 0,
 				temp_start      = DBM.temp,
 				temp_end        = DBM.temp)
+	save_firerates_to_file(DBM.firerate_test,saveto_path+"/FirerateTest")
+
 
 if DO_GEN_IMAGES:
 	with tf.Session() as sess:
@@ -2777,7 +2778,7 @@ if DO_CONTEXT:
 				np.savetxt(saveto_path+"/context_hist/hist_data_c_digit_%i"%cl,np.array(hist_data[cl]))
 				np.savetxt(saveto_path+"/context_hist/hist_data_nc_digit_%i"%cl,np.array(hist_data_nc[cl]))
 			file_gs.close()
-
+			
 
 
 	log.end() #end session

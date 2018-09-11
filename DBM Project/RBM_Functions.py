@@ -46,7 +46,9 @@ def save_firerates_to_file(firerates,dir_):
     if len(firerates) > 10:
         raise ValueError("Length of Input bigger 10. Wrong array as input?")
 
-    os.mkdir(dir_)
+    if not os.path.isdir(dir_):
+        os.mkdir(dir_)
+        
     for l in range(len(firerates)):
         np.savetxt(dir_+"/Layer%i"%l, firerates[l],fmt='%.3e')
 
