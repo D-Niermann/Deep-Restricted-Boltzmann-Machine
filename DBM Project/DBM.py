@@ -79,6 +79,12 @@ if "train_data" not in globals():
 		log.out("Loading Data")
 		mnist = input_data.read_data_sets("MNIST_data/", one_hot=True)
 		train_data, train_label, test_data, test_label = mnist.train.images, mnist.train.labels, mnist.test.images, mnist.test.labels
+		### multiply the label vectors 
+		label_mult  = 5
+		test_label  = np.concatenate((test_label,)*label_mult,axis=1)
+		train_label = np.concatenate((train_label,)*label_mult,axis=1)
+
+		### create context label 
 		train_label_context = np.zeros([len(train_label),2])
 		test_label_context = np.zeros([len(test_label),2])
 
@@ -922,7 +928,7 @@ class DBM_class(object):
 		if self.n_layers <=3 and self.classification==1:
 			M = 2
 		else:
-			M = 50
+			M = 20
 
 
 
@@ -1208,7 +1214,7 @@ class DBM_class(object):
 
 		#### reconstruction of v
 		# update v M times
-		self.label_l_save = layer_save_test[-1][-1]
+		self.label_l_save = layer_save_test[-1][-1][:,:10]
 
 		for i in range(N):
 			layer_save_test[0][i] = sess.run(self.update_l_s[0],{self.temp_tf : mytemp, self.droprate_tf: droprate})
@@ -1828,7 +1834,7 @@ class DBM_context_class(DBM_class):
 		if self.n_layers <=3 and self.classification == 1:
 			M = 2
 		else:
-			M = 50
+			M = 20
 
 
 
@@ -2106,7 +2112,6 @@ class DBM_context_class(DBM_class):
 
 		## get firerates of every unit
 		self.firerate_test = sess.run(self.update_l_p, {self.temp_tf : mytemp, self.droprate_tf : droprate})
-		save_firerates_to_file(self.firerate_test,saveto_path+"/FirerateTest")
 
 		# were firerates are around 0.1
 		# self.neuron_good_test_firerate_ind=[None]*DBM.n_layers
@@ -2502,17 +2507,17 @@ if DO_LOAD_FROM_FILE and np.any(np.fromstring(PATHSUFFIX[26:].split("]")[0],sep=
 
 
 ######### DBM #############################################################################################
-# DBM = DBM_class(	shape = DBM_SHAPE,
-# 					liveplot = 0,
-# 					classification = 1,
-# 					UserSettings = UserSettings,
-# 				)
+DBM = DBM_class(	shape = DBM_SHAPE,
+					liveplot = 0,
+					classification = 1,
+					UserSettings = UserSettings,
+				)
 
-DBM = DBM_context_class(DBM_SHAPE, 
-						liveplot = 0, 
-						classification = 1,
-						UserSettings = UserSettings,
-						)
+# DBM = DBM_context_class(DBM_SHAPE, 
+# 						liveplot = 0, 
+# 						classification = 1,
+# 						UserSettings = UserSettings,
+# 						)
 
 
 ###########################################################################################################
@@ -2603,7 +2608,7 @@ if DO_GEN_IMAGES:
 
 		generated_img = DBM.gibbs_sampling(label_clamp,
 							1000,
-							temp, temp,
+							DBM.temp, DBM.temp,
 							100, 100,
 							mode     = "generate",
 							subspace = [],
@@ -2778,7 +2783,7 @@ if DO_CONTEXT:
 				np.savetxt(saveto_path+"/context_hist/hist_data_c_digit_%i"%cl,np.array(hist_data[cl]))
 				np.savetxt(saveto_path+"/context_hist/hist_data_nc_digit_%i"%cl,np.array(hist_data_nc[cl]))
 			file_gs.close()
-			
+
 
 
 	log.end() #end session

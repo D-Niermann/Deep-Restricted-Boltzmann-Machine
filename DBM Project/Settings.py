@@ -3,8 +3,8 @@ UserSettings = {
 	"N_BATCHES_PRETRAIN" : 500, 				# how many batches per epoch for pretraining
 	"N_BATCHES_TRAIN"    : 60, 				# how many batches per epoch for complete DBM training
 	"N_EPOCHS_PRETRAIN"  : [0,0,0,0,0,0], 	# pretrain epochs for each RBM
-	"N_EPOCHS_TRAIN"     : 1, 				# how often to iter through the test images
-	"TEST_EVERY_EPOCH"   : 10, 					# how many epochs to train before testing on the test data
+	"N_EPOCHS_TRAIN"     : 2, 				# how often to iter through the test images
+	"TEST_EVERY_EPOCH"   : 1, 					# how many epochs to train before testing on the test data
 
 	### learnrates
 	"LEARNRATE_PRETRAIN" : 0.001 ,						# learnrate for pretraining
@@ -52,7 +52,7 @@ UserSettings = {
 					15*15,
 					15*15,
 					15*15,
-					10,2],
+					10*5],
 
 	## only used in DBM_context class
 	"LAYERS_TO_CONNECT" : [-3],		# layer index of which layer to connect the context layer to (v2 label layer is always connected)

@@ -48,9 +48,9 @@ def save_firerates_to_file(firerates,dir_):
 
     if not os.path.isdir(dir_):
         os.mkdir(dir_)
-        
+
     for l in range(len(firerates)):
-        np.savetxt(dir_+"/Layer%i"%l, firerates[l],fmt='%.3e')
+        np.savetxt(dir_+"/Layer%i.txt"%l, firerates[l],fmt='%.3e')
 
 
 def calc_neuron_hist(neuron_index, activities, neuron_label, fire_thresh, n_classes):
