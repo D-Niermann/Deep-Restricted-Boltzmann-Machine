@@ -3110,8 +3110,8 @@ if LOAD_MNIST and DO_TESTING:
 				pass
 		# plot the last layer
 		if DBM.classification:
-			ax3[-DBM.n_label_layer][i].bar(range(DBM.SHAPE[-DBM.n_label_layer]),DBM.label_l_save[i])
-			ax3[-DBM.n_label_layer][i].set_xticks(range(DBM.SHAPE[-DBM.n_label_layer]))
+			ax3[-DBM.n_label_layer][i].bar(range(DBM.SHAPE[-DBM.n_label_layer]/label_mult),DBM.label_l_save[i])
+			ax3[-DBM.n_label_layer][i].set_xticks(range(DBM.SHAPE[-DBM.n_label_layer]/label_mult))
 			ax3[-DBM.n_label_layer][i].set_ylim(0,1)
 
 			if DBM.type() == "DBM_context":
@@ -3150,8 +3150,8 @@ if LOAD_MNIST and DO_TESTING:
 				pass
 		# plot the last layer
 		if DBM.classification:
-			ax3[-DBM.n_label_layer][m].bar(range(DBM.SHAPE[-DBM.n_label_layer]),DBM.label_l_save[i])
-			ax3[-DBM.n_label_layer][m].set_xticks(range(DBM.SHAPE[-DBM.n_label_layer]))
+			ax3[-DBM.n_label_layer][m].bar(range(DBM.SHAPE[-DBM.n_label_layer]/label_mult),DBM.label_l_save[i])
+			ax3[-DBM.n_label_layer][m].set_xticks(range(DBM.SHAPE[-DBM.n_label_layer]/label_mult))
 			ax3[-DBM.n_label_layer][m].set_ylim(0,1)
 
 			if DBM.type() == "DBM_context":
