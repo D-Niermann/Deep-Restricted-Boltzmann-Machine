@@ -80,7 +80,7 @@ if "train_data" not in globals():
 		mnist = input_data.read_data_sets("MNIST_data/", one_hot=True)
 		train_data, train_label, test_data, test_label = mnist.train.images, mnist.train.labels, mnist.test.images, mnist.test.labels
 		### multiply the label vectors 
-		label_mult  = 5
+		label_mult  = 1
 		test_label  = np.concatenate((test_label,)*label_mult,axis=1)
 		train_label = np.concatenate((train_label,)*label_mult,axis=1)
 
@@ -128,29 +128,7 @@ if "train_data" not in globals():
 				index_for_number_train.append(i)
 
 
-
-			# 	new_data_train = np.zeros([len(train_label),100])
-			# 	new_data_test = np.zeros([len(test_label),100])
-			# 	for i in range(len(train_label)):
-			# 		new_data_train[i]  = np.repeat(train_label[i],10).reshape(10,10).T.flatten()
-			# 	for i in range(len(test_label)):
-			# 		new_data_test[i]  = np.repeat(test_label[i],10).reshape(10,10).T.flatten()
-			# 	train_label = new_data_train
-			# 	test_label = new_data_test
-			# log.out("Setting trian label = 10*10")
-				# test_data_noise = np.copy(test_data)
-				# # making noise
-				# for i in range(len(test_data_noise)):
-				# 	test_data_noise[i]  += np.round(rnd.random(test_data_noise[i,:].shape)*0.55)
-				# 	# half_images[i] = abs(half_images[i])
-				# 	# half_images[i] *= 1/half_images[i].max()
-				# 	# half_images[i] *= rnd.random(half_images[i].shape)
-				# test_data_noise   = test_data_noise>0
-
-				# noise_data_train = sample_np(rnd.random(train_data.shape)*0.2)
-				# noise_data_test = sample_np(rnd.random(test_data.shape)*0.2)
-				# noise_label_train = np.zeros(train_label.shape)
-				# noise_label_test = np.zeros(test_label.shape)
+		test_data_noise = sample_np(test_data + (rnd.random(test_data.shape)-0.5)*1.1)
 
 	if LOAD_HORSES:
 		log.out("Loading HORSE Data")
@@ -1612,11 +1590,11 @@ class DBM_class(object):
 
 			# save weights
 			for i in range(len(self.w_np)):
-				np.savetxt("w%i.txt"%i, self.w_np[i])
+				np.savetxt("w%i.txt"%i, self.w_np[i],fmt="%.5e")
 
 			##  save bias
 			for i in range(len(self.bias_np)):
-				np.savetxt("bias%i.txt"%i, self.bias_np[i])
+				np.savetxt("bias%i.txt"%i, self.bias_np[i],fmt="%.5e")
 
 			## save save_dict
 			try:
@@ -2579,7 +2557,7 @@ if DO_TRAINING:
 # last test session
 if DO_TESTING:
 	with tf.Session() as sess:
-		DBM.test(test_data,
+		DBM.test(test_data_noise,
 				test_label if LOAD_MNIST else None, 
 				N               = 40,  # sample ist aus random werten, also mindestens 2 sample machen
 				create_conf_mat = 0,
@@ -3110,8 +3088,8 @@ if LOAD_MNIST and DO_TESTING:
 				pass
 		# plot the last layer
 		if DBM.classification:
-			ax3[-DBM.n_label_layer][i].bar(range(DBM.SHAPE[-DBM.n_label_layer]/label_mult),DBM.label_l_save[i])
-			ax3[-DBM.n_label_layer][i].set_xticks(range(DBM.SHAPE[-DBM.n_label_layer]/label_mult))
+			ax3[-DBM.n_label_layer][i].bar(range(DBM.SHAPE[-DBM.n_label_layer]//label_mult),DBM.label_l_save[i])
+			ax3[-DBM.n_label_layer][i].set_xticks(range(DBM.SHAPE[-DBM.n_label_layer]//label_mult))
 			ax3[-DBM.n_label_layer][i].set_ylim(0,1)
 
 			if DBM.type() == "DBM_context":
@@ -3150,8 +3128,8 @@ if LOAD_MNIST and DO_TESTING:
 				pass
 		# plot the last layer
 		if DBM.classification:
-			ax3[-DBM.n_label_layer][m].bar(range(DBM.SHAPE[-DBM.n_label_layer]/label_mult),DBM.label_l_save[i])
-			ax3[-DBM.n_label_layer][m].set_xticks(range(DBM.SHAPE[-DBM.n_label_layer]/label_mult))
+			ax3[-DBM.n_label_layer][m].bar(range(DBM.SHAPE[-DBM.n_label_layer]//label_mult),DBM.label_l_save[i])
+			ax3[-DBM.n_label_layer][m].set_xticks(range(DBM.SHAPE[-DBM.n_label_layer]//label_mult))
 			ax3[-DBM.n_label_layer][m].set_ylim(0,1)
 
 			if DBM.type() == "DBM_context":
