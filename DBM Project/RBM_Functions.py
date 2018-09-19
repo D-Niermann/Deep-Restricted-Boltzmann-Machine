@@ -6,7 +6,28 @@ from matplotlib.pyplot import savefig,matshow,colorbar
 from math import sqrt
 
 
-
+def load_logfile(path):
+    for files in os.listdir(path):
+        if files=="logfile.txt":
+            logfile_={}
+            with open(path+"logfile.txt","r") as logfile:
+                for line in logfile:
+                    for i in range(len(line)):
+                        if line[i]==",":
+                            save=i
+                            break
+                    value=line[save+1:-1]
+                    try:
+                        value=float(value)
+                    except:
+                        try:
+                            value_buff = np.fromstring(value[1:-1], sep = ",")
+                            if len(value_buff)>0:
+                                value = value_buff
+                        except:
+                            pass
+                    logfile_[line[0:save]] = value
+    return logfile_
 
 def scale_to_unit_interval(ndar, eps=1e-8):
     """ Scales all values in the ndarray ndar to be between 0 and 1 """

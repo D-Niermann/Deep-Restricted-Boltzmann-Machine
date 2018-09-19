@@ -8,10 +8,10 @@ mean_img = np.mean(train_data[:10000],0)
 
 ## user variables
 layer       = 3
-fire_thresh = 0.9
+fire_thresh = 0.8
 w_thresh    = 0.04
 min_mean    = 0.05
-max_mean    = 0.2
+max_mean    = 0.8
 
 
 # os.chdir("/Users/Niermann/Desktop/Plots/Layer_%i"%layer)
@@ -29,11 +29,11 @@ for l in range(1,DBM.n_layers-1):
 neuron_number_ = []
 neuron_means_ =[]
 for neuron in range(DBM.SHAPE[layer]):
-	m_c = means_c[layer-1][neuron]
-	m_nc = means_nc[layer-1][neuron]
-	if m_c<m_nc/2.2:
-	# if m>min_mean and m<max_mean:
-		neuron_number_.append(np.where(means_c[layer-1]==m_c)[0][0])
+	m_c = means_c[layer][neuron]
+	m_nc = means_nc[layer][neuron]
+	# if m_c<m_nc/2.2:
+	if m>min_mean and m<max_mean:
+		neuron_number_.append(np.where(means_c[layer]==m_c)[0][0])
 		neuron_means_.append(m)
 	if len(neuron_number_)>20:
 		break
@@ -42,11 +42,11 @@ neuron_number_ = list(set(neuron_number_))
 
 
 ## get neurons based on their weight strength
-neuron_number_ = np.where(np.abs(DBM.w_np[-1][:,5:])>w_thresh)[0]
-target_class = np.where(np.abs(DBM.w_np[-1][:,5:])>w_thresh)[1]
+# neuron_number_ = np.where(np.abs(DBM.w_np[-1][:,5:])>w_thresh)[0]
+# target_class = np.where(np.abs(DBM.w_np[-1][:,5:])>w_thresh)[1]
 
-# get neurons by max weights from weights to context layer
-neuron_number_ = ind[0]
+# # get neurons by max weights from weights to context layer
+# neuron_number_ = ind[0]
 
 
 
@@ -61,7 +61,7 @@ def get_neuron_subdata(neuron,firerates,fire_thresh,context):
 
 	neurons = np.where(firerates[:,neuron]>fire_thresh)[0]
 
-	if not len(neurons)<4:
+	if len(neurons)>1:
 		if context==False:
 			subdata     = test_data[neurons]
 			sublabel    = test_label[neurons]
@@ -80,15 +80,15 @@ def get_neuron_subdata(neuron,firerates,fire_thresh,context):
 	else:
 		return None,None
 hist_diff  = np.zeros(255)
-for neuron in range(10):#range(len(neuron_number_)):
+for neuron in range(len(neuron_number_)):
 	
-	neuron_number = neuron# = neuron_number_[neuron]
+	neuron_number  = neuron_number_[neuron]
 	log.out("Neuron:" , neuron_number)
 
 
 	subdata,label = get_neuron_subdata(neuron_number,DBM.firerate_test[layer],fire_thresh,False)
-	subdata_c,label_c = get_neuron_subdata(neuron_number,DBM.firerate_c[layer-1],fire_thresh,True)
-	subdata_nc,label_nc = get_neuron_subdata(neuron_number,DBM.firerate_nc[layer-1],fire_thresh,True)
+	subdata_c,label_c = get_neuron_subdata(neuron_number,DBM.firerate_c[layer],fire_thresh,True)
+	subdata_nc,label_nc = get_neuron_subdata(neuron_number,DBM.firerate_nc[layer],fire_thresh,True)
 	try:
 		if label_c==None:
 			log.info("Skipped")
@@ -145,8 +145,8 @@ for neuron in range(10):#range(len(neuron_number_)):
 	else:
 		ax[1].set_title("Firerates")
 		ax[1].bar(1,np.mean(DBM.firerate_test[layer][:,neuron_number]))
-		ax[1].bar(2,np.mean(DBM.firerate_c[layer-1][:,neuron_number]))
-		ax[1].bar(3,np.mean(DBM.firerate_nc[layer-1][:,neuron_number]))
+		ax[1].bar(2,np.mean(DBM.firerate_c[layer][:,neuron_number]))
+		ax[1].bar(3,np.mean(DBM.firerate_nc[layer][:,neuron_number]))
 		ax[1].set_xticks([1,2,3])
 		ax[1].set_xticklabels(["Test","Context","No Context"],rotation=20)
 					### old k means plot 

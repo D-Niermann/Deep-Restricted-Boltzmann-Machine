@@ -72,8 +72,8 @@ if True:
 	time_now = time_now.replace(" ", "_")
 
 #### Load T Data
-LOAD_MNIST = 1
-LOAD_HORSES = 0
+LOAD_MNIST = 0
+LOAD_HORSES = 1
 if "train_data" not in globals():
 	if LOAD_MNIST:
 		log.out("Loading Data")
@@ -89,7 +89,7 @@ if "train_data" not in globals():
 		test_label_context = np.zeros([len(test_label),2])
 
 		# global subspace set 
-		subspace = [0,2,4,6,8]
+		subspace = [5,6,7,8,9]
 		# better name for this:
 		subset = subspace 
 
@@ -1192,7 +1192,7 @@ class DBM_class(object):
 
 		#### reconstruction of v
 		# update v M times
-		self.label_l_save = layer_save_test[-1][-1][:,:10]
+		self.label_l_save = layer_save_test[-1][-1][:,:]
 
 		for i in range(N):
 			layer_save_test[0][i] = sess.run(self.update_l_s[0],{self.temp_tf : mytemp, self.droprate_tf: droprate})
@@ -1270,7 +1270,7 @@ class DBM_class(object):
 		log.reset()
 		return wrong_classified_ind
 
-	def gibbs_sampling(self, v_input, gibbs_steps, TEMP_START, temp_end, droprate_start, droprate_end, subspace, mode, liveplot=1):
+	def gibbs_sampling(self, v_input, gibbs_steps, TEMP_START, temp_end, droprate_start, droprate_end, subspace, mode, liveplot=1, l_input=None):
 		""" Repeatedly samples v and label , where label can be modified by the user with the multiplication
 		by the modification array - clamping the labels to certain numbers.
 		v_input :: starting with an image as input can also be a batch of images
@@ -1309,7 +1309,7 @@ class DBM_class(object):
 
 		if liveplot:
 			log.info("Liveplotting gibbs sampling")
-			fig,ax=plt.subplots(1,self.n_layers+1,figsize=(15,6))
+			fig,ax = plt.subplots(1,self.n_layers+1,figsize=(15,6))
 			# plt.tight_layout()
 
 		log.start("Gibbs Sampling")
@@ -1317,7 +1317,7 @@ class DBM_class(object):
 		log.info("Temp_range:",round(TEMP_START,5),"->",round(temp_end,5))
 		log.info("Dropout_range:",round(droprate_start,5),"->",round(droprate_end,5))
 
-		if mode=="context":
+		if mode == "context":
 			sess.run(self.assign_l[0],{self.layer_ph[0] : v_input})
 			for i in range(1,self.n_layers):
 				sess.run( self.assign_l[i], {self.layer_ph[i] : 0.01*rnd.random([self.batchsize, self.SHAPE[i]])} )
@@ -1347,10 +1347,10 @@ class DBM_class(object):
 				w_ = self.w[-1].eval()
 				b_ = self.bias[-1].eval()
 				# set values to 0
-				w_[:,subspace_anti] = 0
-				b_[subspace_anti] = -1000
+				# w_[:,subspace_anti] = 0
+				b_[subspace_anti] = -1e10
 				# assign to tf variables
-				sess.run(self.w[-1].assign(w_))
+				# sess.run(self.w[-1].assign(w_))
 				sess.run(self.bias[-1].assign(b_))
 
 
@@ -1400,7 +1400,7 @@ class DBM_class(object):
 				self.layer_diversity_nc        = sess.run(self.layer_diversity)
 
 				# save to file	
-				save_firerates_to_file(self.firerate_nc,saveto_path+"/FireratesNoContext")
+				# save_firerates_to_file(self.firerate_nc,saveto_path+"/FireratesNoContext")
 
 			else:
 				self.firerate_c              = sess.run(self.update_l_p[:],{self.temp_tf : temp, self.droprate_tf : droprate})
@@ -1410,7 +1410,7 @@ class DBM_class(object):
 				self.layer_diversity_c       = sess.run(self.layer_diversity)
 
 				## save to file
-				save_firerates_to_file(self.firerate_c,saveto_path+"/FireratesContext")
+				# save_firerates_to_file(self.firerate_c,saveto_path+"/FireratesContext")
 
 		if mode=="generate":
 			sess.run(self.assign_l_rand)
@@ -1451,7 +1451,7 @@ class DBM_class(object):
 			# 	sess.run(self.update_l_s[1:],{self.temp_tf : temp})
 
 			## init save arrays for every layer and every gibbs step
-			self.layer_save_generate = [[None] for i in range(gibbs_steps)]
+			self.layer_save_generate = [[None] for i in range(self.n_layers)]
 			# for i in range(len(self.layer_save_generate)):
 			# 	self.layer_save_generate[i] = np.zeros([gibbs_steps,DBM.SHAPE[i]])
 			self.energy_generate = np.zeros([gibbs_steps,self.batchsize])
@@ -1474,6 +1474,24 @@ class DBM_class(object):
 
 				# assign new temp
 				temp += temp_delta
+				droprate+=drop_delta
+
+		if mode=="clamped":
+			sess.run(self.assign_l_rand)
+
+			self.layer_save_generate = [[None] for i in range(self.n_layers)]
+			for layer in range(len(self.layer_save_generate)):
+				self.layer_save_generate[layer] = np.zeros( [gibbs_steps, self.batchsize, self.SHAPE[layer]] )
+
+			sess.run(self.layer[0].assign(v_input))
+			sess.run(self.layer[-self.n_label_layer].assign(l_input))
+
+			for step in range(gibbs_steps):
+				self.glauber_step("v+l", temp, droprate, self.layer_save_generate, step)
+
+				# assign new temp
+				temp += temp_delta
+				droprate+=drop_delta
 
 
 		if liveplot and plt.fignum_exists(fig.number) and self.batchsize==1:
@@ -1519,15 +1537,15 @@ class DBM_class(object):
 			plt.close(fig)
 
 		log.end()
-		if mode=="freerunning" or mode=="generate":
+		if mode == "context":
+			# return the mean of the last 30 gibbs samples for all images
+			return np.mean(layer_gs[-1][-30:,:],axis=0)
+		else:
 			# return the last images that got generated
-			return np.mean(self.layer_save_generate[0][-40:],0)
+			return np.mean(self.layer_save_generate[0][-10:],0)
 			# v_layer = sess.run(self.update_l_p[0], {self.temp_tf : temp})
 			# return v_layer
 
-		else:
-			# return the mean of the last 30 gibbs samples for all images
-			return np.mean(layer_gs[-1][-30:,:],axis=0)
 
 	def export(self):
 		# convert weights and biases to numpy arrays
@@ -1609,14 +1627,14 @@ class DBM_class(object):
 			self.log_list["Train_Time"] = self.train_time
 			self.log_list["Epochs"]     = self.epochs
 			self.log_list["Update"]     = self.update
-			## wrte to file
-			with open("logfile.txt","w") as log_file:
-					for key in self.log_list:
-						log_file.write(key+","+str(self.log_list[key])+"\n")
-					
-
-
 			log.info("Saved data and log to:", new_path)
+
+		## wrte logfile
+		with open("logfile.txt","w") as log_file:
+				for key in self.log_list:
+					log_file.write(key+","+str(self.log_list[key])+"\n")
+
+
 		os.chdir(workdir)
 
 	def type(self):
@@ -2487,7 +2505,7 @@ if DO_LOAD_FROM_FILE and np.any(np.fromstring(PATHSUFFIX[26:].split("]")[0],sep=
 ######### DBM #############################################################################################
 DBM = DBM_class(	shape = DBM_SHAPE,
 					liveplot = 0,
-					classification = 1,
+					classification = 0,
 					UserSettings = UserSettings,
 				)
 
@@ -2557,13 +2575,13 @@ if DO_TRAINING:
 # last test session
 if DO_TESTING:
 	with tf.Session() as sess:
-		DBM.test(test_data_noise,
+		DBM.test(test_data,
 				test_label if LOAD_MNIST else None, 
 				N               = 40,  # sample ist aus random werten, also mindestens 2 sample machen
 				create_conf_mat = 0,
 				temp_start      = DBM.temp,
 				temp_end        = DBM.temp)
-	save_firerates_to_file(DBM.firerate_test,saveto_path+"/FirerateTest")
+	# save_firerates_to_file(DBM.firerate_test,saveto_path+"/FireratesTest")
 
 
 if DO_GEN_IMAGES:
@@ -2632,12 +2650,12 @@ if DO_CONTEXT:
 	log.info("Subspace: ", subspace)
 
 
-	# loop through images from all wrong classsified images and find al images that are <5
+	# loop through images from all wrong classsified images and find al images that are in subspace
 	index_for_number_gibbs=[]
 	for i in range(10000):
 
 		## find the digit that was presented
-		digit=np.where(test_label[i])[0][0]
+		digit = np.where(test_label[i])[0][0]
 
 		## set desired digit range
 		if digit in subspace:
@@ -2652,6 +2670,7 @@ if DO_CONTEXT:
 		raise ValueError("No Images found")
 
 
+	log.start("Sampling data")
 	with tf.Session() as sess:
 		# first session with no context applied (see param "subspace" = "all")
 		DBM.graph_init("gibbs")
@@ -2659,7 +2678,6 @@ if DO_CONTEXT:
 
 
 		# calculte h2 firerates over all gibbs_steps
-		log.start("Sampling data")
 		h2_no_context = DBM.gibbs_sampling(test_data[index_for_number_gibbs[:]], 30,
 							DBM.temp , DBM.temp,
 							999, 999,
@@ -2680,87 +2698,87 @@ if DO_CONTEXT:
 							mode     = "context",
 							subspace = subspace,
 							liveplot = 0)
-		# log.end()
-		# DBM.export()
-
-		# append h2 activity to array, but only the unit that corresponst to the given digit picture
-		desired_digits_c  = []
-		desired_digits_nc = []
-		wrong_digits_c    = []
-		wrong_digits_nc   = []
-
-		correct_maxis_c    = []
-		correct_maxis_nc   = []
-		incorrect_maxis_c  = []
-		incorrect_maxis_nc = []
-
-		wrongs_outside_subspace_c = 0
-		wrongs_outside_subspace_nc = 0
-
-		hist_data    = np.zeros([10,1,10]).tolist()
-		hist_data_nc = np.zeros([10,1,10]).tolist()
-
-		for i,d in enumerate(index_for_number_gibbs):
-			digit = np.where( test_label[d] == 1 )[0][0]
-
-			hist_data[digit].append( h2_context[i].tolist() )
-			hist_data_nc[digit].append( h2_no_context[i].tolist() )
-
-			### count how many got right (with context)
-			## but only count the labels within subspace
-			maxi_c         = h2_context[i][subspace[:]].max()
-			maxi_all_pos_c = np.where(h2_context[i] == h2_context[i].max())[0][0]
-			max_pos_c      = np.where(h2_context[i] == maxi_c)[0][0]
-			if max_pos_c   == digit:
-				correct_maxis_c.append(maxi_c)
-			else:
-				if maxi_all_pos_c  not  in  subspace:
-					wrongs_outside_subspace_c += 1
-				incorrect_maxis_c.append(maxi_c)
-
-			### count how many got right (no context)
-			## but only count the labels within subspace
-			maxi_nc     = h2_no_context[i][subspace[:]].max()
-			maxi_all_pos_nc = np.where(h2_no_context[i]==h2_no_context[i].max())[0][0]
-			max_pos_nc  = np.where(h2_no_context[i] == maxi_nc)[0][0]
-			if max_pos_nc == digit:
-				correct_maxis_nc.append(maxi_nc)
-			else:
-				if maxi_all_pos_nc  not in  subspace:
-					wrongs_outside_subspace_nc += 1
-				incorrect_maxis_nc.append(maxi_nc)
-
-			desired_digits_c.append(h2_context[i,digit])
-			desired_digits_nc.append(h2_no_context[i,digit])
-
-			wrong_digits_c.append(np.mean(h2_context[i,digit+1:])+np.mean(h2_context[i,:digit]))
-			wrong_digits_nc.append(np.mean(h2_no_context[i,digit+1:])+np.mean(h2_context[i,:digit]))
+	log.end()
 
 
+	# append h2 activity to array, but only the unit that corresponst to the given digit picture
+	desired_digits_c  = []
+	desired_digits_nc = []
+	wrong_digits_c    = []
+	wrong_digits_nc   = []
 
-		log.info("Inorrect Context:" , len(incorrect_maxis_c),"/",round(100*len(incorrect_maxis_c)/float(len(index_for_number_gibbs)),2),"%")
-		log.info("Inorrect No Context:" , len(incorrect_maxis_nc),"/",round(100*len(incorrect_maxis_nc)/float(len(index_for_number_gibbs)),2),"%")
-		log.info("Diff:     ",len(incorrect_maxis_nc)-len(incorrect_maxis_c))
-		log.info("Outside subspace (c/nc):",wrongs_outside_subspace_c,",", wrongs_outside_subspace_nc)
-		log.out("Means: Correct // Wrong (c/nc): \n \t \t ", 	round(np.mean(correct_maxis_c),4),
-																round(np.mean(correct_maxis_nc),4), "//",
-																round(np.mean(incorrect_maxis_c),4),
-																round(np.mean(incorrect_maxis_nc),4)
-				)
-		## save to file
-		if DO_SAVE_TO_FILE:
-			file_gs = open(saveto_path+"/context_results.txt","w")
-			file_gs.write("Found images: %i"%len(index_for_number_gibbs)+"\n")
-			file_gs.write("Inorrect Context: " + str(len(incorrect_maxis_c))+"/"+str(round(100*len(incorrect_maxis_c)/float(len(index_for_number_gibbs)),2))+"%"+"\n")
-			file_gs.write("Inorrect No Context: " + str(len(incorrect_maxis_nc))+"/"+str(round(100*len(incorrect_maxis_nc)/float(len(index_for_number_gibbs)),2))+"%"+"\n")
-			file_gs.write("Diff: "+str(len(incorrect_maxis_nc)-len(incorrect_maxis_c))+"\n")
-			file_gs.write("Outside subspace (c/nc): "+str(wrongs_outside_subspace_c)+","+ str(wrongs_outside_subspace_nc))
-			# save hist data
-			os.makedirs(saveto_path+"/context_hist")
-			for cl in range(10):
-				np.savetxt(saveto_path+"/context_hist/hist_data_c_digit_%i"%cl,np.array(hist_data[cl]))
-				np.savetxt(saveto_path+"/context_hist/hist_data_nc_digit_%i"%cl,np.array(hist_data_nc[cl]))
-			file_gs.close()
+	correct_maxis_c    = []
+	correct_maxis_nc   = []
+	incorrect_maxis_c  = []
+	incorrect_maxis_nc = []
+
+	wrongs_outside_subspace_c = 0
+	wrongs_outside_subspace_nc = 0
+
+	hist_data    = np.zeros([10,1,10]).tolist()
+	hist_data_nc = np.zeros([10,1,10]).tolist()
+
+	for i,d in enumerate(index_for_number_gibbs):
+		digit = np.where( test_label[d] == 1 )[0][0]
+
+		hist_data[digit].append( h2_context[i].tolist() )
+		hist_data_nc[digit].append( h2_no_context[i].tolist() )
+
+		### count how many got right (with context)
+		## but only count the labels within subspace
+		maxi_c         = h2_context[i][subspace[:]].max()
+		maxi_all_pos_c = np.where(h2_context[i] == h2_context[i].max())[0][0]
+		max_pos_c      = np.where(h2_context[i] == maxi_c)[0][0]
+		if max_pos_c   == digit:
+			correct_maxis_c.append(maxi_c)
+		else:
+			if maxi_all_pos_c  not  in  subspace:
+				wrongs_outside_subspace_c += 1
+			incorrect_maxis_c.append(maxi_c)
+
+		### count how many got right (no context)
+		## but only count the labels within subspace
+		maxi_nc     = h2_no_context[i][subspace[:]].max()
+		maxi_all_pos_nc = np.where(h2_no_context[i]==h2_no_context[i].max())[0][0]
+		max_pos_nc  = np.where(h2_no_context[i] == maxi_nc)[0][0]
+		if max_pos_nc == digit:
+			correct_maxis_nc.append(maxi_nc)
+		else:
+			if maxi_all_pos_nc  not in  subspace:
+				wrongs_outside_subspace_nc += 1
+			incorrect_maxis_nc.append(maxi_nc)
+
+		desired_digits_c.append(h2_context[i,digit])
+		desired_digits_nc.append(h2_no_context[i,digit])
+
+		wrong_digits_c.append(np.mean(h2_context[i,digit+1:])+np.mean(h2_context[i,:digit]))
+		wrong_digits_nc.append(np.mean(h2_no_context[i,digit+1:])+np.mean(h2_context[i,:digit]))
+
+
+
+	log.info("Inorrect Context:" , len(incorrect_maxis_c),"/",round(100*len(incorrect_maxis_c)/float(len(index_for_number_gibbs)),2),"%")
+	log.info("Inorrect No Context:" , len(incorrect_maxis_nc),"/",round(100*len(incorrect_maxis_nc)/float(len(index_for_number_gibbs)),2),"%")
+	log.info("Diff:     ",len(incorrect_maxis_nc)-len(incorrect_maxis_c))
+	log.info("Outside subspace (c/nc):",wrongs_outside_subspace_c,",", wrongs_outside_subspace_nc)
+	log.out("Means: Correct // Wrong (c/nc): \n \t \t ", 	round(np.mean(correct_maxis_c),4),
+															round(np.mean(correct_maxis_nc),4), "//",
+															round(np.mean(incorrect_maxis_c),4),
+															round(np.mean(incorrect_maxis_nc),4)
+			)
+	## save to file
+	if DO_SAVE_TO_FILE:
+		file_gs = open(saveto_path+"/context_results.txt","w")
+		file_gs.write("Found images: %i"%len(index_for_number_gibbs)+"\n")
+		file_gs.write("Inorrect Context: " + str(len(incorrect_maxis_c))+"/"+str(round(100*len(incorrect_maxis_c)/float(len(index_for_number_gibbs)),2))+"%"+"\n")
+		file_gs.write("Inorrect No Context: " + str(len(incorrect_maxis_nc))+"/"+str(round(100*len(incorrect_maxis_nc)/float(len(index_for_number_gibbs)),2))+"%"+"\n")
+		file_gs.write("Diff: "+str(len(incorrect_maxis_nc)-len(incorrect_maxis_c))+"\n")
+		file_gs.write("Outside subspace (c/nc): "+str(wrongs_outside_subspace_c)+","+ str(wrongs_outside_subspace_nc))
+		# save hist data
+		os.makedirs(saveto_path+"/context_hist")
+		for cl in range(10):
+			np.savetxt(saveto_path+"/context_hist/hist_data_c_digit_%i"%cl,np.array(hist_data[cl]))
+			np.savetxt(saveto_path+"/context_hist/hist_data_nc_digit_%i"%cl,np.array(hist_data_nc[cl]))
+		file_gs.close()
 
 
 
@@ -2808,16 +2826,18 @@ if DO_TRAINING:
 	save_fig(saveto_path+"/weights_img.pdf", DO_SAVE_TO_FILE)
 
 	# plot layer diversity
-	plt.figure("Layer diversity train")
-	for i in range(DBM.n_layers):
-		label_str = get_layer_label(DBM.type(),DBM.n_layers, i)
-		y = smooth(np.array(DBM.layer_diversity_train)[:,i],10)
-		plt.plot(DBM.updates[:len(y)],y,label=label_str,alpha=0.7)
-		plt.legend()
-	plt.xlabel("Update Number")
-	plt.ylabel("Deviation")
-	save_fig(saveto_path+"/layer_diversity.png", DO_SAVE_TO_FILE)
-
+	try:
+		plt.figure("Layer diversity train")
+		for i in range(DBM.n_layers):
+			label_str = get_layer_label(DBM.type(),DBM.n_layers, i)
+			y = smooth(np.array(DBM.layer_diversity_train)[:,i],10)
+			plt.plot(DBM.updates[:len(y)],y,label=label_str,alpha=0.7)
+			plt.legend()
+		plt.xlabel("Update Number")
+		plt.ylabel("Deviation")
+		save_fig(saveto_path+"/layer_diversity.png", DO_SAVE_TO_FILE)
+	except:
+		print("Could not plot layer diversity.")
 	plt.figure("Errors")
 	## train errors
 	# plt.plot(DBM.updates,DBM.recon_error_train,".",label="Recon Error Train",alpha=0.2)
@@ -2929,6 +2949,46 @@ if DO_TRAINING:
 	plt.xlabel("Update Number")
 	plt.ylabel("Train Layer Activity in %")
 	save_fig(saveto_path+"/layer_act_train.png", DO_SAVE_TO_FILE)
+
+if DO_TESTING:
+	# plot some samples from the testdata
+	fig3,ax3 = plt.subplots(len(DBM.SHAPE)+1,13,figsize=(16,8),sharey="row")
+	for i in range(13):
+		# plot the input
+		ax3[0][i].matshow(test_data[i:i+1].reshape(int(sqrt(DBM.SHAPE[0])),int(sqrt(DBM.SHAPE[0]))))
+		ax3[0][i].set_yticks([])
+		ax3[0][i].set_xticks([])
+		# plot the reconstructed image
+		ax3[1][i].matshow(DBM.firerate_test[0][i].reshape(int(sqrt(DBM.SHAPE[0])),int(sqrt(DBM.SHAPE[0]))))
+		ax3[1][i].set_yticks([])
+		ax3[1][i].set_xticks([])
+
+		#plot hidden layer
+		for layer in DBM.get_hidden_layer_ind():
+			try:
+				ax3[layer+1][i].matshow(DBM.firerate_test[layer][i].reshape(int(sqrt(DBM.SHAPE[layer])),int(sqrt(DBM.SHAPE[layer]))))
+				ax3[layer+1][i].set_yticks([])
+				ax3[layer+1][i].set_xticks([])
+			except:
+				pass
+		# plot the last layer
+		if DBM.classification:
+			ax3[-DBM.n_label_layer][i].bar(range(DBM.SHAPE[-DBM.n_label_layer]//label_mult),DBM.label_l_save[i])
+			ax3[-DBM.n_label_layer][i].set_xticks(range(DBM.SHAPE[-DBM.n_label_layer]//label_mult))
+			ax3[-DBM.n_label_layer][i].set_ylim(0,1)
+
+			if DBM.type() == "DBM_context":
+				ax3[-1][i].bar(range(DBM.SHAPE[-1]),DBM.context_l_save[i])
+		else:
+			ax3[-1][i].matshow(DBM.label_l_save[i].reshape(int(sqrt(DBM.SHAPE[-1])),int(sqrt(DBM.SHAPE[-1]))))
+			ax3[-1][i].set_xticks([])
+			ax3[-1][i].set_yticks([])
+
+		#plot the reconstructed layer h1
+		# ax3[5][i].matshow(DBM.rec_h1[i:i+1].reshape(int(sqrt(DBM.SHAPE[1])),int(sqrt(DBM.SHAPE[1]))))
+		# plt.matshow(random_recon.reshape(int(sqrt(DBM.SHAPE[0])),int(sqrt(DBM.SHAPE[0]))))
+	plt.tight_layout(pad=0.0)
+	save_fig(saveto_path+"/examples.pdf", DO_SAVE_TO_FILE)
 
 
 if LOAD_MNIST and DO_TESTING:
@@ -3066,44 +3126,6 @@ if LOAD_MNIST and DO_TESTING:
 	# 	save_fig(saveto_path+"/timeseries_testrun/timeseries_av_layer_%i.png"%(layer+1),DO_SAVE_TO_FILE)
 
 
-	# plot some samples from the testdata
-	fig3,ax3 = plt.subplots(len(DBM.SHAPE)+1,13,figsize=(16,8),sharey="row")
-	for i in range(13):
-		# plot the input
-		ax3[0][i].matshow(test_data[i:i+1].reshape(int(sqrt(DBM.SHAPE[0])),int(sqrt(DBM.SHAPE[0]))))
-		ax3[0][i].set_yticks([])
-		ax3[0][i].set_xticks([])
-		# plot the reconstructed image
-		ax3[1][i].matshow(DBM.firerate_test[0][i].reshape(int(sqrt(DBM.SHAPE[0])),int(sqrt(DBM.SHAPE[0]))))
-		ax3[1][i].set_yticks([])
-		ax3[1][i].set_xticks([])
-
-		#plot hidden layer
-		for layer in DBM.get_hidden_layer_ind():
-			try:
-				ax3[layer+1][i].matshow(DBM.firerate_test[layer][i].reshape(int(sqrt(DBM.SHAPE[layer])),int(sqrt(DBM.SHAPE[layer]))))
-				ax3[layer+1][i].set_yticks([])
-				ax3[layer+1][i].set_xticks([])
-			except:
-				pass
-		# plot the last layer
-		if DBM.classification:
-			ax3[-DBM.n_label_layer][i].bar(range(DBM.SHAPE[-DBM.n_label_layer]//label_mult),DBM.label_l_save[i])
-			ax3[-DBM.n_label_layer][i].set_xticks(range(DBM.SHAPE[-DBM.n_label_layer]//label_mult))
-			ax3[-DBM.n_label_layer][i].set_ylim(0,1)
-
-			if DBM.type() == "DBM_context":
-				ax3[-1][i].bar(range(DBM.SHAPE[-1]),DBM.context_l_save[i])
-		else:
-			ax3[-1][i].matshow(DBM.label_l_save[i].reshape(int(sqrt(DBM.SHAPE[-1])),int(sqrt(DBM.SHAPE[-1]))))
-			ax3[-1][i].set_xticks([])
-			ax3[-1][i].set_yticks([])
-
-		#plot the reconstructed layer h1
-		# ax3[5][i].matshow(DBM.rec_h1[i:i+1].reshape(int(sqrt(DBM.SHAPE[1])),int(sqrt(DBM.SHAPE[1]))))
-		# plt.matshow(random_recon.reshape(int(sqrt(DBM.SHAPE[0])),int(sqrt(DBM.SHAPE[0]))))
-	plt.tight_layout(pad=0.0)
-	save_fig(saveto_path+"/examples.pdf", DO_SAVE_TO_FILE)
 
 	# plot only one digit
 	fig3,ax3 = plt.subplots(len(DBM.SHAPE)+1,10,figsize=(16,8),sharey="row")
@@ -3166,21 +3188,24 @@ if DO_CONTEXT:
 	### plt histograms for each used digit
 	fig,ax = plt.subplots(1,len(subspace),figsize=(12,7),sharey="row")
 	for i,digit in enumerate(subspace):
-		y_nc = np.mean(hist_data_nc[digit][1:],axis=0)
-		y_c  = np.mean(hist_data[digit][1:],axis=0)
-		for j in range(10):
-			if y_nc[j]>y_c[j]:
-				ax[i].bar(j,y_nc[j],color=[0.8,0.1,0.1],label="Without Context",linewidth=0.1,edgecolor="k")
-				ax[i].bar(j,y_c[j] ,color=[0.1,0.7,0.1],label="With Context",linewidth=0.1,edgecolor="k")
-			else:
-				ax[i].bar(j,y_c[j] ,color=[0.1,0.7,0.1],label="With Context",linewidth=0.1,edgecolor="k")
-				ax[i].bar(j,y_nc[j],color=[0.8,0.1,0.1],label="Without Context",linewidth=0.1,edgecolor="k")
+		if len(hist_data_nc[digit])>1:
+			y_nc = np.mean(np.array(hist_data_nc[digit][1:]),axis=0)
+			y_c  = np.mean(np.array(hist_data[digit][1:]),axis=0)
+			for j in range(10):
+				if y_nc[j]>y_c[j]:
+					ax[i].bar(j,y_nc[j],color=[0.8,0.1,0.1],linewidth=0.1,edgecolor="k")
+					ax[i].bar(j,y_c[j] ,color=[0.1,0.7,0.1],linewidth=0.1,edgecolor="k")
+				else:
+					ax[i].bar(j,y_c[j] ,color=[0.1,0.7,0.1],linewidth=0.1,edgecolor="k")
+					ax[i].bar(j,y_nc[j],color=[0.8,0.1,0.1],linewidth=0.1,edgecolor="k")
 
-		plt.legend(loc="center left",bbox_to_anchor = (1.0,0.5))
 		ax[i].set_ylim([0,1])
-		ax[0].set_ylabel("Mean Predicted Label")
 		ax[i].set_title(str(digit))
 		ax[i].set_xticks(range(10))
+	ax[-1].plot(0,0,color = [0.8,0.1,0.1], label="No Context")
+	ax[-1].plot(0,0,color = [0.1,0.7,0.1], label="Context")
+	ax[0].set_ylabel("Mean Predicted Label")
+	plt.legend(loc="center left",bbox_to_anchor = (1.0,0.5))
 	plt.subplots_adjust(bottom=None, right=0.84, left=0.1, top=None,
 	        wspace=None, hspace=None)
 

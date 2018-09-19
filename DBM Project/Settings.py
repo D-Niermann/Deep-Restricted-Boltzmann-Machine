@@ -1,9 +1,9 @@
 UserSettings = {
 	# training process
-	"N_BATCHES_PRETRAIN" : 500, 				# how many batches per epoch for pretraining
-	"N_BATCHES_TRAIN"    : 60, 				# how many batches per epoch for complete DBM training
+	"N_BATCHES_PRETRAIN" : 20, 				# how many batches per epoch for pretraining
+	"N_BATCHES_TRAIN"    : 20, 				# how many batches per epoch for complete DBM training
 	"N_EPOCHS_PRETRAIN"  : [0,0,0,0,0,0], 	# pretrain epochs for each RBM
-	"N_EPOCHS_TRAIN"     : 2, 				# how often to iter through the test images
+	"N_EPOCHS_TRAIN"     : 1, 				# how often to iter through the test images
 	"TEST_EVERY_EPOCH"   : 1, 					# how many epochs to train before testing on the test data
 
 	### learnrates
@@ -21,11 +21,11 @@ UserSettings = {
 	"TEMP_MIN"      : 0.01 ,			# how low temp can fall at minimum
 
 	# seed for random number generation, set None to have no seed 
-	"SEED" : 1,							# random seed for tf and np
+	"SEED" : 2,							# random seed for tf and np
 
 	### state vars
-	"DO_PRETRAINING" : 0,		# if no pretrain then files are automatically loaded
-	"DO_TRAINING"    : 0,		# if to train the whole DBM
+	"DO_PRETRAINING" : 1,		# if no pretrain then files are automatically loaded
+	"DO_TRAINING"    : 1,		# if to train the whole DBM
 	"DO_TESTING"     : 1,		# if testing the DBM with test data
 	"DO_SHOW_PLOTS"  : 1,		# if plots will show on display - either way they get saved into saveto_path
 
@@ -41,18 +41,16 @@ UserSettings = {
 	### saving and loading
 	"DO_SAVE_TO_FILE"       : 1, 	# if to save plots and data to file
 	"DO_SAVE_PRETRAINED"    : 0, 	# if to save the pretrained weights seperately (for later use)
-	"DO_LOAD_FROM_FILE"     : 1, 	# if to load weights and biases from datadir + pathsuffix
+	"DO_LOAD_FROM_FILE"     : 0, 	# if to load weights and biases from datadir + pathsuffix
 	"PATHSUFFIX"            : "Mon_Jun__4_15-55-25_2018_[784, 225, 225, 225, 10] - ['original'] 15%", 
 							#"Mon_Jun__4_15-55-25_2018_[784, 225, 225, 225, 10] - ['original'] 15%"
 								#"Thu_Jun__7_16-21-28_2018_[784, 225, 225, 225, 10] - ['15cont4']"
 	"PATHSUFFIX_PRETRAINED" : "Thu_Jun__7_13-49-25_2018",
 
 
-	"DBM_SHAPE" : [	28*28,
+	"DBM_SHAPE" : [	64*64,
 					15*15,
-					15*15,
-					15*15,
-					10*1],
+					16*1],
 
 	## only used in DBM_context class
 	"LAYERS_TO_CONNECT" : [],		# layer index of which layer to connect the context layer to (v2 label layer is always connected)

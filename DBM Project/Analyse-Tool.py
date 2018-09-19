@@ -17,7 +17,7 @@ if True:
 		OS = "Linux"
 		import importlib
 
-	data_dir=workdir+"/data"
+	data_dir=workdir+"/data/"
 
 	import numpy as np
 	import numpy.random as rnd
@@ -68,7 +68,63 @@ if True:
 	time_now = time.asctime()
 	time_now = time_now.replace(":", "-")
 	time_now = time_now.replace(" ", "_")
+####################################################################################
+
+def load_firerates(folder_name, load_context):
+
+	test_data_dir = data_dir+folder_name+"/FireratesTest/"
+	c_data_dir    = data_dir+folder_name+"/FireratesContext/"
+	nc_data_dir   = data_dir+folder_name+"/FireratesNoContext/"
+
+	f_test = []
+	f_c    = []
+	f_nc   = []
 
 
-load_context = 0
+	log.start("Loading Test Firerates")
+	for f in os.listdir(test_data_dir):
+		f_test.append(np.loadtxt(test_data_dir+f))
+	log.end()
+
+	if load_context:
+		log.start("Loading Context Firerates")
+		for f in os.listdir(c_data_dir):
+			f_c.append(np.loadtxt(c_data_dir+f))
+		for f in os.listdir(nc_data_dir):
+			f_nc.append(np.loadtxt(nc_data_dir+f))
+		log.end()
+		
+		
+	return f_test,f_c,f_nc
+
+
+####################################################################################
+# User Settings
+####################################################################################
+
+folder_name = "Tue_Sep_18_11-28-06_2018_[784, 225, 225, 225, 10]/"
+load_data    = 0
+load_context = 1
+
+
+####################################################################################
+# LOADING
+####################################################################################
+#load the logfile
+logfile = load_logfile(data_dir+folder_name)
+
+# load the firerates
+if load_data:
+	f_test, f_c, f_nc = load_firerates(folder_name, load_context)
+
+# load the weights 
+w = []
+for i in range(len(logfile["DBM_SHAPE"])-1):
+	w_str = data_dir+logfile["PATHSUFFIX"]+"/w%i.txt"%i
+	w.append(np.loadtxt(w_str))
+
+
+####################################################################################
+# Analyzing
+####################################################################################
 
