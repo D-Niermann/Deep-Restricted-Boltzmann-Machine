@@ -31,13 +31,14 @@ UserSettings = {
 
 	### state vars
 	"DO_PRETRAINING" : 0,					# if no pretrain then files are automatically loaded
-	"DO_TRAINING"    : 1,					# if to train the whole DBM
-	"DO_TESTING"     : 1,					# if testing the DBM with test data
+	"DO_TRAINING"    : 0,					# if to train the whole DBM
+	"DO_TESTING"     : 0,					# if testing the DBM with test data
 	"DO_SHOW_PLOTS"  : 1,					# if plots will show on display - either way they get saved into saveto_path
 
 	"DO_CONTEXT"    : 0,					# if to test the context
 		"SUBSPACE"  : [0, 1, 2, 3, 4], 		# global subspace set 
-	"DO_GEN_IMAGES" : 0,					# if to generate images (mode can be choosen at function call)
+	"DO_GEN_IMAGES" : 1,					# if to generate images (mode can be choosen at function call)
+		"FREERUN_MODE" : "freerunning",		# Mode of the gibbs sampler to generate images (freerunning, generate, context)
 	"DO_NOISE_STAB" : 0,					# if to make a noise stability test,
 
 	"USE_DROPOUT"  : 1,						# if to use synnaptic failure while training
@@ -49,7 +50,7 @@ UserSettings = {
 	"DO_SAVE_TO_FILE"       : 1, 	# if to save plots and data to file
 	"DO_SAVE_PRETRAINED"    : 0, 	# if to save the pretrained weights seperately (for later use)
 	"DO_LOAD_FROM_FILE"     : 1, 	# if to load weights and biases from datadir + pathsuffix
-	"PATHSUFFIX"            : "Mon_Sep_24_10-29-47_2018_[4096, 2500, 100] - ['horses -cont']", 
+	"PATHSUFFIX"            : "Mon_Oct_29_10-42-15_2018_[4096, 2500, 100]", 
 								#"Mon_Jun__4_15-55-25_2018_[784, 225, 225, 225, 10] - ['original'] 15%"
 								#"Thu_Jun__7_16-21-28_2018_[784, 225, 225, 225, 10] - ['15cont4']"
 	"PATHSUFFIX_PRETRAINED" : "Thu_Jun__7_13-49-25_2018",

@@ -30,20 +30,21 @@ UserSettings = {
 	"SEED" : 2,									# random seed for tf and np
 
 	### state vars
-	"DO_PRETRAINING" : 0,		# if no pretrain then files are automatically loaded
-	"DO_TRAINING"    : 0,		# if to train the whole DBM
-	"DO_TESTING"     : 1,		# if testing the DBM with test data
-	"DO_SHOW_PLOTS"  : 1,		# if plots will show on display - either way they get saved into saveto_path
+	"DO_PRETRAINING" : 0,						# if no pretrain then files are automatically loaded
+	"DO_TRAINING"    : 0,						# if to train the whole DBM
+	"DO_TESTING"     : 1,						# if testing the DBM with test data
+	"DO_SHOW_PLOTS"  : 1,						# if plots will show on display - either way they get saved into saveto_path
 
-	"DO_CONTEXT"    : 0,		# if to test the context
-		"SUBSPACE"  : [0, 1, 2, 3, 4], 	# global subspace set 
-	"DO_GEN_IMAGES" : 0,		# if to generate images (mode can be choosen at function call)
-	"DO_NOISE_STAB" : 0,		# if to make a noise stability test,
+	"DO_CONTEXT"    : 0,						# if to test the context
+		"SUBSPACE"  : [0, 1, 2, 3, 4], 			# global subspace set 
+	"DO_GEN_IMAGES" : 0,						# if to generate images (mode can be choosen at function call)
+		"FREERUN_MODE" : "freerunning",			# Mode of the gibbs sampler to generate images (freerunning, generate, context)
+	"DO_NOISE_STAB" : 0,						# if to make a noise stability test,
 
-	"USE_DROPOUT"  : 1,			# if to use synnaptic failure while training
-	"DROPOUT_RATE" : 2,			# multiplication of random uniform synaptic failure matrix (higher number -> less failure)
+	"USE_DROPOUT"  : 1,							# if to use synnaptic failure while training
+	"DROPOUT_RATE" : 2,							# multiplication of random uniform synaptic failure matrix (higher number -> less failure)
 
-	"DO_NORM_W"    : 1,			# if to norm the weights and biases to 1 while training
+	"DO_NORM_W"    : 1,							# if to norm the weights and biases to 1 while training
 
 	### saving and loading
 	"DO_SAVE_TO_FILE"       : 0, 	# if to save plots and data to file

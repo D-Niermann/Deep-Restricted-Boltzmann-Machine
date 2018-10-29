@@ -1469,7 +1469,8 @@ class DBM_class(object):
 
 		if mode=="freerunning":
 			sess.run(self.assign_l_zeros)
-			rng  =  index_for_number_test[4][2]#rnd.randint(100)
+			if LOAD_MNIST:
+				rng  =  index_for_number_test[4][2]#rnd.randint(100)
 
 			# log.out("PreAssigning v1 with test data. rng: "+str(rng))
 			# sess.run(self.assign_l[0], {self.layer_ph[0] : np.repeat(test_data[rng:rng+1],self.batchsize,0)})
@@ -2628,7 +2629,7 @@ if DO_GEN_IMAGES:
 							100,
 							DBM.temp, DBM.temp,
 							999, 999,
-							mode     = "freerunning",
+							mode     = UserSettings["FREERUN_MODE"],
 							subspace = [],
 							liveplot = 0,
 							l_input = None)
@@ -2686,7 +2687,7 @@ if DO_GEN_IMAGES:
 		m = 0
 		for i in range(nn):
 			for j in range(nn):
-				ax[i,j].matshow(generated_img[m].reshape(28, 28))
+				ax[i,j].matshow(generated_img[m].reshape(int(sqrt(DBM_SHAPE[0])), int(sqrt(DBM_SHAPE[0]))))
 				ax[i,j].set_xticks([])
 				ax[i,j].set_yticks([])
 				ax[i,j].grid(False)
