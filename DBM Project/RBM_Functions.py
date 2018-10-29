@@ -6,6 +6,42 @@ from matplotlib.pyplot import savefig,matshow,colorbar
 from math import sqrt
 
 
+def follow_neuron_input(layer, neuron_ind, firerates, DBM):
+    """
+    layer :: layer index where the neuron is
+    neuron_ind :: index of neuron to follow the input of
+    firerates :: shape [layer, timestep, batchsize, neuron]
+
+    returns :: both inputs over time for each image in batch and each timestep (bottom up first)
+    """
+    # top down / recurrent
+    td_input = np.zeros(shape=(firerates[layer].shape[:-1]))
+    # bottom up
+    bu_input = np.zeros(shape=(firerates[layer].shape[:-1]))
+
+    for t in range(len(firerates[layer])):
+        bu_input[t] = np.dot(firerates[layer-1][t], DBM.w_np[layer-1]) [:,neuron_ind]
+        td_input[t] = np.dot(firerates[layer+1][t], DBM.w_np[layer].T) [:,neuron_ind]
+
+    return bu_input, td_input
+
+
+def plot_noise_examples():
+    fig,ax = plt.subplots(1,5)
+    m=1
+    ax[0].matshow(sample_np(test_data[1]).reshape(28,28))
+    ax[0].set_xticks([])
+    ax[0].set_yticks([])
+    ax[0].set_xlabel(r"0 \%")
+    for nf in [0.2,1,2,100]:
+        test_data_noise = sample_np(test_data + (rnd.random(test_data.shape)-0.5)*nf)
+        ax[m].matshow(test_data_noise[1].reshape(28,28))
+        ax[m].set_xticks([])
+        ax[m].set_yticks([])
+        label = str(np.round(100*np.mean(np.abs(test_data_noise[2]-test_data[2])),0))
+        ax[m].set_xlabel(label+r" \%")
+        m+=1
+
 def load_logfile(path):
     for files in os.listdir(path):
         if files=="logfile.txt":

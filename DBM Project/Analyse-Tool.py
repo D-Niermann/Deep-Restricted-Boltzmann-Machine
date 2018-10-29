@@ -78,9 +78,9 @@ if "train_data" not in globals():
 ####################################################################################
 def load_firerates(folder_name, load_context):
 
-	test_data_dir = data_dir+folder_name+"/FireratesTest/"
-	c_data_dir    = data_dir+folder_name+"/FireratesContext/"
-	nc_data_dir   = data_dir+folder_name+"/FireratesNoContext/"
+	test_data_dir = data_dir+folder_name+"FireratesTest/"
+	c_data_dir    = data_dir+folder_name+"FireratesContext/"
+	nc_data_dir   = data_dir+folder_name+"FireratesNoContext/"
 
 	f_test = []
 	f_c    = []
@@ -102,6 +102,20 @@ def load_firerates(folder_name, load_context):
 		
 		
 	return f_test,f_c,f_nc
+
+def calc_entropy(f,l):
+	"""
+	calcs the entropy given firerates f and layer l.
+	"""
+	# calc summands
+	a = f[l]*-np.log(f[l])
+	b = (1-f[l])*np.log(1-f[l])
+	# clear nans 
+	a[np.isnan(a)] = 0
+	b[np.isnan(b)] = 0
+	# add up 
+	return a - b
+
 
 def get_neuron_subdata(neuron,firerates,fire_thresh,context):
 	""" 
@@ -138,8 +152,11 @@ def get_neuron_subdata(neuron,firerates,fire_thresh,context):
 
 folder_name = "Tue_Sep_18_11-28-06_2018_[784, 225, 225, 225, 10]/"
 load_test_data    = 0
-load_context_data = 0
+load_context_data = 1
 
+layer       = 3
+fire_thresh = 0.8
+subspace    = [0,1,2,3,4]
 
 ####################################################################################
 # LOADING
@@ -162,42 +179,104 @@ for i in range(len(logfile["DBM_SHAPE"])-1):
 # Calculations
 ####################################################################################
 n_layers = len(logfile["DBM_SHAPE"])
-unit_diversity_test   = [None]*n_layers
-unit_information_test = [None]*n_layers
-unit_entropy_test     = [None]*n_layers
-f_test_mean           = [None]*n_layers
 
-for l in range(len(f_test_mean)):
+unit_diversity_test   = [None]*n_layers
+unit_diversity_c      = [None]*n_layers
+unit_diversity_nc     = [None]*n_layers
+
+unit_information_test = [None]*n_layers
+unit_information_c    = [None]*n_layers
+unit_information_nc   = [None]*n_layers
+
+unit_entropy_test     = [None]*n_layers
+unit_entropy_c        = [None]*n_layers
+unit_entropy_nc       = [None]*n_layers
+
+f_test_mean           = [None]*n_layers
+f_c_mean              = [None]*n_layers
+f_nc_mean             = [None]*n_layers
+
+for l in range(n_layers):
 	# average
-	f_test_mean[l]           = np.mean(f_test[l], axis = 0)
+	f_test_mean[l] = np.mean(f_test[l], axis = 0)
+	f_c_mean[l]    = np.mean(f_c[l],  axis = 0)
+	f_nc_mean[l]   = np.mean(f_nc[l], axis = 0)
 	# standard deviation
-	unit_diversity_test[l]   = np.sqrt(np.mean(np.square(f_test[l] - f_test_mean[l]),axis=0))
+	unit_diversity_test[l] = np.sqrt(np.mean(np.square(f_test[l] - f_test_mean[l]),axis=0))
+	unit_diversity_c[l]    = np.sqrt(np.mean(np.square(f_c[l]  - f_c_mean[l]),axis=0))
+	unit_diversity_nc[l]   = np.sqrt(np.mean(np.square(f_nc[l] - f_nc_mean[l]),axis=0))
 	# information
 	unit_information_test[l] = -np.log(f_test_mean[l])
-	### entropy                = > expected information: prob * -log(prob) + anti_prob * -log(anit_prob)
-	# calc summands
-	a = f_test_mean[l]*-np.log(f_test_mean[l])
-	b = (1-f_test_mean[l])*np.log(1-f_test_mean[l])
-	# clear nans 
-	a[np.isnan(a)] = 0
-	b[np.isnan(b)] = 0
-	# add up 
-	unit_entropy_test[l] = a - b
+	### entropy   = > expected information: prob * -log(prob) + anti_prob * -log(anit_prob)
+	unit_entropy_test = calc_entropy(f_test , l)
+	unit_entropy_c    = calc_entropy(f_c , l)
+	unit_entropy_nc   = calc_entropy(f_nc , l)
 
-### if found neuron, check how it fired over all images
-neuron_ind  = 140
-layer       = 3
-fire_thresh = 0.8
-plt.figure()
-plt.hist(f_test[layer][:,neuron_ind])
+
+index_for_number_gibbs = []
+for i in range(10000):
+	digit = np.where(test_label[i])[0][0]
+	if digit in subspace:
+		index_for_number_gibbs.append(i)
+
+
+
+delta_div  = unit_diversity_c[layer] - unit_diversity_nc[layer]
+neuron_ind = np.where(np.abs(delta_div)>sorted(np.abs(delta_div))[-5])[0]
+
+## neruon hists c/nc
+hists_c  = calc_neuron_hist(neuron_ind, f_c[layer],  test_label[index_for_number_gibbs[:]], fire_thresh, n_classes = 5)
+hists_nc = calc_neuron_hist(neuron_ind, f_nc[layer], test_label[index_for_number_gibbs[:]], fire_thresh, n_classes = 5)
+
+# fig2, ax2 = plt.subplots(2,len(hists_c)//2,figsize=(8,4),sharey="row")
+# m=0
+# for j in range(2):
+# 	for i in range(len(hists_c)//2):
+# 		ax2[j,i].bar(np.array(subspace)-0.17,hists_c[m],  width = 0.35, color="g")
+# 		ax2[j,i].bar(np.array(subspace)+0.17,hists_nc[m], width = 0.35, color="r")
+# 		ax2[-1,i].set_xlabel("Class")
+# 		ax2[j,0].set_ylabel(r"$N$")
+# 		ax2[j,i].set_xticks((subspace))
+# 		m+=1
+# fig2.tight_layout()
 
 ## PCA
 from sklearn.cluster import KMeans
 from sklearn.decomposition import PCA
 pca            = PCA(2)
-subdata, label = get_neuron_subdata(neuron_ind,f_test[layer],fire_thresh,False)
-pca.fit(subdata)
-trans          = pca.transform(subdata)
+for neuron in neuron_ind:
+	for c in range(1):
+		fig,ax = plt.subplots(1,4, figsize=(10,3))
+		if c  == 0:
+			subdata, label = get_neuron_subdata(neuron,f_test[layer],fire_thresh,False)
+			fig.suptitle("Test | Neuron %i"%neuron)
+		else:
+			subdata, label = get_neuron_subdata(neuron,f_nc[layer],fire_thresh,True)
+			fig.suptitle("No Context | Neuron %i"%neuron)
+		pca.fit(subdata)
+		trans          = pca.transform(subdata)
+
+		# fire verteilung over all images
+		# plt.figure("Hist of neuron %i"%neuron)
+		# plt.hist(f_test[layer][:,neuron])
+
+		## plot the pca things
+		for k in range(2):
+			ax[k].matshow(pca.components_[k].reshape(28,28))
+			ax[k].set_yticks([])
+			ax[k].set_xticks([])
+			ax[k].set_title("Expl. Variance: "+str(round(pca.explained_variance_ratio_[k],3)))
+		mapp3 = ax[2].scatter(trans[::2,0], trans[::2,1], c = label[::2],cmap=plt.cm.get_cmap('gist_rainbow', 10),alpha=0.5,vmin=0,vmax=9)
+		ax[2].set_title("PCA of "+r"$V^{(s)}$")
+		ax[2].set_xlabel("1. PC")
+		ax[2].set_ylabel("2. PC")
+		plt.colorbar(ax = ax[2], mappable = mapp3)
+		ax[3].hist(label,edgecolor = "k", lw = 0.3)
+		ax[3].set_xticks(range(10))
+		ax[3].set_xlabel("Class")
+		ax[3].set_title("Histogram of "+r"$V^{(s)}$")
+		plt.tight_layout()
+		plt.subplots_adjust(top=0.78)
 
 """
 ## nur noch neurone finden die sich krass ändern bei c/nc und dann die 
@@ -215,10 +294,9 @@ for l in range(1,n_layers-1):
 ax[0].set_ylabel(r"$N$")
 plt.tight_layout()
 
-#
-
+#entropy means over layers
 ent_means = []
-label = []
+label     = []
 for l in range(1,n_layers-1):
 	ent_means.append(np.mean(unit_entropy_test[l]))
 	label.append(get_layer_label("DBM", n_layers, l))
@@ -229,22 +307,6 @@ plt.xticks(range(1,n_layers-1),label)
 	
 
 
-## plot the pca things
-fig,ax = plt.subplots(1,4, figsize=(10,2.5))
-for k in range(2):
-	ax[k].matshow(pca.components_[k].reshape(28,28))
-	ax[k].set_yticks([])
-	ax[k].set_xticks([])
-	ax[k].set_title("Expl. Variance: "+str(round(pca.explained_variance_ratio_[k],3)))
-mapp3 = ax[2].scatter(trans[::2,0], trans[::2,1], c = label[::2],cmap=plt.cm.get_cmap('gist_rainbow', 10),alpha=0.5,vmin=0,vmax=9)
-ax[2].set_title("PCA of "+r"$V^{(s)}$")
-ax[2].set_xlabel("1. PC")
-ax[2].set_ylabel("2. PC")
-plt.colorbar(ax = ax[2], mappable = mapp3)
-ax[3].hist(label,edgecolor = "k", lw = 0.3)
-ax[3].set_xticks(range(10))
-ax[3].set_xlabel("Class")
-ax[3].set_title("Histogram of "+r"$V^{(s)}$")
-plt.tight_layout()
+
 
 plt.show()

@@ -24,8 +24,8 @@ UserSettings = {
 	"SEED" : 2,							# random seed for tf and np
 
 	### state vars
-	"DO_PRETRAINING" : 1,		# if no pretrain then files are automatically loaded
-	"DO_TRAINING"    : 1,		# if to train the whole DBM
+	"DO_PRETRAINING" : 0,		# if no pretrain then files are automatically loaded
+	"DO_TRAINING"    : 0,		# if to train the whole DBM
 	"DO_TESTING"     : 1,		# if testing the DBM with test data
 	"DO_SHOW_PLOTS"  : 1,		# if plots will show on display - either way they get saved into saveto_path
 
@@ -34,23 +34,25 @@ UserSettings = {
 	"DO_NOISE_STAB" : 0,		# if to make a noise stability test,
 
 	"USE_DROPOUT"  : 1,		# if to use synnaptic failure while training
-	"DROPOUT_RATE" : 4,		# multiplication of random uniform synaptic failure matrix (higher number -> less failure)
+	"DROPOUT_RATE" : 2,		# multiplication of random uniform synaptic failure matrix (higher number -> less failure)
 
 	"DO_NORM_W"    : 1,		# if to norm the weights and biases to 1 while training
 
 	### saving and loading
-	"DO_SAVE_TO_FILE"       : 1, 	# if to save plots and data to file
+	"DO_SAVE_TO_FILE"       : 0, 	# if to save plots and data to file
 	"DO_SAVE_PRETRAINED"    : 0, 	# if to save the pretrained weights seperately (for later use)
-	"DO_LOAD_FROM_FILE"     : 0, 	# if to load weights and biases from datadir + pathsuffix
+	"DO_LOAD_FROM_FILE"     : 1, 	# if to load weights and biases from datadir + pathsuffix
 	"PATHSUFFIX"            : "Mon_Jun__4_15-55-25_2018_[784, 225, 225, 225, 10] - ['original'] 15%", 
 							#"Mon_Jun__4_15-55-25_2018_[784, 225, 225, 225, 10] - ['original'] 15%"
 								#"Thu_Jun__7_16-21-28_2018_[784, 225, 225, 225, 10] - ['15cont4']"
 	"PATHSUFFIX_PRETRAINED" : "Thu_Jun__7_13-49-25_2018",
 
 
-	"DBM_SHAPE" : [	64*64,
+	"DBM_SHAPE" : [	28*28,
 					15*15,
-					16*1],
+					15*15,
+					15*15,					
+					10],
 
 	## only used in DBM_context class
 	"LAYERS_TO_CONNECT" : [],		# layer index of which layer to connect the context layer to (v2 label layer is always connected)

@@ -72,8 +72,15 @@ if True:
 	time_now = time_now.replace(" ", "_")
 
 #### Load T Data
-LOAD_MNIST = 0
-LOAD_HORSES = 1
+LOAD_MNIST = 1
+LOAD_HORSES = 0
+
+# global subspace set 
+subspace = [0, 1, 2, 3, 4]
+# better name for this:
+subset = subspace
+
+
 if "train_data" not in globals():
 	if LOAD_MNIST:
 		log.out("Loading Data")
@@ -87,11 +94,6 @@ if "train_data" not in globals():
 		### create context label 
 		train_label_context = np.zeros([len(train_label),2])
 		test_label_context = np.zeros([len(test_label),2])
-
-		# global subspace set 
-		subspace = [5,6,7,8,9]
-		# better name for this:
-		subset = subspace 
 
 		# get the context label based on the sum to the border of the subspace 
 		# subspace needs to be a closed set for this method
@@ -152,14 +154,26 @@ if "train_data" not in globals():
 #### Get the arguments list from terminal
 additional_args = sys.argv[1:]
 
+###########################################################################################################
+#### User Settings ###
+import Settings as Settings
+# log.out("Loading Settings from ", additional_args[0])
+# Settings = __import__(additional_args[0])
+if OS == "Mac":
+	reload(Settings)
+else:
+	importlib.reload(Settings)
 
-################################################################################################################################################
+
+UserSettings = Settings.UserSettings
+
+##############################################################################################################
 ### Class RBM
 class RBM(object):
 	""" defines a 2 layer restricted boltzmann machine - first layer = input, second
 	layer = output. Training with contrastive divergence """
 
-	def __init__(self,vu,hu,forw_mult,back_mult,learnrate,liveplot,temp):
+	def __init__(self, vu, hu, forw_mult, back_mult, learnrate, liveplot,temp):
 		#### User Variables
 
 		self.hidden_units  = hu
@@ -238,7 +252,7 @@ class RBM(object):
 		# self.v_prob_rev  = sigmoid(tf.matmul(self.h_rev,(self.w),transpose_b=True) + self.bias_v,temp)
 		# self.v_recon_rev = tf.nn.relu(tf.sign(self.v_prob_rev - tf.random_uniform(tf.shape(self.v_prob_rev))))
 
-	def train(self,sess,RBM_i,RBMs,batch):
+	def train(self, sess, RBM_i, RBMs, batch):
 		self.my_input_data = batch
 		# iterate which RBM level this is and calculate the proper input
 		for j in range(1,len(RBMs)):
@@ -252,7 +266,7 @@ class RBM(object):
 		return self.w_i,self.error_i
 
 
-################################################################################################################################################
+###############################################################################################################
 ### Class Deep BM
 class DBM_class(object):
 	"""
@@ -269,7 +283,7 @@ class DBM_class(object):
 		# temperature of DBM
 		self.temp          = self.TEMP_START;
 		# learnrate of DBM
-		self.learnrate     = self.LEARNRATE_START;	
+		self.learnrate     = self.LEARNRATE_START;
 		# how many freerun steps in train
 		self.freerun_steps = self.N_FREERUN_START;
 
@@ -604,6 +618,7 @@ class DBM_class(object):
 
 		# shuffle the list to really make it random
 		rnd.shuffle(rnd_order)
+		# rnd_order = sorted(rnd_order,reverse=True)
 
 		# run the updates in that random order
 		for layer in rnd_order:
@@ -762,7 +777,7 @@ class DBM_class(object):
 		# self.reset_particles   = [None]*self.n_layers #
 		self.layer_ph          = [None]*self.n_layers # placeholder
 		self.assign_l          = [None]*self.n_layers # assign op. (assigns placeholder)
-		self.assign_l_rand     = [None]*self.n_layers # assign op. (assigns random)
+		self.assign_l_zeros    = [None]*self.n_layers # assign op. (assigns random)
 		self.layer_prob        = [None]*self.n_layers # calc prob for layer n
 		self.layer_samp        = [None]*self.n_layers # take a sample from the prob
 		self.update_l_s        = [None]*self.n_layers # assign op. for calculated samples
@@ -859,7 +874,7 @@ class DBM_class(object):
 		for i in range(len(self.layer)):
 			self.assign_save_layer[i] = self.layer_save[i].assign(self.layer[i])
 			self.assign_l[i]          = self.layer[i].assign(self.layer_ph[i])
-			self.assign_l_rand[i]     = self.layer[i].assign(tf.random_uniform([self.batchsize,self.SHAPE[i]]))
+			self.assign_l_zeros[i]     = self.layer[i].assign(tf.zeros([self.batchsize,self.SHAPE[i]]))
 			self.layer_prob[i]        = self.layer_input(i)
 			self.layer_samp[i]        = self.sample(self.layer_prob[i])
 			self.update_l_p[i]        = self.layer[i].assign(self.layer_prob[i])
@@ -1270,6 +1285,7 @@ class DBM_class(object):
 		log.reset()
 		return wrong_classified_ind
 
+
 	def gibbs_sampling(self, v_input, gibbs_steps, TEMP_START, temp_end, droprate_start, droprate_end, subspace, mode, liveplot=1, l_input=None):
 		""" Repeatedly samples v and label , where label can be modified by the user with the multiplication
 		by the modification array - clamping the labels to certain numbers.
@@ -1413,7 +1429,7 @@ class DBM_class(object):
 				# save_firerates_to_file(self.firerate_c,saveto_path+"/FireratesContext")
 
 		if mode=="generate":
-			sess.run(self.assign_l_rand)
+			sess.run(self.assign_l_zeros)
 			sess.run(self.layer[-1].assign(v_input))
 
 
@@ -1427,6 +1443,7 @@ class DBM_class(object):
 				# update all layer except the last one (labels)
 				self.glauber_step("label",temp, droprate, self.layer_save_generate, step) #sess.run(self.update_l_s[:-1], {self.temp_tf : temp})
 				self.energy_generate[step] = sess.run(self.energy)
+				self.layer_save_generate[-1][step] = v_input
 
 				# save layers
 				if liveplot:
@@ -1440,20 +1457,25 @@ class DBM_class(object):
 
 
 				# assign new temp
-				temp += temp_delta
-				droprate+=drop_delta
+				temp     += temp_delta
+				droprate += drop_delta
+
+			self.unit_input_generate = self.get_units_input();
 
 		if mode=="freerunning":
-			sess.run(self.assign_l_rand)
-			rng  =  rnd.randint(100)
-			# sess.run(self.assign_l[0], {self.layer_ph[0] : test_data[rng:rng+1]})
+			sess.run(self.assign_l_zeros)
+			rng  =  index_for_number_test[4][2]#rnd.randint(100)
+
+			# log.out("PreAssigning v1 with test data. rng: "+str(rng))
+			# sess.run(self.assign_l[0], {self.layer_ph[0] : np.repeat(test_data[rng:rng+1],self.batchsize,0)})
+			# ## run to equlibrium
 			# for i in range(10):
-			# 	sess.run(self.update_l_s[1:],{self.temp_tf : temp})
+			# 	sess.run(self.update_l_s[1:],{self.temp_tf : temp, self.droprate_tf : droprate_start})
 
 			## init save arrays for every layer and every gibbs step
 			self.layer_save_generate = [[None] for i in range(self.n_layers)]
-			# for i in range(len(self.layer_save_generate)):
-			# 	self.layer_save_generate[i] = np.zeros([gibbs_steps,DBM.SHAPE[i]])
+			for i in range(len(self.layer_save_generate)):
+				self.layer_save_generate[i] = np.zeros([gibbs_steps,self.batchsize, DBM.SHAPE[i]])
 			self.energy_generate = np.zeros([gibbs_steps,self.batchsize])
 
 			for step in range(gibbs_steps):
@@ -1477,17 +1499,20 @@ class DBM_class(object):
 				droprate+=drop_delta
 
 		if mode=="clamped":
-			sess.run(self.assign_l_rand)
+			sess.run(self.assign_l_zeros)
 
 			self.layer_save_generate = [[None] for i in range(self.n_layers)]
 			for layer in range(len(self.layer_save_generate)):
 				self.layer_save_generate[layer] = np.zeros( [gibbs_steps, self.batchsize, self.SHAPE[layer]] )
+			
+			self.energy_generate = np.zeros([gibbs_steps,self.batchsize])
 
 			sess.run(self.layer[0].assign(v_input))
 			sess.run(self.layer[-self.n_label_layer].assign(l_input))
 
 			for step in range(gibbs_steps):
 				self.glauber_step("v+l", temp, droprate, self.layer_save_generate, step)
+				self.energy_generate[step] = sess.run(self.energy)
 
 				# assign new temp
 				temp += temp_delta
@@ -2342,7 +2367,7 @@ class DBM_context_class(DBM_class):
 
 
 		if mode=="generate":
-			sess.run(self.assign_l_rand)
+			sess.run(self.assign_l_zeros)
 			sess.run(self.layer[-1].assign(v_input))
 
 
@@ -2373,7 +2398,7 @@ class DBM_context_class(DBM_class):
 				droprate+=drop_delta
 
 		if mode=="freerunning":
-			sess.run(self.assign_l_rand)
+			sess.run(self.assign_l_zeros)
 			rng  =  rnd.randint(100)
 			# sess.run(self.assign_l[0], {self.layer_ph[0] : test_data[rng:rng+1]})
 			# for i in range(10):
@@ -2458,17 +2483,6 @@ class DBM_context_class(DBM_class):
 			# return the mean of the last 30 gibbs samples for all images
 			return np.mean(layer_gs[-2][-30:,:],axis=0)
 
-###########################################################################################################
-#### User Settings ###
-import Settings
-if OS == "Mac":
-	reload(Settings)
-else:
-	importlib.reload(Settings)
-
-
-UserSettings = Settings.UserSettings
-
 
 ###########################################################################################################
 ## set the seed for numpy.random
@@ -2505,7 +2519,7 @@ if DO_LOAD_FROM_FILE and np.any(np.fromstring(PATHSUFFIX[26:].split("]")[0],sep=
 ######### DBM #############################################################################################
 DBM = DBM_class(	shape = DBM_SHAPE,
 					liveplot = 0,
-					classification = 0,
+					classification = 1,
 					UserSettings = UserSettings,
 				)
 
@@ -2576,11 +2590,11 @@ if DO_TRAINING:
 if DO_TESTING:
 	with tf.Session() as sess:
 		DBM.test(test_data,
-				test_label if LOAD_MNIST else None, 
-				N               = 40,  # sample ist aus random werten, also mindestens 2 sample machen
-				create_conf_mat = 0,
-				temp_start      = DBM.temp,
-				temp_end        = DBM.temp)
+					test_label if LOAD_MNIST else None, 
+					N               = 40,  # sample ist aus random werten, also mindestens 2 sample machen
+					create_conf_mat = 0,
+					temp_start      = DBM.temp,
+					temp_end        = DBM.temp)
 	# save_firerates_to_file(DBM.firerate_test,saveto_path+"/FireratesTest")
 
 
@@ -2602,15 +2616,72 @@ if DO_GEN_IMAGES:
 		for j in range(10):
 			label_clamp[10*j:10*j+10,j] = 1
 
+		# v_input_samples = np.zeros([100,784])
+		# m=0
+		# fig,ax = plt.subplots(10,10)
+		# for i in range(10):
+		# 	for j in range(10):
+		# 		v_input_samples[m,:] = test_data[index_for_number_test[j][i]]
+		# 		ax[i,j].matshow(test_data[index_for_number_test[j][i]].reshape(28,28))
+		# 		m+=1
+
 		generated_img = DBM.gibbs_sampling(label_clamp,
-							1000,
+							100,
 							DBM.temp, DBM.temp,
-							100, 100,
-							mode     = "generate",
+							3, 5,
+							mode     = "freerunning",
 							subspace = [],
-							liveplot = 0)
+							liveplot = 0,
+							l_input = None)
 
+		# neurons with good weights
+		if 0:
+			layer = 3
+			n_plots = 7
+			# neurons with good firerate
+			large_weight, classes = np.where(DBM.w_np[-1]>0.02)
+			good_firerates = np.where((np.mean(DBM.layer_save_generate[layer][-1][:],0)>0.08)&(np.mean(DBM.layer_save_generate[layer][-1][:],0)<0.2))[0]
+			neuron_ind_ = []
+			classes_filtered = []
+			for i in range(len(large_weight)):
+				if large_weight[i] in good_firerates and large_weight[i] not in neuron_ind_:
+					neuron_ind_.append(large_weight[i])
+					classes_filtered.append(classes[i])
 
+			fig, ax = plt.subplots(1,n_plots,figsize = (12,2.5))
+			fig.subplots_adjust(wspace = 0.3, left = 0.1, right=0.97)
+			# input for neuron on all images over time (shape : [time,batchsize])
+			for i,neuron_ind in enumerate(neuron_ind_[:n_plots]):
+				log.out(neuron_ind)
+				log.out(classes[i])
+				bu_input, td_input = follow_neuron_input(layer, neuron_ind, DBM.layer_save_generate, DBM)
+				k = range(classes_filtered[i]*10,(classes_filtered[i]+1)*10);
+				# ax[i].plot();
+				seaborn.tsplot(bu_input[:,k].T/td_input[:,k].T, ci=[1], ax = ax[i]);
+				seaborn.tsplot(bu_input[:,k].T/td_input[:,k].T, err_style = "unit_traces", ax = ax[i]);
+				ax[i].set_xlabel("Time step "+r"$t$")
+				ax[i].set_title("Neuron "+str(neuron_ind))
+			ax[0].set_ylabel(r"$h_{b}/h_{t}$")
+
+			fig,ax = plt.subplots(1,1)
+			bu_input, td_input = follow_neuron_input(layer, neuron_ind_[0], DBM.layer_save_generate, DBM)
+			bu_input = []
+			td_input = []
+			ks = []
+			for i,neuron_ind in enumerate(neuron_ind_[:]):
+				bu_input_, td_input_ = follow_neuron_input(layer, neuron_ind, DBM.layer_save_generate, DBM)
+				k = range(classes_filtered[0]*10,(classes_filtered[0]+1)*10)
+				bu_input.append(np.mean(bu_input_[:,range(classes_filtered[i]*10,(classes_filtered[i]+1)*10)],1))
+				td_input.append(np.mean(td_input_[:,range(classes_filtered[i]*10,(classes_filtered[i]+1)*10)],1))
+			bu_input = np.array(bu_input)
+			td_input = np.array(td_input)
+			bu_input *= 1./len(neuron_ind_)
+			td_input *= 1./len(neuron_ind_)
+			seaborn.tsplot(bu_input/td_input, err_style = "unit_traces", ci=[100], ax = ax);
+			ax.set_ylabel(r"$|h_{b}/h_{t}|$")
+			ax.set_xlabel("Time step "+r"$t$")
+
+		#############################################################
 		## plot the images (visible layers)
 		fig,ax = plt.subplots(nn,nn)
 		m = 0
@@ -2758,7 +2829,7 @@ if DO_CONTEXT:
 
 	log.info("Inorrect Context:" , len(incorrect_maxis_c),"/",round(100*len(incorrect_maxis_c)/float(len(index_for_number_gibbs)),2),"%")
 	log.info("Inorrect No Context:" , len(incorrect_maxis_nc),"/",round(100*len(incorrect_maxis_nc)/float(len(index_for_number_gibbs)),2),"%")
-	log.info("Diff:     ",len(incorrect_maxis_nc)-len(incorrect_maxis_c))
+	log.info("Diff:     ", len(incorrect_maxis_nc)-len(incorrect_maxis_c))
 	log.info("Outside subspace (c/nc):",wrongs_outside_subspace_c,",", wrongs_outside_subspace_nc)
 	log.out("Means: Correct // Wrong (c/nc): \n \t \t ", 	round(np.mean(correct_maxis_c),4),
 															round(np.mean(correct_maxis_nc),4), "//",
@@ -2844,7 +2915,7 @@ if DO_TRAINING:
 	if DBM.classification:
 		plt.plot(DBM.updates,DBM.class_error_train,".",label="Class Error Train",alpha=0.2)
 	## test errors
-	x = np.array(DBM.save_dict["Test_Epoch"])*N_BATCHES_TRAIN
+	x = np.array(DBM.save_dict["Test_Epoch"]) * N_BATCHES_TRAIN
 	# plt.plot(x,DBM.save_dict["Recon_Error"],"o--",label="Recon Error Test")
 	if DBM.classification:
 		plt.plot(x,DBM.save_dict["Class_Error"],"^--",label="Class Error Test")
@@ -3401,32 +3472,59 @@ if DO_CONTEXT:
 	# 		fig.tight_layout()
 	# 		save_fig(saveto_path+"/outisde_subspace_hists_l%i"%l, DO_SAVE_TO_FILE)
 
-if DO_GEN_IMAGES:
-	# plot timeseries of every neuron while generate (clamped label)
-	# layer_save_generate has shape : [time][layer][image][neuron]
-	k = 0 #which example image to pick
-	if not os.path.isdir(saveto_path+"/timeseries_generated"):
-		os.makedirs(saveto_path+"/timeseries_generated")
-	for layer in range(DBM.n_layers-1):
-		# timeseries = []
-		# timeseries_average = []
-		# for i in range(len(DBM.layer_save_generate)):
-		# 	timeseries.append(DBM.layer_save_generate[i][layer][k])
-		# 	timeseries_average.append(np.mean(DBM.layer_save_generate[i][layer],0))
+# if DO_GEN_IMAGES:
+# 	# plot timeseries of every neuron while generate (clamped label)
+# 	# layer_save_generate has shape : [time][layer][image][neuron]
+# 	k = 0 #which example image to pick
+# 	if not os.path.isdir(saveto_path+"/timeseries_generated"):
+# 		os.makedirs(saveto_path+"/timeseries_generated")
+# 	for layer in range(DBM.n_layers-1):
+# 		# timeseries = []
+# 		# timeseries_average = []
+# 		# for i in range(len(DBM.layer_save_generate)):
+# 		# 	timeseries.append(DBM.layer_save_generate[i][layer][k])
+# 		# 	timeseries_average.append(np.mean(DBM.layer_save_generate[i][layer],0))
 
 
-		# plot for image k
-		plt.matshow(DBM.layer_save_generate[layer][:,k])
-		plt.ylabel("Time "+r"$t$")
-		plt.xlabel("Unit "+r"$i$")
-		save_fig(saveto_path+"/timeseries_generated/timeseries_1image_layer_%i.png"%(layer+1),DO_SAVE_TO_FILE)
+# 		# plot for image k
+# 		plt.matshow(DBM.layer_save_generate[layer][:,k])
+# 		plt.ylabel("Time "+r"$t$")
+# 		plt.xlabel("Unit "+r"$i$")
+# 		save_fig(saveto_path+"/timeseries_generated/timeseries_1image_layer_%i.png"%(layer+1),DO_SAVE_TO_FILE)
 
-		# plt the average over all test images
-		plt.matshow(np.mean(DBM.layer_save_generate[layer][:,:],1))
-		plt.ylabel("Time "+r"$t$")
-		plt.xlabel("Unit "+r"$i$")
+# 		# plt the average over all test images
+# 		plt.matshow(np.mean(DBM.layer_save_generate[layer][:,:],1))
+# 		plt.ylabel("Time "+r"$t$")
+# 		plt.xlabel("Unit "+r"$i$")
 
-		save_fig(saveto_path+"/timeseries_generated/timeseries_av_layer_%i.png"%(layer+1),DO_SAVE_TO_FILE)
+# 		save_fig(saveto_path+"/timeseries_generated/timeseries_av_layer_%i.png"%(layer+1),DO_SAVE_TO_FILE)
+
+## plot the receptive field of the ...
+# get hidden layers of one sampled image as boolen
+h = []
+for l in range(1,len(DBM.SHAPE)-1):
+	h.append(DBM.layer_save_generate[l][-1,0].astype(bool))
+v2 = DBM.layer_save_generate[-1][-1,0]
+h.append(sample_np(v2))
+# clean the weights
+w = []
+for l in range(len(DBM.w_np)):
+	w.append(np.copy(DBM.w_np[l]))
+	if l < len(DBM.w_np)-2:
+		w[l][:,np.logical_not(h[l])] = 0
+# use the cleaned weights for calculation
+ww = np.dot(w[0],w[1])
+# ww = np.dot(ww,w[2])
+# ww = np.dot(ww,w[3])
+for i in range(2,len(DBM.SHAPE)-1):
+	ww = np.dot(ww,w[i])
+
+fig,ax = plt.subplots(1,10)
+for i in range(10):
+	ax[i].matshow(ww[:,i].reshape(28,28))
+	ax[i].set_xticks([])
+	ax[i].set_yticks([])
+	ax[i].set_title(str(i))
 
 log.out("Finished")
 log.close()
