@@ -71,16 +71,37 @@ if True:
 	time_now = time_now.replace(":", "-")
 	time_now = time_now.replace(" ", "_")
 
-#### Load T Data
-LOAD_MNIST = 1
-LOAD_HORSES = 0
-
-# global subspace set 
-subspace = [0, 1, 2, 3, 4]
-# better name for this:
-subset = subspace
 
 
+
+
+#### Get the arguments list from terminal
+additional_args = sys.argv[1:]
+
+###########################################################################################################
+#### User Settings ###
+if len(additional_args)>0:
+	log.out("Loading Settings from ", additional_args[0])
+	Settings = __import__(additional_args[0])
+else:
+	import SettingsHorses as Settings
+
+if OS == "Mac":
+	reload(Settings)
+else:
+	importlib.reload(Settings)
+
+UserSettings = Settings.UserSettings
+
+# load UserSettings into globals
+log.out("For now, copying UserSettings into globals()")
+for key in UserSettings:
+	globals()[key] = UserSettings[key]
+
+# better name for subset:
+subset = SUBSPACE
+
+# load data 
 if "train_data" not in globals():
 	if LOAD_MNIST:
 		log.out("Loading Data")
@@ -149,23 +170,6 @@ if "train_data" not in globals():
 					test_data[i-train_data.shape[0]] = img_data
 			else:
 				log.info("Skipped %s"%f)
-
-
-#### Get the arguments list from terminal
-additional_args = sys.argv[1:]
-
-###########################################################################################################
-#### User Settings ###
-import Settings as Settings
-# log.out("Loading Settings from ", additional_args[0])
-# Settings = __import__(additional_args[0])
-if OS == "Mac":
-	reload(Settings)
-else:
-	importlib.reload(Settings)
-
-
-UserSettings = Settings.UserSettings
 
 ##############################################################################################################
 ### Class RBM
@@ -926,6 +930,7 @@ class DBM_class(object):
 
 
 
+
 		### free energy
 		# self.F=[]
 		# self.F_test=[]
@@ -961,13 +966,13 @@ class DBM_class(object):
 			b_old.append(np.copy(self.bias[i].eval()))
 
 		# starting the training
-		log.info("Batchsize:",self.batchsize,"N_Updates",self.num_of_updates)
+		log.info("Batchsize:",self.batchsize,"N_Updates:",self.num_of_updates)
 
 		log.start("Deep BM Epoch:",self.epochs+1,"/",N_EPOCHS_TRAIN)
 
 		# shuffle test data and labels so that batches are not equal every epoch
 		log.out("Shuffling TrainData")
-		self.seed   = rnd.randint(len(train_data),size=(len(train_data)//10,2))
+		self.seed   = rnd.randint(len(train_data), size=(len(train_data)//10,2))
 		train_data  = shuffle(train_data, self.seed)
 		if self.classification:
 			train_label = shuffle(train_label, self.seed)
@@ -2489,12 +2494,6 @@ class DBM_context_class(DBM_class):
 rnd.seed(UserSettings["SEED"])
 
 
-# load UserSettings into globals
-log.out("For now, copying UserSettings into globals()")
-for key in UserSettings:
-	globals()[key] = UserSettings[key]
-
-
 saveto_path = data_dir+"/"+time_now+"_"+str(DBM_SHAPE)
 
 ### modify the parameters with additional_args
@@ -2519,7 +2518,7 @@ if DO_LOAD_FROM_FILE and np.any(np.fromstring(PATHSUFFIX[26:].split("]")[0],sep=
 ######### DBM #############################################################################################
 DBM = DBM_class(	shape = DBM_SHAPE,
 					liveplot = 0,
-					classification = 1,
+					classification = DO_CLASSIFICATION,
 					UserSettings = UserSettings,
 				)
 
@@ -2628,7 +2627,7 @@ if DO_GEN_IMAGES:
 		generated_img = DBM.gibbs_sampling(label_clamp,
 							100,
 							DBM.temp, DBM.temp,
-							3, 5,
+							999, 999,
 							mode     = "freerunning",
 							subspace = [],
 							liveplot = 0,
@@ -3501,30 +3500,30 @@ if DO_CONTEXT:
 
 ## plot the receptive field of the ...
 # get hidden layers of one sampled image as boolen
-h = []
-for l in range(1,len(DBM.SHAPE)-1):
-	h.append(DBM.layer_save_generate[l][-1,0].astype(bool))
-v2 = DBM.layer_save_generate[-1][-1,0]
-h.append(sample_np(v2))
-# clean the weights
-w = []
-for l in range(len(DBM.w_np)):
-	w.append(np.copy(DBM.w_np[l]))
-	if l < len(DBM.w_np)-2:
-		w[l][:,np.logical_not(h[l])] = 0
-# use the cleaned weights for calculation
-ww = np.dot(w[0],w[1])
-# ww = np.dot(ww,w[2])
-# ww = np.dot(ww,w[3])
-for i in range(2,len(DBM.SHAPE)-1):
-	ww = np.dot(ww,w[i])
+# h = []
+# for l in range(1,len(DBM.SHAPE)-1):
+# 	h.append(DBM.layer_save_generate[l][-1,0].astype(bool))
+# v2 = DBM.layer_save_generate[-1][-1,0]
+# h.append(sample_np(v2))
+# # clean the weights
+# w = []
+# for l in range(len(DBM.w_np)):
+# 	w.append(np.copy(DBM.w_np[l]))
+# 	if l < len(DBM.w_np)-2:
+# 		w[l][:,np.logical_not(h[l])] = 0
+# # use the cleaned weights for calculation
+# ww = np.dot(w[0],w[1])
+# # ww = np.dot(ww,w[2])
+# # ww = np.dot(ww,w[3])
+# for i in range(2,len(DBM.SHAPE)-1):
+# 	ww = np.dot(ww,w[i])
 
-fig,ax = plt.subplots(1,10)
-for i in range(10):
-	ax[i].matshow(ww[:,i].reshape(28,28))
-	ax[i].set_xticks([])
-	ax[i].set_yticks([])
-	ax[i].set_title(str(i))
+# fig,ax = plt.subplots(1,10)
+# for i in range(10):
+# 	ax[i].matshow(ww[:,i].reshape(28,28))
+# 	ax[i].set_xticks([])
+# 	ax[i].set_yticks([])
+# 	ax[i].set_title(str(i))
 
 log.out("Finished")
 log.close()
