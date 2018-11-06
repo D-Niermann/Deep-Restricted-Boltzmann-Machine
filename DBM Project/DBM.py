@@ -84,14 +84,35 @@ if len(additional_args)>0:
 	log.out("Loading Settings from ", additional_args[0])
 	Settings = __import__(additional_args[0])
 else:
-	import SettingsHorses as Settings
+	import Settings as Settings
 
 if OS == "Mac":
 	reload(Settings)
 else:
 	importlib.reload(Settings)
 
+# rename 
 UserSettings = Settings.UserSettings
+
+# path were results are saved 
+saveto_path = data_dir+"/"+time_now+"_"+str(UserSettings["DBM_SHAPE"])
+
+### modify the parameters with additional_args
+if len(additional_args) > 0:
+	try:
+		first_param = int(additional_args[1])
+		if len(additional_args) == 3:
+			second_param = int(additional_args[2])
+		log.out("Additional Arguments:", first_param, second_param)
+		UserSettings["TEMP_START"] = second_param
+		UserSettings["TEMP_MIN"] = second_param
+		log.out(UserSettings)
+	except:
+		log.out("ERROR: Not using additional args!")
+
+	saveto_path  += " - " + str(additional_args)
+
+
 
 # load UserSettings into globals
 log.out("For now, copying UserSettings into globals()")
@@ -559,7 +580,7 @@ class DBM_class(object):
 			w = self.w[layer_i];
 			if self.USE_DROPOUT:
 				w *= self.dropout_matrix[layer_i]
-			_input_ = sigmoid(tf.matmul(self.layer[layer_i+1], w,transpose_b=True) + self.bias[layer_i], self.temp_tf)
+			_input_ = sigmoid(tf.matmul(self.layer[layer_i+1], w, transpose_b=True) + self.bias[layer_i], self.temp_tf)
 
 		elif layer_i == self.n_layers-1:
 			w = self.w[layer_i-1];
@@ -949,6 +970,7 @@ class DBM_class(object):
 			self.graph_init("training")
 			self.import_()
 			self.tested = 0
+			self.learnrate = self.get_learnrate(self.epochs, self.LEARNRATE_SLOPE, self.LEARNRATE_START)
 
 
 		if self.liveplot:
@@ -1263,8 +1285,8 @@ class DBM_class(object):
 				for digit in range(10):
 					w[digit]  = np.round(np.mean(np.array(DBM.conf_data[digit]),axis=0),3)
 				seaborn.heatmap(w*100,annot=True)
-				plt.ylabel("Desired Label in %")
-				plt.xlabel("Predicted Label in %")
+				plt.ylabel("Desired Label in \%")
+				plt.xlabel("Predicted Label in \%")
 
 		self.class_error_test = float(n_wrongs)/self.batchsize
 
@@ -1612,11 +1634,11 @@ class DBM_class(object):
 
 			# save weights
 			for i in range(len(self.w_np)):
-				np.savetxt("w%i.txt"%i, self.w_np[i])
+				np.savetxt("w%i.txt"%i, self.w_np[i], fmt = "%1.3e")
 
 			##  save bias
 			for i in range(self.n_layers):
-				np.savetxt("bias%i.txt"%i, self.bias_np[i])
+				np.savetxt("bias%i.txt"%i, self.bias_np[i], fmt = "%1.3e")
 
 			## save save_dict
 			try:
@@ -2495,15 +2517,6 @@ class DBM_context_class(DBM_class):
 rnd.seed(UserSettings["SEED"])
 
 
-saveto_path = data_dir+"/"+time_now+"_"+str(DBM_SHAPE)
-
-### modify the parameters with additional_args
-if len(additional_args) > 0:
-	# first_param = int(additional_args[0])
-	saveto_path  += " - " + str(additional_args)
-
-
-
 ## open the logger-file
 if DO_SAVE_TO_FILE:
 	os.makedirs(saveto_path)
@@ -2567,9 +2580,9 @@ if DO_TRAINING:
 						temp_start      = DBM.temp,
 						temp_end        = DBM.temp
 						)
-
-				log.out("Creating Backup of Parameters")
-				DBM.backup_params()
+				if LOAD_MNIST:
+					log.out("Creating Backup of Parameters")
+					DBM.backup_params()
 
 				# DBM.test(train_data[0:10000], train_label[0:10000] if LOAD_MNIST else None, train_label_context[0:10000] if LOAD_MNIST else None,
 				# 		N               = 30,  # sample ist aus random werten, also mindestens 2 sample machen
@@ -2592,7 +2605,7 @@ if DO_TESTING:
 		DBM.test(test_data,
 					test_label if LOAD_MNIST else None, 
 					N               = 40,  # sample ist aus random werten, also mindestens 2 sample machen
-					create_conf_mat = 0,
+					create_conf_mat = 1,
 					temp_start      = DBM.temp,
 					temp_end        = DBM.temp)
 	# save_firerates_to_file(DBM.firerate_test,saveto_path+"/FireratesTest")
@@ -2626,7 +2639,7 @@ if DO_GEN_IMAGES:
 		# 		m+=1
 
 		generated_img = DBM.gibbs_sampling(label_clamp,
-							100,
+							300,
 							DBM.temp, DBM.temp,
 							999, 999,
 							mode     = UserSettings["FREERUN_MODE"],
@@ -2718,10 +2731,10 @@ if DO_CONTEXT:
 		DBM.load_from_file(workdir+"/data/"+PATHSUFFIX,override_params=1)
 
 	
-	log.info("Subspace: ", subspace)
+	log.info("Subspace: ", subset)
 
 
-	# loop through images from all wrong classsified images and find al images that are in subspace
+	# loop through images from all wrong classsified images and find al images that are in subset
 	index_for_number_gibbs=[]
 	for i in range(10000):
 
@@ -2729,7 +2742,7 @@ if DO_CONTEXT:
 		digit = np.where(test_label[i])[0][0]
 
 		## set desired digit range
-		if digit in subspace:
+		if digit in subset:
 			index_for_number_gibbs.append(i)
 
 	log.info("Found %i Images"%len(index_for_number_gibbs))
@@ -2743,7 +2756,7 @@ if DO_CONTEXT:
 
 	log.start("Sampling data")
 	with tf.Session() as sess:
-		# first session with no context applied (see param "subspace" = "all")
+		# first session with no context applied (see param "subset" = "all")
 		DBM.graph_init("gibbs")
 		DBM.import_()
 
@@ -2757,7 +2770,7 @@ if DO_CONTEXT:
 							liveplot = 0)
 
 	with tf.Session() as sess:
-		# second session (random vars are the same as 1. session) with context applied (see param "subspace")
+		# second session (random vars are the same as 1. session) with context applied (see param "subset")
 		DBM.graph_init("gibbs")
 		DBM.import_()
 		rnd.seed(UserSettings["SEED"])
@@ -2767,7 +2780,7 @@ if DO_CONTEXT:
 							DBM.temp , DBM.temp,
 							999, 999,
 							mode     = "context",
-							subspace = subspace,
+							subspace = subset,
 							liveplot = 0)
 	log.end()
 
@@ -2797,25 +2810,25 @@ if DO_CONTEXT:
 
 		### count how many got right (with context)
 		## but only count the labels within subspace
-		maxi_c         = h2_context[i][subspace[:]].max()
+		maxi_c         = h2_context[i][subset[:]].max()
 		maxi_all_pos_c = np.where(h2_context[i] == h2_context[i].max())[0][0]
 		max_pos_c      = np.where(h2_context[i] == maxi_c)[0][0]
 		if max_pos_c   == digit:
 			correct_maxis_c.append(maxi_c)
 		else:
-			if maxi_all_pos_c  not  in  subspace:
+			if maxi_all_pos_c  not  in  subset:
 				wrongs_outside_subspace_c += 1
 			incorrect_maxis_c.append(maxi_c)
 
 		### count how many got right (no context)
-		## but only count the labels within subspace
-		maxi_nc     = h2_no_context[i][subspace[:]].max()
+		## but only count the labels within subset
+		maxi_nc     = h2_no_context[i][subset[:]].max()
 		maxi_all_pos_nc = np.where(h2_no_context[i]==h2_no_context[i].max())[0][0]
 		max_pos_nc  = np.where(h2_no_context[i] == maxi_nc)[0][0]
 		if max_pos_nc == digit:
 			correct_maxis_nc.append(maxi_nc)
 		else:
-			if maxi_all_pos_nc  not in  subspace:
+			if maxi_all_pos_nc  not in  subset:
 				wrongs_outside_subspace_nc += 1
 			incorrect_maxis_nc.append(maxi_nc)
 
@@ -2830,7 +2843,7 @@ if DO_CONTEXT:
 	log.info("Inorrect Context:" , len(incorrect_maxis_c),"/",round(100*len(incorrect_maxis_c)/float(len(index_for_number_gibbs)),2),"%")
 	log.info("Inorrect No Context:" , len(incorrect_maxis_nc),"/",round(100*len(incorrect_maxis_nc)/float(len(index_for_number_gibbs)),2),"%")
 	log.info("Diff:     ", len(incorrect_maxis_nc)-len(incorrect_maxis_c))
-	log.info("Outside subspace (c/nc):",wrongs_outside_subspace_c,",", wrongs_outside_subspace_nc)
+	log.info("Outside subset (c/nc):",wrongs_outside_subspace_c,",", wrongs_outside_subspace_nc)
 	log.out("Means: Correct // Wrong (c/nc): \n \t \t ", 	round(np.mean(correct_maxis_c),4),
 															round(np.mean(correct_maxis_nc),4), "//",
 															round(np.mean(incorrect_maxis_c),4),
@@ -3257,8 +3270,8 @@ if DO_CONTEXT:
 
 
 	### plt histograms for each used digit
-	fig,ax = plt.subplots(1,len(subspace),figsize=(12,7),sharey="row")
-	for i,digit in enumerate(subspace):
+	fig,ax = plt.subplots(1,len(subset),figsize=(12,7),sharey="row")
+	for i,digit in enumerate(subset):
 		if len(hist_data_nc[digit])>1:
 			y_nc = np.mean(np.array(hist_data_nc[digit][1:]),axis=0)
 			y_c  = np.mean(np.array(hist_data[digit][1:]),axis=0)
@@ -3376,18 +3389,18 @@ if DO_CONTEXT:
 
 		biggest_var_change_ind[l-1] = np.where(delta_sigma > sorted(delta_sigma)[-11] )[0]
 
-		big_var_change_hists_c  = calc_neuron_hist(biggest_var_change_ind[l-1], DBM.firerate_c[l],   test_label[index_for_number_gibbs[:]], 0.5, len(subspace))
-		big_var_change_hists_nc = calc_neuron_hist(biggest_var_change_ind[l-1], DBM.firerate_nc[l],  test_label[index_for_number_gibbs[:]], 0.5, len(subspace))
+		big_var_change_hists_c  = calc_neuron_hist(biggest_var_change_ind[l-1], DBM.firerate_c[l],   test_label[index_for_number_gibbs[:]], 0.5, len(subset))
+		big_var_change_hists_nc = calc_neuron_hist(biggest_var_change_ind[l-1], DBM.firerate_nc[l],  test_label[index_for_number_gibbs[:]], 0.5, len(subset))
 
 		fig2, ax2 = plt.subplots(2,len(big_var_change_hists_c)//2,figsize=(8,4),sharey="row")
 		m=0
 		for j in range(2):
 			for i in range(len(big_var_change_hists_c)//2):
-				ax2[j,i].bar(np.array(subspace)-0.17,big_var_change_hists_c[m], width = 0.35, color="g")
-				ax2[j,i].bar(np.array(subspace)+0.17,big_var_change_hists_nc[m], width = 0.35, color="r")
+				ax2[j,i].bar(np.array(subset)-0.17,big_var_change_hists_c[m], width = 0.35, color="g")
+				ax2[j,i].bar(np.array(subset)+0.17,big_var_change_hists_nc[m], width = 0.35, color="r")
 				ax2[-1,i].set_xlabel("Class")
 				ax2[j,0].set_ylabel(r"$N$")
-				ax2[j,i].set_xticks((subspace))
+				ax2[j,i].set_xticks((subset))
 				m+=1
 		fig2.tight_layout()
 		save_fig(saveto_path+"/big_var_change_l%i.pdf"%l, DO_SAVE_TO_FILE)
@@ -3397,16 +3410,16 @@ if DO_CONTEXT:
 		ax_f[0,l-1].hist(np.mean(DBM.firerate_nc[l],0),bins=30, lw = 0.2, edgecolor = "k")
 		ax_f[1,l-1].hist(delta_f,bins=30, lw = 0.2, edgecolor = "k")
 
-		ax_f[0,l-1].set_xlabel(r"$<f_{%s}^{\mathrm{nc}}>_{batch}$"%layer_str[1:-1])
+		ax_f[0,l-1].set_xlabel(r"$<f_{%s}^{\mathrm{nc}}>_\mathrm{dataset}$"%layer_str[1:-1])
 		ax_f[1,l-1].set_xlabel(r"$\Delta f_{%s}$"%layer_str[1:-1])
 		ax_f[0,l-1].set_ylabel("N",style= "italic")
 		ax_f[1,l-1].set_ylabel("N",style= "italic")
+ 
 
+		ax_sig[0,l-1].hist(DBM.unit_diversity_nc[l], bins=20, lw = 0.2, edgecolor = "k")
+		ax_sig[1,l-1].hist(delta_sigma, bins=20, lw = 0.2, edgecolor = "k")
 
-		ax_sig[0,l-1].hist(DBM.unit_diversity_nc[l], bins=30, lw = 0.2, edgecolor = "k")
-		ax_sig[1,l-1].hist(delta_sigma, bins=30, lw = 0.2, edgecolor = "k")
-
-		ax_sig[0,l-1].set_xlabel(r"$<\sigma_{%s}^{\mathrm{nc}}>_{batch}$"%layer_str[1:-1])
+		ax_sig[0,l-1].set_xlabel(r"$<\sigma_{%s}^{\mathrm{nc}}>_\mathrm{dataset}$"%layer_str[1:-1])
 		ax_sig[1,l-1].set_xlabel(r"$\Delta \sigma_{%s}$"%layer_str[1:-1])
 		ax_sig[0,l-1].set_ylabel("N",style= "italic")
 		ax_sig[1,l-1].set_ylabel("N",style= "italic")
@@ -3527,7 +3540,7 @@ if DO_CONTEXT:
 # 	ax[i].set_title(str(i))
 
 log.out("Finished")
-log.close()
+# log.close()
 if DO_SHOW_PLOTS:
 	plt.show()
 else:

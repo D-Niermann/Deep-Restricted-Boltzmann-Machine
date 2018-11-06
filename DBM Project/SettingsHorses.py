@@ -3,13 +3,6 @@ UserSettings = {
 	"LOAD_MNIST" : 0,
 	"DO_CLASSIFICATION" : 0,
 	"LOAD_HORSES" : 1,
-	
-	# training process
-	"N_BATCHES_PRETRAIN" : 5, 				# how many batches per epoch for pretraining
-	"N_BATCHES_TRAIN"    : 5, 				# how many batches per epoch for complete DBM training
-	"N_EPOCHS_PRETRAIN"  : [0,0,0,0,0,0], 	# pretrain epochs for each RBM
-	"N_EPOCHS_TRAIN"     : 10, 				# how often to iter through the test images
-	"TEST_EVERY_EPOCH"   : 4, 				# how many epochs to train before testing on the test data
 
 	### learnrates
 	"LEARNRATE_PRETRAIN" : 0.001 ,			# learnrate for pretraining
@@ -29,16 +22,26 @@ UserSettings = {
 	# set None to have no seed 
 	"SEED" : 2,								# random seed for tf and np
 
-	### state vars
+
 	"DO_PRETRAINING" : 0,					# if no pretrain then files are automatically loaded
-	"DO_TRAINING"    : 0,					# if to train the whole DBM
-	"DO_TESTING"     : 0,					# if testing the DBM with test data
+
+	"DO_TRAINING"    : 1,					# if to train the whole DBM
+		"N_BATCHES_PRETRAIN" : 20, 				# how many batches per epoch for pretraining
+		"N_BATCHES_TRAIN"    : 20, 				# how many batches per epoch for complete DBM training
+		"N_EPOCHS_PRETRAIN"  : [0,0,0,0,0,0], 	# pretrain epochs for each RBM
+		"N_EPOCHS_TRAIN"     : 1, 				# how often to iter through the test images
+		"TEST_EVERY_EPOCH"   : 4, 				# how many epochs to train before testing on the test data
+	
+	"DO_TESTING"     : 1,					# if testing the DBM with test data
+	
 	"DO_SHOW_PLOTS"  : 1,					# if plots will show on display - either way they get saved into saveto_path
 
 	"DO_CONTEXT"    : 0,					# if to test the context
 		"SUBSPACE"  : [0, 1, 2, 3, 4], 		# global subspace set 
-	"DO_GEN_IMAGES" : 1,					# if to generate images (mode can be choosen at function call)
+	
+	"DO_GEN_IMAGES" : 0,					# if to generate images (mode can be choosen at function call)
 		"FREERUN_MODE" : "freerunning",		# Mode of the gibbs sampler to generate images (freerunning, generate, context)
+	
 	"DO_NOISE_STAB" : 0,					# if to make a noise stability test,
 
 	"USE_DROPOUT"  : 1,						# if to use synnaptic failure while training

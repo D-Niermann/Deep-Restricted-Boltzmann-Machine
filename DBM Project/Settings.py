@@ -13,7 +13,7 @@ UserSettings = {
 
 	### learnrates
 	"LEARNRATE_PRETRAIN" : 0.001 ,				# learnrate for pretraining
-	"LEARNRATE_START"    : 0.01					# starting learnrate
+	"LEARNRATE_START"    : 0.01	,				# starting learnrate
 	"LEARNRATE_SLOPE"    : 1. ,					# bigger number -> smaller slope
 
 	# freerunning steps 
@@ -32,10 +32,10 @@ UserSettings = {
 	### state vars
 	"DO_PRETRAINING" : 0,						# if no pretrain then files are automatically loaded
 	"DO_TRAINING"    : 0,						# if to train the whole DBM
-	"DO_TESTING"     : 1,						# if testing the DBM with test data
+	"DO_TESTING"     : 0,						# if testing the DBM with test data
 	"DO_SHOW_PLOTS"  : 1,						# if plots will show on display - either way they get saved into saveto_path
 
-	"DO_CONTEXT"    : 0,						# if to test the context
+	"DO_CONTEXT"    : 1,						# if to test the context
 		"SUBSPACE"  : [0, 1, 2, 3, 4], 			# global subspace set 
 	"DO_GEN_IMAGES" : 0,						# if to generate images (mode can be choosen at function call)
 		"FREERUN_MODE" : "freerunning",			# Mode of the gibbs sampler to generate images (freerunning, generate, context)
