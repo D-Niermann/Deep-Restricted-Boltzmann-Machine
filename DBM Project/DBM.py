@@ -214,11 +214,19 @@ if "train_data" not in globals():
 
 		## split off the test dataset
 		n_test_points = 10000
-		# test data
-		test_data_attention = train_data_attention[(n_data_points - n_test_points):]
 		# test label
 		test_label_attention_side  = train_label_attention_side[(n_data_points - n_test_points):]
 		test_label_attention_class = train_label_attention_class[(n_data_points - n_test_points):]
+		# test data
+		test_data_attention = train_data_attention[(n_data_points - n_test_points):]
+		for i in range(len(test_data_attention)):
+			c2  = rnd.randint(0,3)
+			im  = rnd.randint(0, len(index_for_number_train_clear[c2]))
+			if train_label_attention_side[i][0] == 1:
+				test_data_attention[i][784:] = train_data[index_for_number_train_clear[c2][im]]
+			else:
+				test_data_attention[i][:784] = train_data[index_for_number_train_clear[c2][im]]
+
 		# delete the test data from the train data arrays
 		train_data_attention        = np.delete(train_data_attention, range((n_data_points - n_test_points), n_data_points), axis=0)
 		train_label_attention_class = np.delete(train_label_attention_class, range((n_data_points - n_test_points), n_data_points), axis=0)
