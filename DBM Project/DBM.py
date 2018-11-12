@@ -2185,7 +2185,8 @@ class DBM_attention_class(DBM_class):
 			log.info("Using test data")
 
 		# give input to v layer
-		sess.run(self.assign_l[0], {self.layer_ph[0] : my_test_data, self.temp_tf : mytemp})
+		sess.run(self.assign_l[0], {self.layer_ph[0] : my_test_data})
+		sess.run(self.assign_l[-1], {self.layer_ph[-1] : test_label_attention_side})
 
 		# update hidden and label N times
 		log.start("Sampling hidden %i times "%N)
@@ -2197,7 +2198,7 @@ class DBM_attention_class(DBM_class):
 			self.layer_act_test[n,:] = sess.run(self.layer_activities, {self.temp_tf : mytemp})
 
 			# update layer 
-			self.glauber_step("visible", mytemp, droprate, layer_save_test, n) # sess.run(self.update_l_s[1:], {self.mytemp_tf : mytemp})
+			self.glauber_step("visible + context", mytemp, droprate, layer_save_test, n) # sess.run(self.update_l_s[1:], {self.mytemp_tf : mytemp})
 			
 			# increment mytemp
 			mytemp+=temp_delta
