@@ -97,6 +97,13 @@ UserSettings = Settings.UserSettings
 # path were results are saved 
 saveto_path = data_dir+"/"+time_now+"_"+str(UserSettings["DBM_SHAPE"])
 
+
+## open the logger-file
+if UserSettings["DO_SAVE_TO_FILE"]:
+	os.makedirs(saveto_path)
+	log.open(saveto_path)
+
+
 ### modify the parameters with additional_args
 if len(additional_args) > 0:
 	try:
@@ -133,44 +140,90 @@ if "train_data" not in globals():
 		test_label  = np.concatenate((test_label,)*label_mult,axis=1)
 		train_label = np.concatenate((train_label,)*label_mult,axis=1)
 
-		### create context label 
-		train_label_context = np.zeros([len(train_label),2])
-		test_label_context = np.zeros([len(test_label),2])
-
-		# get the context label based on the sum to the border of the subspace 
-		# subspace needs to be a closed set for this method
-		# train_label_context = np.sum(train_label[:,:5], 1) == 1
-		# test_label_context  = np.sum(test_label[:,:5], 1)  == 1
 		
-		### label context is even / odd numbers 
-		train_label_context = np.sum(train_label[:,(0,2,4,6,8)], 1) == 1
-		test_label_context  = np.sum(test_label[:,(0,2,4,6,8)], 1) == 1
-		################
-
-		# expand axis
-		train_label_context = np.expand_dims(train_label_context, axis=1)
-		test_label_context  = np.expand_dims(test_label_context, axis=1)
-		# concatenate new anti value 
-		train_label_context = np.concatenate([train_label_context,1-train_label_context], axis=1)
-		test_label_context  = np.concatenate([test_label_context,1-test_label_context], axis=1)
 
 		# get test data of only one number class:
 		index_for_number_test  = np.zeros([10,1200])
 		where = np.zeros(10).astype(np.int)
-		index_for_number_train = []
 		for i in range(len(test_label)):
 			for digit in range(10):
 				d_array = np.zeros(10)
 				d_array[digit] = 1
 				if (test_label[i]==d_array).sum()==10:
 					index_for_number_test[digit][where[digit]]=i
-					where[digit]+=1
+					where[digit]+=1	
+					break	
+		# convert to integer 
 		index_for_number_test = index_for_number_test.astype(np.int)
+		# clear up the zeros at the end of the arrays
+		index_for_number_test_clear = [None]*10
+		for digit in range(10):
+			index_for_number_test_clear[digit] = np.delete(index_for_number_test[digit],np.where(index_for_number_test[digit]==0)[0][1:])
+		
+		# delete the dirty data
+		del index_for_number_test
 
+		### create MNIST data for the attention task
+		# search the train data for 0s, 1s and 2s 
+		index_for_number_train  = np.zeros([3,6200])
+		where = np.zeros(3).astype(np.int)
 		for i in range(len(train_label)):
-			if (train_label[i]==[0,0,0,1,0,0,0,0,0,0]).sum()==10:
-				index_for_number_train.append(i)
+			for digit in range(3):
+				d_array = np.zeros(10)
+				d_array[digit] = 1
+				if (train_label[i]==d_array).sum()==10:
+					index_for_number_train[digit][where[digit]]=i
+					where[digit]+=1	
+					break	
+		# convert to integer
+		index_for_number_train = index_for_number_train.astype(np.int)
+		# clear up the zeros at the end of the arrays
+		index_for_number_train_clear = [None]*3
+		for digit in range(3):
+			index_for_number_train_clear[digit] = np.delete(index_for_number_train[digit],np.where(index_for_number_train[digit]==0)[0][1:])
+		del index_for_number_train
 
+		## combine images from MNIST
+		# how many datapoints to create (contains labels and images and train + test data)
+		n_data_points               = 50000
+		# data with two images side by side
+		train_data_attention        = np.zeros([n_data_points,28*28*2])
+		# class label of the focused image
+		train_label_attention_class = np.zeros([n_data_points,3])
+		# label which tells on which image to focus 
+		train_label_attention_side  = np.zeros([n_data_points,2])
+
+		for i in range(n_data_points):
+			# random class and image and side index 
+			c   = rnd.randint(0,3)
+			c2  = rnd.randint(0,3)
+			while c2 == c:
+				c2  = rnd.randint(0,3)
+			im  = rnd.randint(0, len(index_for_number_train_clear[c]))
+			im2 = rnd.randint(0, len(index_for_number_train_clear[c2]))
+			s = rnd.randint(0,2)
+			# set the label 
+			train_label_attention_side[i][s] = 1 
+			if s == 0:
+				train_label_attention_class[i][c] = 1	# left side attendet (or top side)
+			else:
+				train_label_attention_class[i][c2] = 1	# right side attendet
+			# combine both images and add them to the dataset
+			train_data_attention[i] = np.concatenate([train_data[index_for_number_train_clear[c][im]], train_data[index_for_number_train_clear[c2][im2]]])
+
+		## split off the test dataset
+		n_test_points = 10000
+		# test data
+		test_data_attention = train_data_attention[(n_data_points - n_test_points):]
+		# test label
+		test_label_attention_side  = train_label_attention_side[(n_data_points - n_test_points):]
+		test_label_attention_class = train_label_attention_class[(n_data_points - n_test_points):]
+		# delete the test data from the train data arrays
+		train_data_attention        = np.delete(train_data_attention, range((n_data_points - n_test_points), n_data_points), axis=0)
+		train_label_attention_class = np.delete(train_label_attention_class, range((n_data_points - n_test_points), n_data_points), axis=0)
+		train_label_attention_side  = np.delete(train_label_attention_side, range((n_data_points - n_test_points), n_data_points), axis=0)
+
+	
 
 		test_data_noise = sample_np(test_data + (rnd.random(test_data.shape)-0.5)*1.1)
 
@@ -403,7 +456,7 @@ class DBM_class(object):
 					self.RBMs[i] = RBM(self.SHAPE[i],self.SHAPE[i+1], forw_mult= 1, back_mult = 1, learnrate = self.LEARNRATE_PRETRAIN, liveplot=0, temp = self.temp)
 					log.out("2,2")
 
-	def pretrain(self):
+	def pretrain(self, train_data):
 		""" this function will pretrain the RBMs and define a self.weights list where every
 		weight will be stored in. This weights list can then be used to save to file and/or
 		to be loaded into the DBM for further training.
@@ -514,7 +567,7 @@ class DBM_class(object):
 		self.w_np     = []
 		self.w_np_old = []
 		r = self.n_layers-1
-		if self.type() == "DBM_context":
+		if self.type() == "DBM_attention":
 			r = self.n_layers-1 + len(self.layers_to_connect)
 		for i in range(r):
 			self.w_np.append(np.loadtxt("w%i.txt"%(i)))
@@ -718,7 +771,7 @@ class DBM_class(object):
 		if mode == "testing":
 			if self.classification:
 					self.save_dict["Class_Error"].append(self.class_error_test)
-					if self.type() == "DBM_context":
+					if self.type() == "DBM_attention":
 						self.save_dict["Context_Error"].append(self.context_error_test)
 			self.save_dict["Recon_Error"].append(self.recon_error)
 			self.save_dict["Test_Epoch"].append(self.epochs)
@@ -849,7 +902,7 @@ class DBM_class(object):
 		
 
 		### append extra connections from context layer 
-		if self.type() == "DBM_context":
+		if self.type() == "DBM_attention":
 			# # array of weights connecting to the context layer (index i will show connection between layer[i] and context layer)
 			for i,l in enumerate(self.layers_to_connect):
 				index = i+len(self.w) # index continues at length of DBM weights 
@@ -1492,7 +1545,7 @@ class DBM_class(object):
 		if mode=="freerunning":
 			sess.run(self.assign_l_zeros)
 			if LOAD_MNIST:
-				rng  =  index_for_number_test[4][2]#rnd.randint(100)
+				rng  =  index_for_number_test_clear[4][2]#rnd.randint(100)
 
 			# log.out("PreAssigning v1 with test data. rng: "+str(rng))
 			# sess.run(self.assign_l[0], {self.layer_ph[0] : np.repeat(test_data[rng:rng+1],self.batchsize,0)})
@@ -1699,12 +1752,11 @@ class DBM_class(object):
 
 ################################################################################################################################################
 ### Class Extra Unit DBM
-class DBM_context_class(DBM_class):
+class DBM_attention_class(DBM_class):
 	""" 
-	Defines a DBM with an addition "context" layer (which is always defined as the last layer). 
-	This layer acts layer a visible label layer, but the label are more general (context).
-	THis goal is to clamp one of the genereal context label and see if the recurrent connections improve
-	classification on the normal labels.
+	Defines a DBM with an addition "attention" layer (which is always defined as the last layer). 
+	This DBM receives 2 images side by side. 
+	This layer acts like a visible label layer, but the labels tell if right oder left v1 is attented.
 	"""
 
 	def __init__ (self, shape, liveplot, classification, UserSettings):
@@ -1716,7 +1768,7 @@ class DBM_context_class(DBM_class):
 								- the label layer has to be exluded, only include additional layers
 		"""
 		# define the parent class
-		self.parent = super(DBM_context_class, self);
+		self.parent = super(DBM_attention_class, self);
 
 		# call init from parent
 		self.parent.__init__(shape, liveplot, classification, UserSettings)
@@ -1738,7 +1790,7 @@ class DBM_context_class(DBM_class):
 			self.save_dict["CD_abs_mean_%i"%i] = []
 
 	def type(self):
-		return "DBM_context"
+		return "DBM_attention"
 
 	def glauber_step(self, clamp, temp, droprate, save_array, step):
 		"""
@@ -1843,8 +1895,9 @@ class DBM_context_class(DBM_class):
 
 	def layer_input_context(self):
 		"""
+		!NOT USED!
 		contruct input for the context layer
-		NOT USED
+		!NOT USED!
 		"""
 		_input_ = 0
 		for l in self.layers_to_connect:
@@ -1868,7 +1921,7 @@ class DBM_context_class(DBM_class):
 				
 		sess.run(tf.global_variables_initializer())
 
-	def train(self, train_data, train_label, train_label_context, num_batches, cont):
+	def train(self, train_data, train_label, train_label_attention, num_batches, cont):
 		""" training the DBM with given h2 as labels and v as input images
 		train_data  :: images
 		train_label :: corresponding label
@@ -1933,7 +1986,7 @@ class DBM_context_class(DBM_class):
 		train_data  = shuffle(train_data, self.seed)
 		if self.classification:
 			train_label = shuffle(train_label, self.seed)
-			train_label_context = shuffle(train_label_context, self.seed)
+			train_label_attention = shuffle(train_label_attention, self.seed)
 
 		log.out("Running Epoch")
 		# log.info("++ Using Weight Decay! Not updating bias! ++")
@@ -1944,7 +1997,7 @@ class DBM_context_class(DBM_class):
 			batch = train_data[start:end]
 			if self.classification:
 				batch_label = train_label[start:end]
-				batch_label_context = train_label_context[start:end]
+				batch_label_context = train_label_attention[start:end]
 
 
 
@@ -2202,8 +2255,8 @@ class DBM_context_class(DBM_class):
 
 		if self.classification:
 			## error of classifivation labels
-			self.class_error_test = np.mean(np.abs(self.label_l_save-my_test_label[:,:10]))
-			self.context_error_test = np.mean(np.abs(self.context_l_save-test_label_context[:,:]))
+			self.class_error_test = np.mean(np.abs(self.label_l_save - my_test_label))
+			self.context_error_test = np.mean(np.abs(self.context_l_save - test_label_attention_side))
 
 
 			for i in range(len(self.label_l_save)):
@@ -2517,10 +2570,6 @@ class DBM_context_class(DBM_class):
 rnd.seed(UserSettings["SEED"])
 
 
-## open the logger-file
-if DO_SAVE_TO_FILE:
-	os.makedirs(saveto_path)
-	log.open(saveto_path)
 
 
 ## Error checking
@@ -2530,17 +2579,17 @@ if DO_LOAD_FROM_FILE and np.any(np.fromstring(PATHSUFFIX[26:].split("]")[0],sep=
 
 
 ######### DBM #############################################################################################
-DBM = DBM_class(	shape = DBM_SHAPE,
-					liveplot = 0,
-					classification = DO_CLASSIFICATION,
-					UserSettings = UserSettings,
-				)
+# DBM = DBM_class(	shape = DBM_SHAPE,
+# 					liveplot = 0,
+# 					classification = DO_CLASSIFICATION,
+# 					UserSettings = UserSettings,
+# 				)
 
-# DBM = DBM_context_class(DBM_SHAPE, 
-# 						liveplot = 0, 
-# 						classification = 1,
-# 						UserSettings = UserSettings,
-# 						)
+DBM = DBM_attention_class(DBM_SHAPE, 
+						liveplot = 0, 
+						classification = 1,
+						UserSettings = UserSettings,
+						)
 
 
 ###########################################################################################################
@@ -2548,7 +2597,7 @@ DBM = DBM_class(	shape = DBM_SHAPE,
 log.reset()
 log.info(time_now)
 
-DBM.pretrain()
+DBM.pretrain(train_data_attention)
 
 if DO_TRAINING:
 	log.start("DBM Train Session")
@@ -2562,35 +2611,26 @@ if DO_TRAINING:
 
 
 			# start a train epoch
-			DBM.train(	train_data  = train_data,
-						train_label = train_label if LOAD_MNIST else None,
-						train_label_context = train_label_context if LOAD_MNIST else None,
+			DBM.train(	train_data  = train_data_attention,
+						train_label = train_label_attention_class if LOAD_MNIST else None,
+						train_label_attention = train_label_attention_side if LOAD_MNIST else None,
 						num_batches = N_BATCHES_TRAIN,
 						cont        = run)
 
 			# test session while training
-			if run!=N_EPOCHS_TRAIN-1 and run%TEST_EVERY_EPOCH==0:
-				# wrong_classified_id = np.loadtxt("wrongs.txt").astype(np.int)
-				# DBM.test(train_data[:1000], train_label[:1000], 50, 10)
+			# if run!=N_EPOCHS_TRAIN-1 and run%TEST_EVERY_EPOCH==0:
+			# 	DBM.test(test_data_attention, 
+			# 			test_label_attention_class if LOAD_MNIST else None, 
+			# 			N               = 30,  # sample ist aus random werten, also mindestens 2 sample machen
+			# 			create_conf_mat = 0,
+			# 			temp_start      = DBM.temp,
+			# 			temp_end        = DBM.temp
+			# 			)
 
-				DBM.test(test_data, 
-						test_label if LOAD_MNIST else None, 
-						N               = 30,  # sample ist aus random werten, also mindestens 2 sample machen
-						create_conf_mat = 0,
-						temp_start      = DBM.temp,
-						temp_end        = DBM.temp
-						)
-				if LOAD_MNIST:
-					log.out("Creating Backup of Parameters")
-					DBM.backup_params()
+			# 	if LOAD_MNIST:
+			# 		log.out("Creating Backup of Parameters")
+			# 		DBM.backup_params()
 
-				# DBM.test(train_data[0:10000], train_label[0:10000] if LOAD_MNIST else None, train_label_context[0:10000] if LOAD_MNIST else None,
-				# 		N               = 30,  # sample ist aus random werten, also mindestens 2 sample machen
-				# 		create_conf_mat = 0,
-				# 		temp_start      = DBM.temp,
-				# 		temp_end        = DBM.temp,
-				# 		using_train_data = True,
-				# 		)
 
 
 
@@ -2602,10 +2642,10 @@ if DO_TRAINING:
 # last test session
 if DO_TESTING:
 	with tf.Session() as sess:
-		DBM.test(test_data,
-					test_label if LOAD_MNIST else None, 
+		DBM.test(test_data_attention,
+					test_label_attention_class if LOAD_MNIST else None, 
 					N               = 40,  # sample ist aus random werten, also mindestens 2 sample machen
-					create_conf_mat = 1,
+					create_conf_mat = 0,
 					temp_start      = DBM.temp,
 					temp_end        = DBM.temp)
 	# save_firerates_to_file(DBM.firerate_test,saveto_path+"/FireratesTest")
@@ -2634,8 +2674,8 @@ if DO_GEN_IMAGES:
 		# fig,ax = plt.subplots(10,10)
 		# for i in range(10):
 		# 	for j in range(10):
-		# 		v_input_samples[m,:] = test_data[index_for_number_test[j][i]]
-		# 		ax[i,j].matshow(test_data[index_for_number_test[j][i]].reshape(28,28))
+		# 		v_input_samples[m,:] = test_data[index_for_number_test_clear[j][i]]
+		# 		ax[i,j].matshow(test_data[index_for_number_test_clear[j][i]].reshape(28,28))
 		# 		m+=1
 
 		generated_img = DBM.gibbs_sampling(label_clamp,
@@ -2902,8 +2942,11 @@ log.out("Plotting...")
 
 if DO_TRAINING:
 	# plot w1 as image
-	fig=plt.figure(figsize=(9,9))
-	map1=plt.matshow(tile(DBM.w_np[0]),cmap="gray",fignum=fig.number)
+	fig = plt.figure(figsize=(9,9))
+	if DBM.type() == "DBM":
+		map1 = plt.matshow(tile(DBM.w_np[0]), cmap = "gray", fignum = fig.number)
+	else:
+		map1 = plt.matshow(tile_attention(DBM.w_np[0]), cmap = "gray", fignum = fig.number)
 	plt.colorbar(map1)
 	plt.grid(False)
 	plt.title("W %i"%0)
@@ -3039,11 +3082,17 @@ if DO_TESTING:
 	fig3,ax3 = plt.subplots(len(DBM.SHAPE)+1,13,figsize=(16,8),sharey="row")
 	for i in range(13):
 		# plot the input
-		ax3[0][i].matshow(test_data[i:i+1].reshape(int(sqrt(DBM.SHAPE[0])),int(sqrt(DBM.SHAPE[0]))))
+		if DBM.type() != "DBM_attention":
+			ax3[0][i].matshow(test_data[i:i+1].reshape(int(sqrt(DBM.SHAPE[0])),int(sqrt(DBM.SHAPE[0]))))
+			ax3[1][i].matshow(DBM.firerate_test[0][i].reshape(int(sqrt(DBM.SHAPE[0])),int(sqrt(DBM.SHAPE[0]))))
+		else:
+			ax3[0][i].matshow(test_data_attention[i].reshape(28*2,28))
+			ax3[0][i].set_title(str(test_label_attention_side[i]))
+			ax3[1][i].matshow(DBM.firerate_test[0][i].reshape(28*2,28))	
+	
 		ax3[0][i].set_yticks([])
 		ax3[0][i].set_xticks([])
-		# plot the reconstructed image
-		ax3[1][i].matshow(DBM.firerate_test[0][i].reshape(int(sqrt(DBM.SHAPE[0])),int(sqrt(DBM.SHAPE[0]))))
+	
 		ax3[1][i].set_yticks([])
 		ax3[1][i].set_xticks([])
 
@@ -3061,7 +3110,7 @@ if DO_TESTING:
 			ax3[-DBM.n_label_layer][i].set_xticks(range(DBM.SHAPE[-DBM.n_label_layer]//label_mult))
 			ax3[-DBM.n_label_layer][i].set_ylim(0,1)
 
-			if DBM.type() == "DBM_context":
+			if DBM.type() == "DBM_attention":
 				ax3[-1][i].bar(range(DBM.SHAPE[-1]),DBM.context_l_save[i])
 		else:
 			ax3[-1][i].matshow(DBM.label_l_save[i].reshape(int(sqrt(DBM.SHAPE[-1])),int(sqrt(DBM.SHAPE[-1]))))
@@ -3212,44 +3261,45 @@ if LOAD_MNIST and DO_TESTING:
 
 
 	# plot only one digit
-	fig3,ax3 = plt.subplots(len(DBM.SHAPE)+1,10,figsize=(16,8),sharey="row")
-	m=0
-	for i in index_for_number_test.astype(np.int)[8][0:10]:
-		# plot the input
-		ax3[0][m].matshow(test_data[i:i+1].reshape(int(sqrt(DBM.SHAPE[0])),int(sqrt(DBM.SHAPE[0]))))
-		ax3[0][m].set_yticks([])
-		ax3[0][m].set_xticks([])
-		# plot the reconstructed image
-		ax3[1][m].matshow(DBM.firerate_test[0][i].reshape(int(sqrt(DBM.SHAPE[0])),int(sqrt(DBM.SHAPE[0]))))
-		ax3[1][m].set_yticks([])
-		ax3[1][m].set_xticks([])
+	if DBM.type() == "DBM":
+		fig3,ax3 = plt.subplots(len(DBM.SHAPE)+1,10,figsize=(16,8),sharey="row")
+		m=0
+		for i in index_for_number_test_clear[8][0:10]:
+			# plot the input
+			ax3[0][m].matshow(test_data[i:i+1].reshape(int(sqrt(DBM.SHAPE[0])),int(sqrt(DBM.SHAPE[0]))))
+			ax3[0][m].set_yticks([])
+			ax3[0][m].set_xticks([])
+			# plot the reconstructed image
+			ax3[1][m].matshow(DBM.firerate_test[0][i].reshape(int(sqrt(DBM.SHAPE[0])),int(sqrt(DBM.SHAPE[0]))))
+			ax3[1][m].set_yticks([])
+			ax3[1][m].set_xticks([])
 
-		#plot hidden layer
-		for layer in DBM.get_hidden_layer_ind():
-			try:
-				ax3[layer+1][m].matshow(DBM.firerate_test[layer][i].reshape(int(sqrt(DBM.SHAPE[layer])),int(sqrt(DBM.SHAPE[layer]))))
-				ax3[layer+1][m].set_yticks([])
-				ax3[layer+1][m].set_xticks([])
-			except:
-				pass
-		# plot the last layer
-		if DBM.classification:
-			ax3[-DBM.n_label_layer][m].bar(range(DBM.SHAPE[-DBM.n_label_layer]//label_mult),DBM.label_l_save[i])
-			ax3[-DBM.n_label_layer][m].set_xticks(range(DBM.SHAPE[-DBM.n_label_layer]//label_mult))
-			ax3[-DBM.n_label_layer][m].set_ylim(0,1)
+			#plot hidden layer
+			for layer in DBM.get_hidden_layer_ind():
+				try:
+					ax3[layer+1][m].matshow(DBM.firerate_test[layer][i].reshape(int(sqrt(DBM.SHAPE[layer])),int(sqrt(DBM.SHAPE[layer]))))
+					ax3[layer+1][m].set_yticks([])
+					ax3[layer+1][m].set_xticks([])
+				except:
+					pass
+			# plot the last layer
+			if DBM.classification:
+				ax3[-DBM.n_label_layer][m].bar(range(DBM.SHAPE[-DBM.n_label_layer]//label_mult),DBM.label_l_save[i])
+				ax3[-DBM.n_label_layer][m].set_xticks(range(DBM.SHAPE[-DBM.n_label_layer]//label_mult))
+				ax3[-DBM.n_label_layer][m].set_ylim(0,1)
 
-			if DBM.type() == "DBM_context":
-				ax3[-1][m].bar(range(DBM.SHAPE[-1]),DBM.context_l_save[i])
-		else:
-			ax3[-1][m].matshow(DBM.label_l_save[i].reshape(int(sqrt(DBM.SHAPE[-1])),int(sqrt(DBM.SHAPE[-1]))))
-			ax3[-1][m].set_xticks([])
-			ax3[-1][m].set_yticks([])
-			#plot the reconstructed layer h1
-			# ax4[5][m].matshow(DBM.rec_h1[i:i+1].reshape(int(sqrt(DBM.SHAPE[1])),int(sqrt(DBM.SHAPE[1]))))
-			# plt.matshow(random_recon.reshape(int(sqrt(DBM.SHAPE[0])),int(sqrt(DBM.SHAPE[0]))))
-		m+=1
-	plt.tight_layout()
-	save_fig(saveto_path+"/examples_one_digit.pdf", DO_SAVE_TO_FILE)
+				if DBM.type() == "DBM_attention":
+					ax3[-1][m].bar(range(DBM.SHAPE[-1]),DBM.context_l_save[i])
+			else:
+				ax3[-1][m].matshow(DBM.label_l_save[i].reshape(int(sqrt(DBM.SHAPE[-1])),int(sqrt(DBM.SHAPE[-1]))))
+				ax3[-1][m].set_xticks([])
+				ax3[-1][m].set_yticks([])
+				#plot the reconstructed layer h1
+				# ax4[5][m].matshow(DBM.rec_h1[i:i+1].reshape(int(sqrt(DBM.SHAPE[1])),int(sqrt(DBM.SHAPE[1]))))
+				# plt.matshow(random_recon.reshape(int(sqrt(DBM.SHAPE[0])),int(sqrt(DBM.SHAPE[0]))))
+			m+=1
+		plt.tight_layout()
+		save_fig(saveto_path+"/examples_one_digit.pdf", DO_SAVE_TO_FILE)
 
 
 if DO_CONTEXT:

@@ -185,6 +185,20 @@ def sort_by_index(m,index,axis=0):
     return new_m
 
 
+def tile_attention(w):
+    a        = np.zeros([int(1.2*sqrt(w.shape[0]*w.shape[1])),int(1.1*sqrt(w.shape[0]*w.shape[1]))])
+    j,k      = 0,0
+    pic_size = 28
+    r        = w.shape[1]
+    for i in range(r):
+        a[k:k+pic_size*2,j:j+pic_size]=w[:,i].reshape(pic_size*2,pic_size)
+        k+=pic_size*2+1
+        if k+pic_size*2 > a.shape[0]:
+            k=0
+            j+=pic_size+1
+    return a
+
+
 def tile(w):
     a        = np.zeros([int(sqrt(w.shape[0]*w.shape[1])),int(sqrt(w.shape[0]*w.shape[1]))])
     j,k      = 0,0
