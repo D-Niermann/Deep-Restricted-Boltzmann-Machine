@@ -7,7 +7,7 @@ UserSettings = {
 	# training process
 	"N_BATCHES_PRETRAIN" : 500, 				# how many batches per epoch for pretraining
 	"N_BATCHES_TRAIN"    : 500, 				# how many batches per epoch for complete DBM training
-	"N_EPOCHS_PRETRAIN"  : [3,0,0,0,0,0], 		# pretrain epochs for each RBM
+	"N_EPOCHS_PRETRAIN"  : [1,0,0,0,0,0], 		# pretrain epochs for each RBM
 	"N_EPOCHS_TRAIN"     : 1, 					# how often to iter through the test images
 	"TEST_EVERY_EPOCH"   : 2, 					# how many epochs to train before testing on the test data
 
@@ -48,7 +48,7 @@ UserSettings = {
 
 	### saving and loading
 	"DO_SAVE_TO_FILE"       : 1, 	# if to save plots and data to file
-	"DO_SAVE_PRETRAINED"    : 1, 	# if to save the pretrained weights seperately (for later use)
+	"DO_SAVE_PRETRAINED"    : 0, 	# if to save the pretrained weights seperately (for later use)
 	"DO_LOAD_FROM_FILE"     : 0, 	# if to load weights and biases from datadir + pathsuffix
 	"PATHSUFFIX"            : "Sun_Nov_11_14-56-08_2018_[1568, 225, 3, 2]", 
 								#"Mon_Jun__4_15-55-25_2018_[784, 225, 225, 225, 10] - ['original'] 15%"

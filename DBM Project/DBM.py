@@ -4,7 +4,7 @@ if True:
 	print ("Starting")
 
 	import matplotlib as mpl
-	import os,time,sys
+	import os, time, sys
 
 	try: # if on macbook
 		workdir="/Users/Niermann/Google Drive/Masterarbeit/Python/DBM Project"
@@ -25,9 +25,9 @@ if True:
 	import numpy.random as rnd
 	import matplotlib.pyplot as plt
 	import tensorflow as tf
-	from pandas import DataFrame,Series,read_csv
+	from pandas import DataFrame, Series,read_csv
 
-	from math import exp,sqrt,sin,pi,cos
+	from math import exp, sqrt, sin, pi, cos
 	np.set_printoptions(precision=3)
 
 
@@ -96,7 +96,8 @@ UserSettings = Settings.UserSettings
 
 # path were results are saved 
 saveto_path = data_dir+"/"+time_now+"_"+str(UserSettings["DBM_SHAPE"])
-
+if len(additional_args) > 0:
+	saveto_path  += " - " + str(additional_args)
 
 ## open the logger-file
 if UserSettings["DO_SAVE_TO_FILE"]:
@@ -116,8 +117,6 @@ if len(additional_args) > 0:
 		log.out(UserSettings)
 	except:
 		log.out("ERROR: Not using additional args!")
-
-	saveto_path  += " - " + str(additional_args)
 
 
 
@@ -196,20 +195,22 @@ if "train_data" not in globals():
 		for i in range(n_data_points):
 			# random class and image and side index 
 			c   = rnd.randint(0,3)
-			c2  = rnd.randint(0,3)
-			while c2 == c:
-				c2  = rnd.randint(0,3)
+			# c2  = rnd.randint(0,3)
+			# while c2 == c:
+			# 	c2  = rnd.randint(0,3)
 			im  = rnd.randint(0, len(index_for_number_train_clear[c]))
-			im2 = rnd.randint(0, len(index_for_number_train_clear[c2]))
+			im2 = rnd.randint(0, len(index_for_number_train_clear[c]))
 			s = rnd.randint(0,2)
 			# set the label 
 			train_label_attention_side[i][s] = 1 
 			if s == 0:
 				train_label_attention_class[i][c] = 1	# left side attendet (or top side)
+				# combine both images and add them to the dataset
+				train_data_attention[i] = np.concatenate([train_data[index_for_number_train_clear[c][im]], np.zeros([28*28])])
 			else:
-				train_label_attention_class[i][c2] = 1	# right side attendet
-			# combine both images and add them to the dataset
-			train_data_attention[i] = np.concatenate([train_data[index_for_number_train_clear[c][im]], train_data[index_for_number_train_clear[c2][im2]]])
+				train_label_attention_class[i][c] = 1	# right side attendet
+				# combine both images and add them to the dataset
+				train_data_attention[i] = np.concatenate([np.zeros([28*28]), train_data[index_for_number_train_clear[c][im2]]])
 
 		## split off the test dataset
 		n_test_points = 10000
@@ -2233,7 +2234,7 @@ class DBM_attention_class(DBM_class):
 		#### reconstruction of v
 		# update v M times
 		self.label_l_save = layer_save_test[-2][-1]
-		self.context_l_save = layer_save_test[-1][-1]
+		# self.context_l_save = layer_save_test[-1][-1]
 
 		for i in range(N):
 			layer_save_test[0][i] = sess.run(self.update_l_s[0],{self.temp_tf : mytemp, self.droprate_tf: droprate})
@@ -2257,7 +2258,7 @@ class DBM_attention_class(DBM_class):
 		if self.classification:
 			## error of classifivation labels
 			self.class_error_test = np.mean(np.abs(self.label_l_save - my_test_label))
-			self.context_error_test = np.mean(np.abs(self.context_l_save - test_label_attention_side))
+			self.context_error_test = np.mean(np.abs(self.firerate_test[-1] - test_label_attention_side))
 
 
 			for i in range(len(self.label_l_save)):
@@ -2598,7 +2599,9 @@ DBM = DBM_attention_class(DBM_SHAPE,
 log.reset()
 log.info(time_now)
 
+
 DBM.pretrain(train_data_attention)
+
 
 if DO_TRAINING:
 	log.start("DBM Train Session")
@@ -3112,7 +3115,7 @@ if DO_TESTING:
 			ax3[-DBM.n_label_layer][i].set_ylim(0,1)
 
 			if DBM.type() == "DBM_attention":
-				ax3[-1][i].bar(range(DBM.SHAPE[-1]),DBM.context_l_save[i])
+				ax3[-1][i].bar(range(DBM.SHAPE[-1]),DBM.firerate_test[-1][i])
 		else:
 			ax3[-1][i].matshow(DBM.label_l_save[i].reshape(int(sqrt(DBM.SHAPE[-1])),int(sqrt(DBM.SHAPE[-1]))))
 			ax3[-1][i].set_xticks([])
@@ -3290,7 +3293,7 @@ if LOAD_MNIST and DO_TESTING:
 				ax3[-DBM.n_label_layer][m].set_ylim(0,1)
 
 				if DBM.type() == "DBM_attention":
-					ax3[-1][m].bar(range(DBM.SHAPE[-1]),DBM.context_l_save[i])
+					ax3[-1][m].bar(range(DBM.SHAPE[-1]),DBM.firerate_test[-1][i])
 			else:
 				ax3[-1][m].matshow(DBM.label_l_save[i].reshape(int(sqrt(DBM.SHAPE[-1])),int(sqrt(DBM.SHAPE[-1]))))
 				ax3[-1][m].set_xticks([])
