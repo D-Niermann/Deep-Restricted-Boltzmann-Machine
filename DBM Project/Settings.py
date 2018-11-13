@@ -30,8 +30,8 @@ UserSettings = {
 	"SEED" : None,									# random seed for tf and np
 
 	### state vars
-	"DO_PRETRAINING" : 1,						# if no pretrain then files are automatically loaded
-	"DO_TRAINING"    : 1,						# if to train the whole DBM
+	"DO_PRETRAINING" : 0,						# if no pretrain then files are automatically loaded
+	"DO_TRAINING"    : 0,						# if to train the whole DBM
 	"DO_TESTING"     : 1,						# if testing the DBM with test data
 	"DO_SHOW_PLOTS"  : 1,						# if plots will show on display - either way they get saved into saveto_path
 
@@ -49,15 +49,15 @@ UserSettings = {
 	### saving and loading
 	"DO_SAVE_TO_FILE"       : 1, 	# if to save plots and data to file
 	"DO_SAVE_PRETRAINED"    : 0, 	# if to save the pretrained weights seperately (for later use)
-	"DO_LOAD_FROM_FILE"     : 0, 	# if to load weights and biases from datadir + pathsuffix
-	"PATHSUFFIX"            : "Sun_Nov_11_14-56-08_2018_[1568, 225, 3, 2]", 
+	"DO_LOAD_FROM_FILE"     : 1, 	# if to load weights and biases from datadir + pathsuffix
+	"PATHSUFFIX"            : "Sun_Nov_11_15-45-08_2018_[1568, 400, 3, 2]", 
 								#"Mon_Jun__4_15-55-25_2018_[784, 225, 225, 225, 10] - ['original'] 15%"
 								#"Thu_Jun__7_16-21-28_2018_[784, 225, 225, 225, 10] - ['15cont4']"
 	"PATHSUFFIX_PRETRAINED" : "Thu_Jun__7_13-49-25_2018",
 
 
 	"DBM_SHAPE" : [	28*28*2,
-					10*10,
+					20*20,
 					3,
 					2],
 

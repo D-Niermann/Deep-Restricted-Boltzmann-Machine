@@ -195,22 +195,20 @@ if "train_data" not in globals():
 		for i in range(n_data_points):
 			# random class and image and side index 
 			c   = rnd.randint(0,3)
-			# c2  = rnd.randint(0,3)
-			# while c2 == c:
-			# 	c2  = rnd.randint(0,3)
+			c2  = rnd.randint(0,3)
+			while c2 == c:
+				c2  = rnd.randint(0,3)
 			im  = rnd.randint(0, len(index_for_number_train_clear[c]))
-			im2 = rnd.randint(0, len(index_for_number_train_clear[c]))
+			im2 = rnd.randint(0, len(index_for_number_train_clear[c2]))
 			s = rnd.randint(0,2)
 			# set the label 
 			train_label_attention_side[i][s] = 1 
 			if s == 0:
 				train_label_attention_class[i][c] = 1	# left side attendet (or top side)
-				# combine both images and add them to the dataset
-				train_data_attention[i] = np.concatenate([train_data[index_for_number_train_clear[c][im]], np.zeros([28*28])])
 			else:
-				train_label_attention_class[i][c] = 1	# right side attendet
-				# combine both images and add them to the dataset
-				train_data_attention[i] = np.concatenate([np.zeros([28*28]), train_data[index_for_number_train_clear[c][im2]]])
+				train_label_attention_class[i][c2] = 1	# right side attendet
+			# combine both images and add them to the dataset
+			train_data_attention[i] = np.concatenate([train_data[index_for_number_train_clear[c][im]], train_data[index_for_number_train_clear[c2][im2]]])
 
 		## split off the test dataset
 		n_test_points = 10000
@@ -219,13 +217,13 @@ if "train_data" not in globals():
 		test_label_attention_class = train_label_attention_class[(n_data_points - n_test_points):]
 		# test data
 		test_data_attention = train_data_attention[(n_data_points - n_test_points):]
-		for i in range(len(test_data_attention)):
-			c2  = rnd.randint(0,3)
-			im  = rnd.randint(0, len(index_for_number_train_clear[c2]))
-			if train_label_attention_side[i][0] == 1:
-				test_data_attention[i][784:] = train_data[index_for_number_train_clear[c2][im]]
-			else:
-				test_data_attention[i][:784] = train_data[index_for_number_train_clear[c2][im]]
+		# for i in range(len(test_data_attention)):
+		# 	c2  = rnd.randint(0,3)
+		# 	im  = rnd.randint(0, len(index_for_number_train_clear[c2]))
+		# 	if test_label_attention_side[i][0] == 1:
+		# 		test_data_attention[i][784:] = train_data[index_for_number_train_clear[c2][im]]
+		# 	else:
+		# 		test_data_attention[i][:784] = train_data[index_for_number_train_clear[c2][im]]
 
 		# delete the test data from the train data arrays
 		train_data_attention        = np.delete(train_data_attention, range((n_data_points - n_test_points), n_data_points), axis=0)
@@ -3118,7 +3116,13 @@ if DO_TESTING:
 				pass
 		# plot the last layer
 		if DBM.classification:
-			ax3[-DBM.n_label_layer][i].bar(range(DBM.SHAPE[-DBM.n_label_layer]//label_mult),DBM.label_l_save[i])
+			if DBM.type() == "DBM_attention" and np.where(DBM.label_l_save[i]==1)[0][0] == np.where(test_label_attention_class[i] == 1)[0][0]:
+				color = "g"
+			elif DBM.type() == "DBM" and np.where(DBM.label_l_save[i]==1)[0][0] == np.where(test_label[i] == 1)[0][0]:
+				color = "g"
+			else:
+				color = "r"
+			ax3[-DBM.n_label_layer][i].bar(range(DBM.SHAPE[-DBM.n_label_layer]//label_mult),DBM.label_l_save[i],color=color)
 			ax3[-DBM.n_label_layer][i].set_xticks(range(DBM.SHAPE[-DBM.n_label_layer]//label_mult))
 			ax3[-DBM.n_label_layer][i].set_ylim(0,1)
 
