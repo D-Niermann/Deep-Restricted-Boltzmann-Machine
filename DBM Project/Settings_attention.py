@@ -1,5 +1,5 @@
 UserSettings = {
-	"DBM_TYPE" : "DBM",							# what class to use. ("DBM", "DBM_attention")
+	"DBM_TYPE" : "DBM_attention",							# what class to use. ("DBM", "DBM_attention")
 	#### Which Dataset to load 
 	"LOAD_MNIST" : 1,							# MNIST dataset with images of hand drwan digits and labels
 	"DO_CLASSIFICATION" : 1,					# if the last layer is a classification layer or not
@@ -28,17 +28,17 @@ UserSettings = {
 
 	# seed for random number generation,
 	# set None to have no seed 
-	"SEED" : None,									# random seed for tf and np
+	"SEED" : 2,									# random seed for tf and np
 
 	### state vars
 	"DO_PRETRAINING" : 0,						# if no pretrain then files are automatically loaded
 	"DO_TRAINING"    : 0,						# if to train the whole DBM
-	"DO_TESTING"     : 0,						# if testing the DBM with test data
+	"DO_TESTING"     : 1,						# if testing the DBM with test data
 	"DO_SHOW_PLOTS"  : 1,						# if plots will show on display - either way they get saved into saveto_path
 
 	"DO_CONTEXT"    : 0,						# if to test the context
 		"SUBSPACE"  : [0, 1, 2, 3, 4], 			# global subspace set 
-	"DO_GEN_IMAGES" : 1,						# if to generate images (mode can be choosen at function call)
+	"DO_GEN_IMAGES" : 0,						# if to generate images (mode can be choosen at function call)
 		"FREERUN_MODE" : "freerunning",			# Mode of the gibbs sampler to generate images (freerunning, generate, context)
 	"DO_NOISE_STAB" : 0,						# if to make a noise stability test,
 
@@ -51,18 +51,17 @@ UserSettings = {
 	"DO_SAVE_TO_FILE"       : 1, 	# if to save plots and data to file
 	"DO_SAVE_PRETRAINED"    : 0, 	# if to save the pretrained weights seperately (for later use)
 	"DO_LOAD_FROM_FILE"     : 1, 	# if to load weights and biases from datadir + pathsuffix
-	"PATHSUFFIX"            : "Mon_Jun__4_15-55-25_2018_[784, 225, 225, 225, 10] - ['original'] 15%", 
+	"PATHSUFFIX"            : "Mon_Nov_12_13-46-06_2018_[1568, 225, 3, 2] - ['Settings', 'test new data -long']", 
 								#"Mon_Jun__4_15-55-25_2018_[784, 225, 225, 225, 10] - ['original'] 15%"
 								#"Thu_Jun__7_16-21-28_2018_[784, 225, 225, 225, 10] - ['15cont4']"
 	"PATHSUFFIX_PRETRAINED" : "Thu_Jun__7_13-49-25_2018",
 
 
-	"DBM_SHAPE" : [	28*28,
-					15*15,
-					15*15,
-					15*15,
-					10],
+	"DBM_SHAPE" : [	28*28*2,
+					5*5,
+					3,
+					2],
 
 	## only used in DBM_context class
-	"LAYERS_TO_CONNECT" : [],		# layer index of which layer to connect the context layer to (v2 label layer is always connected)
+	"LAYERS_TO_CONNECT" : [1],		# layer index of which layer to connect the context layer to (v2 label layer is always connected)
 }

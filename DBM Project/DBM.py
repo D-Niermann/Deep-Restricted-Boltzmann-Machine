@@ -1372,6 +1372,14 @@ class DBM_class(object):
 		log.reset()
 		return wrong_classified_ind
 
+	def temp_from_energy(self, energy, min, max):
+		temp = (1./(25+energy))*0.1
+		if temp > max:
+			temp = max
+		elif temp < min:
+			temp = min
+		return temp 
+
 
 	def gibbs_sampling(self, v_input, gibbs_steps, TEMP_START, temp_end, droprate_start, droprate_end, subspace, mode, liveplot=1, l_input=None):
 		""" Repeatedly samples v and label , where label can be modified by the user with the multiplication
@@ -1461,30 +1469,30 @@ class DBM_class(object):
 			### gibbs steps
 			for step in range(gibbs_steps):
 
-				# update all self.layer except first one (set step = 0 because time series is not saved)
-				self.glauber_step("visible", temp, droprate, layer_gs, step) #sess.run(self.update_l_s[1:], {self.temp_tf : temp})
 
 
 				if subspace == "all":
 					## without context
 					#	save layer activites
 					self.activity_nc[:,step]  = sess.run(self.layer_activities[1:], {self.temp_tf : temp})
-					self.class_error_gibbs_nc[step] = np.mean(np.abs(layer_gs[-1][step]-input_label))
+					self.class_error_gibbs_nc[step] = np.mean(np.abs(layer_gs[-1][step-1] - input_label))
 					# save layer difference to previous layers
 					if step != 0:
-						for i in range(1,self.n_layers):
-							self.layer_diff_gibbs_nc[i-1, step] = np.mean(np.abs(layer_gs[i][step-1] - layer_gs[i][step]))
+						for l in range(1,self.n_layers):
+							self.layer_diff_gibbs_nc[l-1, step] = np.mean(np.abs(layer_gs[l][step-1] - layer_gs[l][step]))
 				else:
 					## wih context
 					# save layer activites
 					self.activity_c[:,step]   = sess.run(self.layer_activities[1:], {self.temp_tf : temp})
-					self.class_error_gibbs_c[step] = np.mean(np.abs(layer_gs[-1][step]-input_label))
+					self.class_error_gibbs_c[step] = np.mean(np.abs(layer_gs[-1][step-1]-input_label))
 					# save layer difference to previous layers
 					if step!=0:
-						for i in range(1,self.n_layers):
-							self.layer_diff_gibbs_c[i-1, step] = np.mean(np.abs(layer_gs[i][step-1] - layer_gs[i][step]))
+						for l in range(1,self.n_layers):
+							self.layer_diff_gibbs_c[l-1, step] = np.mean(np.abs(layer_gs[l][step-1] - layer_gs[l][step]))
 
 
+				# update all self.layer except first one (set step = 0 because time series is not saved)
+				self.glauber_step("visible", temp, droprate, layer_gs, step) #sess.run(self.update_l_s[1:], {self.temp_tf : temp})
 
 				# assign new temp and dropout rate
 				temp += temp_delta
@@ -1524,6 +1532,7 @@ class DBM_class(object):
 			self.layer_save_generate = [[None] for i in range(self.n_layers)]
 			for layer in range(len(self.layer_save_generate)):
 				self.layer_save_generate[layer] = np.zeros( [gibbs_steps, self.batchsize, self.SHAPE[layer]] )
+			self.temp_save = np.zeros([gibbs_steps,self.batchsize])
 			self.energy_generate = np.zeros([gibbs_steps,self.batchsize])
 
 			for step in range(gibbs_steps):
@@ -1547,6 +1556,9 @@ class DBM_class(object):
 				temp     += temp_delta
 				droprate += drop_delta
 
+				# save the temp for later Plotting
+				self.temp_save[step,:] = temp
+
 			self.unit_input_generate = self.get_units_input();
 
 		if mode=="freerunning":
@@ -1565,6 +1577,8 @@ class DBM_class(object):
 			for i in range(len(self.layer_save_generate)):
 				self.layer_save_generate[i] = np.zeros([gibbs_steps,self.batchsize, DBM.SHAPE[i]])
 			self.energy_generate = np.zeros([gibbs_steps,self.batchsize])
+			self.temp_save = np.zeros([gibbs_steps,self.batchsize])
+
 
 			for step in range(gibbs_steps):
 
@@ -1583,8 +1597,11 @@ class DBM_class(object):
 					temp_[step] = temp
 
 				# assign new temp
-				temp += temp_delta
+				temp = self.temp_from_energy(self.energy_generate[step].mean(), 0.001, 1)
 				droprate+=drop_delta
+
+				# save the temp for later Plotting
+				self.temp_save[step,:] = temp
 
 		if mode=="clamped":
 			sess.run(self.assign_l_zeros)
@@ -2587,17 +2604,19 @@ if DO_LOAD_FROM_FILE and np.any(np.fromstring(PATHSUFFIX[26:].split("]")[0],sep=
 
 
 ######### DBM #############################################################################################
-# DBM = DBM_class(	shape = DBM_SHAPE,
-# 					liveplot = 0,
-# 					classification = DO_CLASSIFICATION,
-# 					UserSettings = UserSettings,
-# 				)
-
-DBM = DBM_attention_class(DBM_SHAPE, 
-						liveplot = 0, 
-						classification = 1,
+if DBM_TYPE == "DBM":
+	DBM = DBM_class(	shape = DBM_SHAPE,
+						liveplot = 0,
+						classification = DO_CLASSIFICATION,
 						UserSettings = UserSettings,
-						)
+					)
+
+if DBM_TYPE == "DBM_attention":
+	DBM = DBM_attention_class(DBM_SHAPE, 
+							liveplot = 0, 
+							classification = 1,
+							UserSettings = UserSettings,
+							)
 
 
 ###########################################################################################################
@@ -2606,7 +2625,7 @@ log.reset()
 log.info(time_now)
 
 
-DBM.pretrain(train_data_attention)
+DBM.pretrain(train_data)
 
 
 if DO_TRAINING:
@@ -2621,9 +2640,9 @@ if DO_TRAINING:
 
 
 			# start a train epoch
-			DBM.train(	train_data  = train_data_attention,
-						train_label = train_label_attention_class if LOAD_MNIST else None,
-						train_label_attention = train_label_attention_side if LOAD_MNIST else None,
+			DBM.train(	train_data  = train_data,
+						train_label = train_label if LOAD_MNIST else None,
+						# train_label_attention = train_label_attention_side if LOAD_MNIST else None,
 						num_batches = N_BATCHES_TRAIN,
 						cont        = run)
 
@@ -2652,8 +2671,8 @@ if DO_TRAINING:
 # last test session
 if DO_TESTING:
 	with tf.Session() as sess:
-		DBM.test(test_data_attention,
-					test_label_attention_class if LOAD_MNIST else None, 
+		DBM.test(test_data,
+					test_label if LOAD_MNIST else None, 
 					N               = 40,  # sample ist aus random werten, also mindestens 2 sample machen
 					create_conf_mat = 0,
 					temp_start      = DBM.temp,
@@ -2679,17 +2698,9 @@ if DO_GEN_IMAGES:
 		for j in range(10):
 			label_clamp[10*j:10*j+10,j] = 1
 
-		# v_input_samples = np.zeros([100,784])
-		# m=0
-		# fig,ax = plt.subplots(10,10)
-		# for i in range(10):
-		# 	for j in range(10):
-		# 		v_input_samples[m,:] = test_data[index_for_number_test_clear[j][i]]
-		# 		ax[i,j].matshow(test_data[index_for_number_test_clear[j][i]].reshape(28,28))
-		# 		m+=1
 
 		generated_img = DBM.gibbs_sampling(label_clamp,
-							300,
+							100,
 							DBM.temp, DBM.temp,
 							999, 999,
 							mode     = UserSettings["FREERUN_MODE"],
@@ -2763,12 +2774,14 @@ if DO_GEN_IMAGES:
 		for i in range(nn):
 			for j in range(nn):
 				ax_en[i,j].plot(DBM.energy_generate[:,m])
+				ax_en[i,j].plot(DBM.temp_save[:,m]*700)
 				m += 1
 				ax_en[-1,j].set_xlabel("Timestep t")
 			ax_en[i,0].set_ylabel("Energy")
 		plt.tight_layout()
 		save_fig(saveto_path+"/generated_energy.png",DO_SAVE_TO_FILE)
 		log.end()
+
 
 if DO_CONTEXT:
 
@@ -2812,7 +2825,7 @@ if DO_CONTEXT:
 
 
 		# calculte h2 firerates over all gibbs_steps
-		h2_no_context = DBM.gibbs_sampling(test_data[index_for_number_gibbs[:]], 30,
+		h2_no_context = DBM.gibbs_sampling(test_data[index_for_number_gibbs[:]], 100,
 							DBM.temp , DBM.temp,
 							999, 999,
 							mode     = "context",
@@ -2826,7 +2839,7 @@ if DO_CONTEXT:
 		rnd.seed(UserSettings["SEED"])
 
 		# # with context
-		h2_context = DBM.gibbs_sampling(test_data[index_for_number_gibbs[:]], 30,
+		h2_context = DBM.gibbs_sampling(test_data[index_for_number_gibbs[:]], 100,
 							DBM.temp , DBM.temp,
 							999, 999,
 							mode     = "context",
@@ -3116,9 +3129,9 @@ if DO_TESTING:
 				pass
 		# plot the last layer
 		if DBM.classification:
-			if DBM.type() == "DBM_attention" and np.where(DBM.label_l_save[i]==1)[0][0] == np.where(test_label_attention_class[i] == 1)[0][0]:
+			if DBM.type() == "DBM_attention" and np.where(DBM.label_l_save[i]==DBM.label_l_save[i].max())[0] == np.where(test_label_attention_class[i] == 1)[0]:
 				color = "g"
-			elif DBM.type() == "DBM" and np.where(DBM.label_l_save[i]==1)[0][0] == np.where(test_label[i] == 1)[0][0]:
+			elif DBM.type() == "DBM" and np.where(DBM.label_l_save[i]==DBM.label_l_save[i].max())[0][0] == np.where(test_label[i] == 1)[0][0]:
 				color = "g"
 			else:
 				color = "r"
@@ -3203,7 +3216,7 @@ if LOAD_MNIST and DO_TESTING:
 			if i == 0:
 				ax.bar(1,0,label=label,color=color*color_m, linewidth = 1.0, edgecolor = "k")
 
-			ax.set_ylabel("Mean Input")
+			ax.set_ylabel("Average Input")
 
 		m+=1
 		ax.set_xlabel("Layer")
@@ -3375,22 +3388,22 @@ if DO_CONTEXT:
 		ax[0].plot(0,0,color=color,label=label_str)
 	ax[0].plot(1,1,"k--",label="No Context")
 	ax[0].plot(1,1,"k-",label="with Context")
-	ax[0].legend(loc="upper right")
-	ax[0].set_ylabel("Active Neurons in %")
+	# ax[0].legend(loc="upper right")
+	ax[0].set_ylabel("Active Neurons in \%")
 	ax[0].set_xlabel("Timestep")
 
 	for i in range(DBM.n_layers-1):
 		color = next(ax[1]._get_lines.prop_cycler)['color'];
 		# color="r"
 
-		ax[1].plot(DBM.layer_diff_gibbs_c[i,1:],"-",color=color)
-		ax[1].plot(DBM.layer_diff_gibbs_nc[i,1:],"--",color=color)
+		ax[1].plot(range(1,len(DBM.layer_diff_gibbs_c[i])),DBM.layer_diff_gibbs_c[i, 1:],"-",color=color)
+		ax[1].plot(range(1,len(DBM.layer_diff_gibbs_nc[i])),DBM.layer_diff_gibbs_nc[i, 1:],"--",color=color)
 		label_str = get_layer_label(DBM.type(), DBM.n_layers, i+1)
 		ax[1].plot(0,0,color=color,label=label_str)
 	ax[1].plot(0,0,"k--",label="No Context")
 	ax[1].plot(0,0,"k-",label="with Context")
-	ax[1].legend(loc="best")
-	ax[1].set_ylabel("|Layer(t) - Layer(t-1)|")
+	ax[1].legend(loc="center left",bbox_to_anchor = (2.5,0.5))
+	ax[1].set_ylabel(r"$|$"+"Layer(t) - Layer(t-1)"+r"$|$")
 	ax[1].set_xlabel("Timestep")
 
 	ax[2].plot(DBM.class_error_gibbs_c,"-",color=color)
@@ -3398,12 +3411,11 @@ if DO_CONTEXT:
 
 	ax[2].plot(0,0,"k--",label="No Context")
 	ax[2].plot(0,0,"k-",label="With Context")
-	ax[2].legend(loc="best")
+	# ax[2].legend(loc="best")
 	ax[2].set_ylabel("Class Error")
 	ax[2].set_xlabel("Timestep")
-	# plt.subplots_adjust(bottom=None, right=0.73, left=0.1, top=None,
-	# 	            wspace=None, hspace=None)
-	plt.tight_layout()
+	plt.subplots_adjust(bottom=0.19, right=0.83, left=0.1, top=None,
+		            wspace=0.37, hspace=None)
 	save_fig(saveto_path+"/context_time_series.pdf",DO_SAVE_TO_FILE)
 
 
@@ -3434,7 +3446,7 @@ if DO_CONTEXT:
 				 linewidth = 0.2, edgecolor = "k",
 
 				)
-			ax.set_ylabel("Mean Input")
+			ax.set_ylabel("Aver Input")
 
 		m+=1
 		ax.set_xlabel("Layer")
