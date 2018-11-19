@@ -1372,14 +1372,6 @@ class DBM_class(object):
 		log.reset()
 		return wrong_classified_ind
 
-	def temp_from_energy(self, energy, min, max):
-		temp = (1./(25+energy))*0.1
-		if temp > max:
-			temp = max
-		elif temp < min:
-			temp = min
-		return temp 
-
 
 	def gibbs_sampling(self, v_input, gibbs_steps, TEMP_START, temp_end, droprate_start, droprate_end, subspace, mode, liveplot=1, l_input=None):
 		""" Repeatedly samples v and label , where label can be modified by the user with the multiplication
@@ -1577,8 +1569,6 @@ class DBM_class(object):
 			for i in range(len(self.layer_save_generate)):
 				self.layer_save_generate[i] = np.zeros([gibbs_steps,self.batchsize, DBM.SHAPE[i]])
 			self.energy_generate = np.zeros([gibbs_steps,self.batchsize])
-			self.temp_save = np.zeros([gibbs_steps,self.batchsize])
-
 
 			for step in range(gibbs_steps):
 
@@ -1597,11 +1587,8 @@ class DBM_class(object):
 					temp_[step] = temp
 
 				# assign new temp
-				temp = self.temp_from_energy(self.energy_generate[step].mean(), 0.001, 1)
+				temp += temp_delta
 				droprate+=drop_delta
-
-				# save the temp for later Plotting
-				self.temp_save[step,:] = temp
 
 		if mode=="clamped":
 			sess.run(self.assign_l_zeros)
@@ -2774,7 +2761,6 @@ if DO_GEN_IMAGES:
 		for i in range(nn):
 			for j in range(nn):
 				ax_en[i,j].plot(DBM.energy_generate[:,m])
-				ax_en[i,j].plot(DBM.temp_save[:,m]*700)
 				m += 1
 				ax_en[-1,j].set_xlabel("Timestep t")
 			ax_en[i,0].set_ylabel("Energy")
