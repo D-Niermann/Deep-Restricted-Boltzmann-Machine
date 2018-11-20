@@ -2626,22 +2626,22 @@ if DO_TRAINING:
 			log.start("Run %i"%run)
 
 
-			# start a train epoch
+			### start a train epoch
 			DBM.train(	train_data  = train_data,
 						train_label = train_label if LOAD_MNIST else None,
 						# train_label_attention = train_label_attention_side if LOAD_MNIST else None,
 						num_batches = N_BATCHES_TRAIN,
 						cont        = run)
 
-			# test session while training
-			# if run!=N_EPOCHS_TRAIN-1 and run%TEST_EVERY_EPOCH==0:
-			# 	DBM.test(test_data_attention, 
-			# 			test_label_attention_class if LOAD_MNIST else None, 
-			# 			N               = 30,  # sample ist aus random werten, also mindestens 2 sample machen
-			# 			create_conf_mat = 0,
-			# 			temp_start      = DBM.temp,
-			# 			temp_end        = DBM.temp
-			# 			)
+			### test session while training
+			if run!=N_EPOCHS_TRAIN-1 and run%TEST_EVERY_EPOCH==0:
+				DBM.test(test_data_attention, 
+						test_label_attention_class if LOAD_MNIST else None, 
+						N               = 30,  # sample ist aus random werten, also mindestens 2 sample machen
+						create_conf_mat = 0,
+						temp_start      = DBM.temp,
+						temp_end        = DBM.temp
+						)
 
 			# 	if LOAD_MNIST:
 			# 		log.out("Creating Backup of Parameters")
@@ -3336,11 +3336,18 @@ if DO_CONTEXT:
 
 	### plt histograms for each used digit
 	fig,ax = plt.subplots(1,len(subset),figsize=(12,7),sharey="row")
+	fig2,ax2 = plt.subplots(1,len(subset),figsize=(7,4),sharey="row")
 	for i,digit in enumerate(subset):
 		if len(hist_data_nc[digit])>1:
 			y_nc = np.mean(np.array(hist_data_nc[digit][1:]),axis=0)
 			y_c  = np.mean(np.array(hist_data[digit][1:]),axis=0)
+
 			for j in range(10):
+				if j in SUBSPACE:
+					rel_change = (y_c[j]-y_nc[j])/(1-y_nc[j])
+					c = "r" if j != digit else "g"
+					ax2[i].bar(j,rel_change, color = c)
+
 				if y_nc[j]>y_c[j]:
 					ax[i].bar(j,y_nc[j],color=[0.8,0.1,0.1],linewidth=0.1,edgecolor="k")
 					ax[i].bar(j,y_c[j] ,color=[0.1,0.7,0.1],linewidth=0.1,edgecolor="k")
@@ -3351,12 +3358,17 @@ if DO_CONTEXT:
 		ax[i].set_ylim([0,1])
 		ax[i].set_title(str(digit))
 		ax[i].set_xticks(range(10))
+		ax2[i].set_xticks(range(len(subset)))
+		ax2[i].set_title(str(digit))
+		ax2[i].set_xlabel("Class")
 	ax[-1].plot(0,0,color = [0.8,0.1,0.1], label="No Context")
 	ax[-1].plot(0,0,color = [0.1,0.7,0.1], label="Context")
 	ax[0].set_ylabel("Mean Predicted Label")
+	ax2[0].set_ylabel("Relative Increase "+r"$\rho_{\mathrm{rel}}$")
 	plt.legend(loc="center left",bbox_to_anchor = (1.0,0.5))
-	plt.subplots_adjust(bottom=None, right=0.84, left=0.1, top=None,
+	fig.subplots_adjust(bottom=None, right=0.84, left=0.1, top=None,
 	        wspace=None, hspace=None)
+	fig2.tight_layout()
 
 	save_fig(saveto_path+"/context_hists.pdf",DO_SAVE_TO_FILE)
 
@@ -3442,19 +3454,19 @@ if DO_CONTEXT:
 
 
 	# plot the unit variance and firerate c/nc
-	fig_sig,ax_sig = plt.subplots(2,DBM.n_layers-2,figsize=(10,5))
-	fig_f,ax_f = plt.subplots(2,DBM.n_layers-2,figsize=(10,5))
-	biggest_var_change_ind = [None]*(DBM.n_layers-2)
+	fig_sig,ax_sig         = plt.subplots(2,DBM.n_layers-2,figsize=(10,5))
+	fig_f,ax_f             = plt.subplots(2,DBM.n_layers-2,figsize=(10,5))
+	biggest_var_change_ind = [None]*(DBM.n_layers)
 	for l in DBM.get_hidden_layer_ind():
 		layer_str = get_layer_label(DBM.type(), DBM.n_layers,l,short=True)
 
 		delta_sigma = DBM.unit_diversity_c[l]-DBM.unit_diversity_nc[l]
 		delta_f     = np.mean(DBM.firerate_c[l],0) - np.mean(DBM.firerate_nc[l],0)
 
-		biggest_var_change_ind[l-1] = np.where(delta_sigma > sorted(delta_sigma)[-11] )[0]
+		biggest_var_change_ind[l] = np.where((delta_sigma) > sorted((delta_sigma))[-11] )[0]
 
-		big_var_change_hists_c  = calc_neuron_hist(biggest_var_change_ind[l-1], DBM.firerate_c[l],   test_label[index_for_number_gibbs[:]], 0.5, len(subset))
-		big_var_change_hists_nc = calc_neuron_hist(biggest_var_change_ind[l-1], DBM.firerate_nc[l],  test_label[index_for_number_gibbs[:]], 0.5, len(subset))
+		big_var_change_hists_c  = calc_neuron_hist(biggest_var_change_ind[l], DBM.firerate_c[l],   test_label[index_for_number_gibbs[:]], 0.5, len(subset))
+		big_var_change_hists_nc = calc_neuron_hist(biggest_var_change_ind[l], DBM.firerate_nc[l],  test_label[index_for_number_gibbs[:]], 0.5, len(subset))
 
 		fig2, ax2 = plt.subplots(2,len(big_var_change_hists_c)//2,figsize=(8,4),sharey="row")
 		m=0
@@ -3462,6 +3474,7 @@ if DO_CONTEXT:
 			for i in range(len(big_var_change_hists_c)//2):
 				ax2[j,i].bar(np.array(subset)-0.17,big_var_change_hists_c[m], width = 0.35, color="g")
 				ax2[j,i].bar(np.array(subset)+0.17,big_var_change_hists_nc[m], width = 0.35, color="r")
+				ax2[j,i].set_title(r"$\Delta \sigma = $"+str(np.round(delta_sigma[biggest_var_change_ind[l][m]],3)))
 				ax2[-1,i].set_xlabel("Class")
 				ax2[j,0].set_ylabel(r"$N$")
 				ax2[j,i].set_xticks((subset))
@@ -3478,7 +3491,7 @@ if DO_CONTEXT:
 		ax_f[1,l-1].set_xlabel(r"$\Delta f_{%s}$"%layer_str[1:-1])
 		ax_f[0,l-1].set_ylabel("N",style= "italic")
 		ax_f[1,l-1].set_ylabel("N",style= "italic")
- 
+
 
 		ax_sig[0,l-1].hist(DBM.unit_diversity_nc[l], bins=20, lw = 0.2, edgecolor = "k")
 		ax_sig[1,l-1].hist(delta_sigma, bins=20, lw = 0.2, edgecolor = "k")

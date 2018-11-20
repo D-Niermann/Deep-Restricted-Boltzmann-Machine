@@ -7,7 +7,7 @@ pca = PCA(2)
 mean_img = np.mean(train_data[:10000],0)
 
 ## user variables
-layer       = 3
+layer       = 1
 fire_thresh = 0.8
 w_thresh    = 0.04
 min_mean    = 0.05
@@ -38,7 +38,7 @@ for neuron in range(DBM.SHAPE[layer]):
 	if len(neuron_number_)>20:
 		break
 """
-neuron_number_ = list(set(neuron_number_))
+# neuron_number_ = list(set(neuron_number_))
 neuron_number_ = [38,81,99,112,114]
 
 ## get neurons based on their weight strength
@@ -114,8 +114,8 @@ for neuron in range(len(neuron_number_)):
 	
 
 
-	fig,ax = plt.subplots(1,5,figsize=(13,2.9))
-	fig.suptitle("Layer %i | Neuron %i"%(layer,neuron_number))#+ r" $<f>$ = %f" %(neuron_means_[neuron]))
+	fig,ax = plt.subplots(1,4,figsize=(11,2.9))
+	# fig.suptitle("Layer %i | Neuron %i"%(layer,neuron_number))#+ r" $<f>$ = %f" %(neuron_means_[neuron]))
 
 					## old code for plotting many PCA compnents or kmeans 
 					# k = 0
@@ -130,30 +130,26 @@ for neuron in range(len(neuron_number_)):
 					# 		ax[i,j].set_yticks([])
 					# 		k+=1
 
-	ax[0].set_title(r"$<V_i^{(s)}>-<V_i>$")
-	mapp = ax[0].matshow((mean_subdata-mean_img).reshape(28,28))
+	ax[0].set_title("1. PC")
+	# mapp = ax[0].matshow((mean_subdata-mean_img).reshape(28,28))
+	mapp  =ax[0].matshow(pca.components_[0].reshape(28,28))
 	plt.colorbar(ax=ax[0], mappable=mapp)
 	ax[0].set_xticks([])
 	ax[0].set_yticks([])
 	
-	if layer==1:
-		ax[1].set_title("Corresponding Filter")
-		mapp2 = ax[1].matshow(DBM.w_np[0][:,neuron_number].reshape(28,28))
-		plt.colorbar(ax=ax[1], mappable=mapp2)
-		ax[1].set_xticks([])
-		ax[1].set_yticks([])
-	else:
-		ax[1].set_title("Firerates")
-		ax[1].bar(1,np.mean(DBM.firerate_test[layer][:,neuron_number]))
-		# ax[1].bar(2,np.mean(DBM.firerate_c[layer][:,neuron_number]))
-		# ax[1].bar(3,np.mean(DBM.firerate_nc[layer][:,neuron_number]))
-		ax[1].set_xticks([1,2,3])
-		ax[1].set_xticklabels(["Test","Context","No Context"],rotation=20)
-					### old k means plot 
-					# mapp2 = ax[1].matshow(kmeans.cluster_centers_[0].reshape(28,28))
-					# plt.colorbar(ax=ax[1], mappable=mapp2)
-					# ax[1].set_xticks([])
-					# ax[1].set_yticks([])
+
+
+	# ax[1].set_title("Firerates")
+	# ax[1].bar(1,np.mean(DBM.firerate_test[layer][:,neuron_number]))
+	# ax[1].bar(2,np.mean(DBM.firerate_c[layer][:,neuron_number]))
+	# ax[1].bar(3,np.mean(DBM.firerate_nc[layer][:,neuron_number]))
+	# ax[1].set_xticks([1,2,3])
+	# ax[1].set_xticklabels(["Test","Context","No Context"],rotation=20)
+	ax[1].set_title("2. PC")
+	mapp2 = ax[1].matshow(pca.components_[1].reshape(28,28))
+	plt.colorbar(ax=ax[1], mappable=mapp2)
+	ax[1].set_xticks([])
+	ax[1].set_yticks([])
 
 
 
@@ -180,14 +176,14 @@ for neuron in range(len(neuron_number_)):
 
 	
 
-	ax[4].set_title("Weight strength")
-	ax[4].bar(range(10),DBM.w_np[-1][neuron_number,:])
-	ax[4].set_xticks(range(10))
+	# ax[4].set_title("Weight strength")
+	# ax[4].bar(range(10),DBM.w_np[-1][neuron_number,:])
+	# ax[4].set_xticks(range(10))
 	# plt.savefig(str(neuron),dpi=250)
 	# mapp = ax[1,1].matshow(pca.components_[2].reshape(28,28))
 	# plt.colorbar(ax=ax[1,1], mappable=mapp)
 
-	plt.subplots_adjust(top=0.65, bottom = 0.19, wspace=0.4, left=0.04, right=0.97)
+	plt.subplots_adjust(top=0.65, bottom = 0.19, wspace=0.5, left=0.04, right=0.97)
 	            # wspace=None, hspace=None)
 
 
