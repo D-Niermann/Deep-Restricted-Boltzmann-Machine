@@ -976,7 +976,7 @@ class DBM_class(object):
 				self.layer_energy[i] = tf.einsum("ij,ij->i",self.layer[i+1], tf.matmul(self.layer[i],self.w[i]))+tf.reduce_sum(self.layer[i]*self.bias[i],1)+tf.reduce_sum(self.layer[i+1]*self.bias[i+1],1)
 			self.update_l_s[i]   = self.layer[i].assign(self.layer_samp[i])
 		self.update_l_s[-1] = self.layer[-1].assign(self.layer_prob[-1])
-
+		
 
 		### Error and stuff
 		self.error       = tf.reduce_mean(tf.square(self.layer_ph[0]-self.layer[0]))
@@ -991,7 +991,7 @@ class DBM_class(object):
 		sess.run(tf.global_variables_initializer())
 		self.init_state = 1
 
-	def train(self, train_data, train_label, train_label_context, num_batches, cont):
+	def train(self, train_data, train_label, train_label_attention, num_batches, cont):
 		""" training the DBM with given h2 as labels and v as input images
 		train_data  :: images
 		train_label :: corresponding label
@@ -1556,13 +1556,13 @@ class DBM_class(object):
 		if mode=="freerunning":
 			sess.run(self.assign_l_zeros)
 			if LOAD_MNIST:
-				rng  =  index_for_number_test_clear[4][2]#rnd.randint(100)
+				rng  =  index_for_number_test_clear[7][2]#rnd.randint(100)
 
-			# log.out("PreAssigning v1 with test data. rng: "+str(rng))
-			# sess.run(self.assign_l[0], {self.layer_ph[0] : np.repeat(test_data[rng:rng+1],self.batchsize,0)})
-			# ## run to equlibrium
-			# for i in range(10):
-			# 	sess.run(self.update_l_s[1:],{self.temp_tf : temp, self.droprate_tf : droprate_start})
+			log.out("PreAssigning v1 with test data. rng: "+str(rng))
+			sess.run(self.assign_l[0], {self.layer_ph[0] : np.repeat(test_data[rng:rng+1],self.batchsize,0)})
+			## run to equlibrium
+			for i in range(10):
+				sess.run(self.update_l_s[1:],{self.temp_tf : temp, self.droprate_tf : droprate_start})
 
 			## init save arrays for every layer and every gibbs step
 			self.layer_save_generate = [[None] for i in range(self.n_layers)]
@@ -1575,6 +1575,10 @@ class DBM_class(object):
 				# update all layer
 				self.glauber_step("None", temp, droprate, self.layer_save_generate, step) #sess.run(self.update_l_s, {self.temp_tf : temp})
 				self.energy_generate[step] = sess.run(self.energy)
+
+				if step == 0 or step == 1 or step == 5 or step == 10 or step == 100 or step == 1000:
+					plt.matshow(self.layer_save_generate[0][step][0].reshape(28,28))
+					plt.title(str(self.energy_generate[step][0]))
 
 
 				if liveplot:
@@ -2629,7 +2633,7 @@ if DO_TRAINING:
 			### start a train epoch
 			DBM.train(	train_data  = train_data,
 						train_label = train_label if LOAD_MNIST else None,
-						# train_label_attention = train_label_attention_side if LOAD_MNIST else None,
+						train_label_attention = train_label_attention_side if LOAD_MNIST else None,
 						num_batches = N_BATCHES_TRAIN,
 						cont        = run)
 
@@ -2660,8 +2664,8 @@ if DO_TESTING:
 	with tf.Session() as sess:
 		DBM.test(test_data,
 					test_label if LOAD_MNIST else None, 
-					N               = 40,  # sample ist aus random werten, also mindestens 2 sample machen
-					create_conf_mat = 0,
+					N               = 100,  # sample ist aus random werten, also mindestens 2 sample machen
+					create_conf_mat = 1,
 					temp_start      = DBM.temp,
 					temp_end        = DBM.temp)
 	# save_firerates_to_file(DBM.firerate_test,saveto_path+"/FireratesTest")
@@ -2674,7 +2678,7 @@ if DO_GEN_IMAGES:
 		if DO_LOAD_FROM_FILE and not DO_TRAINING:
 			DBM.load_from_file(workdir+"/data/"+PATHSUFFIX,override_params=1)
 
-		nn                = 10		# grid with nn^2 plots (has to stay 10 for now)
+		nn                = 1		# grid with nn^2 plots (has to stay 10 for now)
 		DBM.batchsize     = nn**2
 
 		DBM.graph_init("gibbs")
@@ -2687,7 +2691,7 @@ if DO_GEN_IMAGES:
 
 
 		generated_img = DBM.gibbs_sampling(label_clamp,
-							100,
+							10000,
 							DBM.temp, DBM.temp,
 							999, 999,
 							mode     = UserSettings["FREERUN_MODE"],
