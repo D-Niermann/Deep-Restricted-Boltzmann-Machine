@@ -976,7 +976,7 @@ class DBM_class(object):
 				self.layer_energy[i] = tf.einsum("ij,ij->i",self.layer[i+1], tf.matmul(self.layer[i],self.w[i]))+tf.reduce_sum(self.layer[i]*self.bias[i],1)+tf.reduce_sum(self.layer[i+1]*self.bias[i+1],1)
 			self.update_l_s[i]   = self.layer[i].assign(self.layer_samp[i])
 		self.update_l_s[-1] = self.layer[-1].assign(self.layer_prob[-1])
-		
+
 
 		### Error and stuff
 		self.error       = tf.reduce_mean(tf.square(self.layer_ph[0]-self.layer[0]))
@@ -1345,8 +1345,8 @@ class DBM_class(object):
 				for digit in range(10):
 					w[digit]  = np.round(np.mean(np.array(DBM.conf_data[digit]),axis=0),3)
 				seaborn.heatmap(w*100,annot=True)
-				plt.ylabel("Desired Label in \%")
-				plt.xlabel("Predicted Label in \%")
+				plt.ylabel("Desired Label")
+				plt.xlabel("Predicted Label")
 
 		self.class_error_test = float(n_wrongs)/self.batchsize
 
@@ -1558,8 +1558,8 @@ class DBM_class(object):
 			if LOAD_MNIST:
 				rng  =  index_for_number_test_clear[7][2]#rnd.randint(100)
 
-			log.out("PreAssigning v1 with test data. rng: "+str(rng))
-			sess.run(self.assign_l[0], {self.layer_ph[0] : np.repeat(test_data[rng:rng+1],self.batchsize,0)})
+			# log.out("PreAssigning v1 with test data. rng: "+str(rng))
+			# sess.run(self.assign_l[0], {self.layer_ph[0] : np.repeat(test_data[rng:rng+1],self.batchsize,0)})
 			## run to equlibrium
 			for i in range(10):
 				sess.run(self.update_l_s[1:],{self.temp_tf : temp, self.droprate_tf : droprate_start})
@@ -2639,8 +2639,8 @@ if DO_TRAINING:
 
 			### test session while training
 			if run!=N_EPOCHS_TRAIN-1 and run%TEST_EVERY_EPOCH==0:
-				DBM.test(test_data_attention, 
-						test_label_attention_class if LOAD_MNIST else None, 
+				DBM.test(test_data, 
+						test_label if LOAD_MNIST else None, 
 						N               = 30,  # sample ist aus random werten, also mindestens 2 sample machen
 						create_conf_mat = 0,
 						temp_start      = DBM.temp,
@@ -2665,7 +2665,7 @@ if DO_TESTING:
 		DBM.test(test_data,
 					test_label if LOAD_MNIST else None, 
 					N               = 100,  # sample ist aus random werten, also mindestens 2 sample machen
-					create_conf_mat = 1,
+					create_conf_mat = 0,
 					temp_start      = DBM.temp,
 					temp_end        = DBM.temp)
 	# save_firerates_to_file(DBM.firerate_test,saveto_path+"/FireratesTest")
@@ -2678,7 +2678,7 @@ if DO_GEN_IMAGES:
 		if DO_LOAD_FROM_FILE and not DO_TRAINING:
 			DBM.load_from_file(workdir+"/data/"+PATHSUFFIX,override_params=1)
 
-		nn                = 1		# grid with nn^2 plots (has to stay 10 for now)
+		nn                = 10		# grid with nn^2 plots (has to stay 10 for now)
 		DBM.batchsize     = nn**2
 
 		DBM.graph_init("gibbs")
@@ -2691,7 +2691,7 @@ if DO_GEN_IMAGES:
 
 
 		generated_img = DBM.gibbs_sampling(label_clamp,
-							10000,
+							1000,
 							DBM.temp, DBM.temp,
 							999, 999,
 							mode     = UserSettings["FREERUN_MODE"],
@@ -3467,10 +3467,12 @@ if DO_CONTEXT:
 		delta_sigma = DBM.unit_diversity_c[l]-DBM.unit_diversity_nc[l]
 		delta_f     = np.mean(DBM.firerate_c[l],0) - np.mean(DBM.firerate_nc[l],0)
 
-		biggest_var_change_ind[l] = np.where((delta_sigma) > sorted((delta_sigma))[-11] )[0]
+		biggest_var_change_ind[l] = np.where(abs(delta_sigma) > sorted(abs(delta_sigma))[-11] )[0]
+		rnd_index = rnd.randint(0,225,size=(11))
 
-		big_var_change_hists_c  = calc_neuron_hist(biggest_var_change_ind[l], DBM.firerate_c[l],   test_label[index_for_number_gibbs[:]], 0.5, len(subset))
-		big_var_change_hists_nc = calc_neuron_hist(biggest_var_change_ind[l], DBM.firerate_nc[l],  test_label[index_for_number_gibbs[:]], 0.5, len(subset))
+
+		big_var_change_hists_c  = calc_neuron_hist(rnd_index, DBM.firerate_c[l],   test_label[index_for_number_gibbs[:]], 0.5, len(subset))
+		big_var_change_hists_nc = calc_neuron_hist(rnd_index, DBM.firerate_nc[l],  test_label[index_for_number_gibbs[:]], 0.5, len(subset))
 
 		fig2, ax2 = plt.subplots(2,len(big_var_change_hists_c)//2,figsize=(8,4),sharey="row")
 		m=0
@@ -3478,7 +3480,7 @@ if DO_CONTEXT:
 			for i in range(len(big_var_change_hists_c)//2):
 				ax2[j,i].bar(np.array(subset)-0.17,big_var_change_hists_c[m], width = 0.35, color="g")
 				ax2[j,i].bar(np.array(subset)+0.17,big_var_change_hists_nc[m], width = 0.35, color="r")
-				ax2[j,i].set_title(r"$\Delta \sigma = $"+str(np.round(delta_sigma[biggest_var_change_ind[l][m]],3)))
+				ax2[j,i].set_title(r"$\Delta \sigma = $"+str(np.round(delta_sigma[rnd_index[m]],3)))
 				ax2[-1,i].set_xlabel("Class")
 				ax2[j,0].set_ylabel(r"$N$")
 				ax2[j,i].set_xticks((subset))
