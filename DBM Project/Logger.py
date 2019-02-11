@@ -30,7 +30,7 @@ class Logger(object):
 			for i in args:
 				string+=str(i)+" "
 			printstr = string 
-			print printstr
+			print(printstr)
 			if self.write_file:
 				self.file = open(self.path+"Logger-File.txt","a")
 				self.file.write(printstr+"\n")
@@ -41,7 +41,7 @@ class Logger(object):
 			for i in args:
 				string+=str(i)+" "
 			printstr = string 
-			print printstr
+			print( printstr)
 			if self.write_file:
 				self.file = open(self.path+"Logger-File.txt","a")
 				self.file.write(printstr+"\n")
@@ -51,7 +51,7 @@ class Logger(object):
 		if self.on:
 			if self.count==1:
 				printstr = ""
-				print printstr
+				print( printstr)
 				if self.write_file:
 					self.file = open(self.path+"Logger-File.txt","a")
 					self.file.write(printstr+"\n")
@@ -60,7 +60,7 @@ class Logger(object):
 				input_str+=" "+str(i)
 			try:
 				printstr = str(self.count)+".      "+"\t"*(len(self.start_time)-1)+str(input_str)
-				print printstr
+				print( printstr)
 				if self.write_file:
 					self.file = open(self.path+"Logger-File.txt","a")
 					self.file.write(printstr+"\n")
@@ -68,7 +68,7 @@ class Logger(object):
 				self.count+=1
 			except:
 				printstr = "Error while logging"
-				print printstr
+				print( printstr)
 				if self.write_file:
 					self.file = open(self.path+"Logger-File.txt","a")
 					self.file.write(printstr+"\n")
@@ -78,7 +78,7 @@ class Logger(object):
 		if self.on:
 			if self.count==1:
 				printstr = ""
-				print printstr
+				print( printstr)
 				if self.write_file:
 					self.file = open(self.path+"Logger-File.txt","a")
 					self.file.write(printstr+"\n")
@@ -89,7 +89,7 @@ class Logger(object):
 			try:
 				start_len=(len(self.start_time))
 				printstr = str(self.count)+"."+"-"*start_len+"v"+" "*(5-start_len)+"\t"*(len(self.start_time)-1)+str(input_str)
-				print printstr
+				print( printstr)
 				if self.write_file:
 					self.file = open(self.path+"Logger-File.txt","a")
 					self.file.write(printstr+"\n")
@@ -100,7 +100,7 @@ class Logger(object):
 				self.process_name.append(input_str)
 			except:
 				printstr = "Error: while begin logging"
-				print printstr
+				print( printstr)
 				if self.write_file:
 					self.file = open(self.path+"Logger-File.txt","a")
 					self.file.write(printstr+"\n")
@@ -114,7 +114,7 @@ class Logger(object):
 				try:
 					start_len=(len(self.start_time)-1)
 					printstr = str(self.count_save.pop())+"."+"-"*start_len+"^"+" "*(5-start_len)+"\t"*(len(self.start_time)-2)+self.process_name[len(self.process_name)-1]+" (took "+str(round(self.end_time-self.start_time[len(self.start_time)-1],3))+" sek)"
-					print printstr
+					print( printstr)
 					if self.write_file:
 						self.file = open(self.path+"Logger-File.txt","a")
 						self.file.write(printstr+"\n")
@@ -126,14 +126,14 @@ class Logger(object):
 					return time_needed
 				except:
 					printstr = "Error: while end logging"
-					print printstr
+					print( printstr)
 					if self.write_file:
 						self.file = open(self.path+"Logger-File.txt","a")
 						self.file.write(printstr+"\n")
 						self.file.close()
 			else:
 				printstr = "Error : end log: No start time found"
-				print printstr
+				print( printstr)
 				if self.write_file:
 					self.file = open(self.path+"Logger-File.txt","a")
 					self.file.write(printstr+"\n")
@@ -142,7 +142,7 @@ class Logger(object):
 	def reset(self):
 		if self.on:
 			printstr = "------------------------------------------------"
-			print printstr
+			print( printstr)
 			if self.write_file:
 				self.file = open(self.path+"Logger-File.txt","a")
 				self.file.write(printstr+"\n")

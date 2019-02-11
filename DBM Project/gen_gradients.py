@@ -7,36 +7,45 @@ from Logger import *
 
 log = Logger(True)
 
-n_images = 10000
-train_data = np.ones([n_images, 28, 28])
 
-def f(x,y, x_off, y_off, size):
-    return exp(-((x-x_off)**2+(y-y_off)**2)/size)
+def generateGradients(n_images):
+    train_data = np.ones([n_images, 784])
 
-log.start("Generating data")
-for i in range(n_images):
-    
-    x_off = rnd.randint(0,28)
-    y_off = rnd.randint(0,28)
-    size = rnd.randint(5, 500)
-   
-    for x in range(28):
-        for y in range(28):
-            
-            train_data[i,x,y] = f(x, y, x_off, y_off, size)
-log.end()
+    def f(x,y, x_off, y_off, size):
+        return exp(-((x-x_off)**2+(y-y_off)**2)/size)
 
-print("Generated %i images with values ranging from %f to %f"%
-            (
-            n_images, 
-            train_data.min(),
-            train_data.max(),
+    log.start("Generating data")
+    for i in range(n_images):
+        
+        x_off = rnd.randint(0,28)
+        y_off = rnd.randint(0,28)
+        size = rnd.randint(5, 500)
+
+        m = 0
+        for x in range(28):
+            for y in range(28):   
+                train_data[i,m] = f(x, y, x_off, y_off, size)
+                m += 1
+
+    log.end()
+
+    print("Generated %i images with values ranging from %f to %f"%
+                (
+                n_images, 
+                train_data.min(),
+                train_data.max(),
+                )
             )
-        )
 
+    return train_data
 
-fig,ax = plt.subplots(1,10, figsize = (16,3))
-for i in range(10):
-    ax[i].matshow(train_data[i])
-plt.tight_layout()
-plt.show()
+if __name__ =="__main__":
+    train_data = generateGradients(10)
+    fig,ax = plt.subplots(1,10, figsize = (16,3))
+    for i in range(10):
+        ax[i].matshow(train_data[i])
+    plt.tight_layout()
+    import seaborn
+    plt.matshow(train_data[0])
+    
+    plt.show()
