@@ -47,6 +47,8 @@ if True:
 	from RBM_Functions 	import *
 	from DBM_Class 		import *
 	from gen_gradients 	import * 
+	from gen_driveData 	import *
+
 
 	 # set the numpy print precision
 	np.set_printoptions(precision=3)
@@ -148,9 +150,16 @@ subset = SUBSPACE
 
 ###########################################################################################################
 #### Get test and train data  #####
+n_visible = DBM_SHAPE[0]
+n_hidden = DBM_SHAPE[1]
+# define a weight matrix
+w = rnd.randn(n_visible, n_hidden)*0.5
+# set small elemts to zero
+w[np.abs(w)<0.45] = 0
 
-train_data = generateGradients(1000)
-test_data = generateGradients(100)
+# calculate test and train data
+train_data, train_label = generateDriveData(n_visible, n_hidden, 2000, w)
+test_data, test_label  = generateDriveData(n_visible, n_hidden, 200, w)
 
 ###########################################################################################################
 #### Create a DBM  #####
@@ -169,15 +178,16 @@ DBM = DBM_class(shape = DBM_SHAPE,
 DBM.pretrain(train_data)
 
 # train the complete DBM with train data
-DBM.train(train_data, test_data)
+DBM.train(train_data, test_data, train_label, test_label)
 
 # test the DBM with test data
-DBM.test(test_data)
+DBM.test(test_data, test_label, N = 50)
 
 # Plot the results or save them to file (see Settings.py)
 DBM.show_results()
 
-# gibbs sampling? generate images from freerunning ...
+# gibbs sampling? generate images from freerunning ... grade sowas wie "ich habe nur zwei von 5 infos, wie unsicher ist er und was könnten die anderen 3 infos sein"
 # split show results into multiple functions ? (show weights, show train log, show test restuls ....) also check if testing again and then plotting again really plots the new tested daata and results
+# include "is image data" variable in init to create better plots and analytics -> show matri tiled or not, show v2 layer desired vs result, better remap of data to images fro plot
 
 print("Finished")

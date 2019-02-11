@@ -762,11 +762,11 @@ class DBM_class(object):
 		self.log.start("Deep BM Epoch:",self.epochs+1,"/",self.N_EPOCHS_TRAIN)
 
 		# shuffle test data and labels so that batches are not equal every epoch
-		self.log.out("Shuffling TrainData")
-		self.seed   = rnd.randint(len(train_data), size=(len(train_data)//10,2))
-		train_data  = shuffle(train_data, self.seed)
-		if self.classification:
-			train_label = shuffle(train_label, self.seed)
+		# self.log.out("Shuffling TrainData")
+		# self.seed   = rnd.randint(len(train_data), size=(len(train_data)//10,2))
+		# train_data  = shuffle(train_data, self.seed)
+		# if self.classification:
+		# 	train_label = shuffle(train_label, self.seed)
 
 		self.log.out("Running Epoch")
 		# self.log.info("++ Using Weight Decay! Not updating bias! ++")
@@ -972,6 +972,7 @@ class DBM_class(object):
 			# increment mytemp
 			mytemp+=temp_delta
 
+
 		# calc layer variance across batch
 		self.layer_diversity_test = sess.run(self.layer_diversity)
 		self.layer_variance_test  = sess.run(self.layer_variance)
@@ -980,7 +981,7 @@ class DBM_class(object):
 
 		self.log.end()
 
-		## get firerates of every unit
+		## get firerates of every unit and also update all units states to their probabilites
 		self.firerate_test = sess.run(self.update_l_p, {self.temp_tf : mytemp, self.droprate_tf : droprate})
 
 
@@ -1025,16 +1026,16 @@ class DBM_class(object):
 			## error of classifivation labels
 			self.class_error_test = np.mean(np.abs(self.label_l_save-my_test_label[:,:10]))
 
-			for i in range(len(self.label_l_save)):
-				digit   = np.where(my_test_label[i]==1)[0][0]
-				maxi    = self.label_l_save[i].max()
-				max_pos = np.where(self.label_l_save[i] == maxi)[0][0]
-				if max_pos != digit:
-					wrong_classified_ind.append(i)
-					wrong_maxis.append(maxi)#
-				elif max_pos == digit:
-					right_maxis.append(maxi)
-			n_wrongs = len(wrong_maxis)
+			# for i in range(len(self.label_l_save)):
+			# 	digit   = np.where(my_test_label[i]==1)[0][0]
+			# 	maxi    = self.label_l_save[i].max()
+			# 	max_pos = np.where(self.label_l_save[i] == maxi)[0][0]
+			# 	if max_pos != digit:
+			# 		wrong_classified_ind.append(i)
+			# 		wrong_maxis.append(maxi)#
+			# 	elif max_pos == digit:
+			# 		right_maxis.append(maxi)
+			# n_wrongs = len(wrong_maxis)
 
 			if create_conf_mat:
 				self.log.out("Making Confusion Matrix")
@@ -1054,7 +1055,7 @@ class DBM_class(object):
 				plt.ylabel("Desired Label")
 				plt.xlabel("Predicted Label")
 
-		self.class_error_test = float(n_wrongs)/self.batchsize
+		# self.class_error_test = float(n_wrongs)/self.batchsize
 
 
 
@@ -1511,7 +1512,6 @@ class DBM_class(object):
 
 
 				# plot all other weights as hists
-				self.log.out("Plotting Weights histograms")
 				n_weights = len(self.w_np)
 				fig,ax    = plt.subplots(n_weights,1,figsize=(8,10),sharex="col")
 				for i in range(n_weights):
@@ -1632,8 +1632,11 @@ class DBM_class(object):
 					# plot the last layer
 					if self.classification:
 						color = "r"
-						ax3[-self.n_label_layer][i].bar(range(self.SHAPE[-self.n_label_layer]//label_mult),self.label_l_save[i],color=color)
-						ax3[-self.n_label_layer][i].set_xticks(range(self.SHAPE[-self.n_label_layer]//label_mult))
+						
+						ax3[-self.n_label_layer][i].bar(range(self.SHAPE[-self.n_label_layer]),self.label_l_save[i],color=color, label= "Predicted")
+						ax3[-self.n_label_layer][i].bar(range(self.SHAPE[-self.n_label_layer]),self.test_label[i],color="gray", alpha = 0.5, label= "Desired")
+
+						ax3[-self.n_label_layer][i].set_xticks(range(self.SHAPE[-self.n_label_layer]))
 						ax3[-self.n_label_layer][i].set_ylim(0,1)
 
 						
@@ -1645,7 +1648,8 @@ class DBM_class(object):
 					#plot the reconstructed layer h1
 					# ax3[5][i].matshow(self.rec_h1[i:i+1].reshape(int(sqrt(self.SHAPE[1])),int(sqrt(self.SHAPE[1]))))
 					# plt.matshow(random_recon.reshape(int(sqrt(self.SHAPE[0])),int(sqrt(self.SHAPE[0]))))
-				plt.tight_layout(pad=0.0)
+				plt.tight_layout(pad=0.2)
+				plt.legend()
 				save_fig(self.saveto_path+"/examples.pdf", self.DO_SAVE_TO_FILE)
 			
 			
