@@ -7,7 +7,7 @@ UserSettings = {
 	
 	# training process
 		"N_BATCHES_PRETRAIN" : 200, 				# how many batches per epoch for pretraining
-		"N_BATCHES_TRAIN"    : 100, 				# how many batches per epoch for complete DBM training
+		"N_BATCHES_TRAIN"    : 200, 				# how many batches per epoch for complete DBM training
 		"N_EPOCHS_PRETRAIN"  : [0,0,0,0,0,0], 		# pretrain epochs for each RBM
 		"N_EPOCHS_TRAIN"     : 200, 					# how often to iter through the test images
 		"TEST_EVERY_EPOCH"   : 50, 					# how many epochs to train before testing on the test data
@@ -46,7 +46,7 @@ UserSettings = {
 		"USE_DROPOUT"  : 1,							# if to use synnaptic failure while training
 		"DROPOUT_RATE" : 1,							# multiplication of random uniform synaptic failure matrix (higher number -> less failure)
 
-		"DO_NORM_W"    : 1,							# if to norm the weights and biases to 1 while training
+		"DO_NORM_W"    : 0,							# if to norm the weights and biases to 1 while training
 
 	### saving and loading
 		"DO_SAVE_TO_FILE"       : 1, 	# if to save plots and data to file

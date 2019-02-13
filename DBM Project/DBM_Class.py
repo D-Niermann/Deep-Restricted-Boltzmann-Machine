@@ -11,7 +11,7 @@ class DBM_class(object):
 	def type(self):
 		return "DBM"
 		
-	def __init__(self,shape, liveplot, classification, UserSettings, logger, workdir, saveto_path):
+	def __init__(self, UserSettings, logger, workdir, saveto_path, liveplot):
 
 		### load UserSettings into self
 		for key in UserSettings:
@@ -32,13 +32,13 @@ class DBM_class(object):
 		self.freerun_steps = self.N_FREERUN_START;
 
 
-		self.n_layers       = len(shape)
+		self.n_layers       = len(self.DBM_SHAPE)
 		# if true will open a lifeplot of the weight matrix
 		self.liveplot       = liveplot
 		# contains the number of  neurons in a list from v layer to h1 to h2
-		self.SHAPE          = shape 
+		self.SHAPE          = self.DBM_SHAPE 
 		# weather the machine uses a label layer
-		self.classification = classification
+		self.classification = self.DO_CLASSIFICATION
 
 		# weather or not the graph init function was called
 		self.init_state     = 0

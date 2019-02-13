@@ -28,6 +28,7 @@ def generateDriveData(n_v, n_h, N, w ):
     for i in range(n_data_points):
         # define v as random vector
         v = rnd.rand(n_visible)
+       
         # calculate h with the def weights + add some noise
         h = sigmoid(np.dot(v,w) + rnd.random(n_hidden)*0.05)
         # assing the v and h to the data and label
@@ -39,10 +40,18 @@ def generateDriveData(n_v, n_h, N, w ):
 
 if __name__ == "__main__":
     ## show results
-    print("W")
-    print(w)
-    print("\n")
+    n_visible = 6
+    n_hidden = 2
+    # define a weight matrix
+    w = rnd.randn(n_visible, n_hidden)*0.5
+    # set small elemts to zero
+    w[np.abs(w)<0.45] = 0
+    plt.matshow(w.T, cmap="gray")
+    plt.colorbar()
+    plt.figure()
+
+    train_data, train_label = generateDriveData(n_visible, n_hidden, 100, w)
 
     # print distribution of hidden activities
-    plt.hist(train_label.flatten(),bins=20,lw=0.5,edgecolor="k")
+    plt.hist(train_label.flatten(), bins=20, lw=0.5, edgecolor="k")
     plt.show()

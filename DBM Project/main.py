@@ -1,22 +1,3 @@
-"""
-
-import DBM_class
-
-load data 
-
-DBM = DBM_class(data, ...)
-
-
-DBM.pretrain(...)
-
-DBM.train(...)
-
-DBM.test(...)
-
-DBM.plot_results(what to plot)
-
-"""
-
 
 # -*- coding: utf-8 -*-
 #### Imports
@@ -97,9 +78,6 @@ if True:
 additional_args = sys.argv[1:]
 
 
-
-
-
 ###########################################################################################################
 #### Load User Settings ###
 
@@ -125,52 +103,36 @@ if UserSettings["DO_SAVE_TO_FILE"]:
 
 ### modify the parameters with additional_args
 if len(additional_args) > 0:
-	try:
-		first_param = int(additional_args[1])
-		if len(additional_args) == 3:
-			second_param = int(additional_args[2])
-		log.out("Additional Arguments:", first_param, second_param)
-		UserSettings["TEMP_START"] = second_param
-		UserSettings["TEMP_MIN"] = second_param
-		log.out(UserSettings)
-	except:
-		log.out("ERROR: Not using additional args!")
-
-
-
-# load UserSettings into globals
-log.out("For now, copying UserSettings into globals()")
-for key in UserSettings:
-	globals()[key] = UserSettings[key]
-
-# better name for subset:
-subset = SUBSPACE
-
+	first_param = int(additional_args[1]) #...
+	# change settigns here
+	log.out(UserSettings)
+	
 
 
 ###########################################################################################################
 #### Get test and train data  #####
-n_visible = DBM_SHAPE[0]
-n_hidden = DBM_SHAPE[1]
+n_visible = UserSettings["DBM_SHAPE"][0]
+n_hidden  = UserSettings["DBM_SHAPE"][1]
 # define a weight matrix
 w = rnd.randn(n_visible, n_hidden)*0.5
 # set small elemts to zero
 w[np.abs(w)<0.45] = 0
+fig = plt.figure("Org Weights")
+plt.matshow(w,fig.number)
+plt.colorbar()
 
 # calculate test and train data
-train_data, train_label = generateDriveData(n_visible, n_hidden, 2000, w)
-test_data, test_label  = generateDriveData(n_visible, n_hidden, 200, w)
+train_data, train_label = generateDriveData(n_visible, n_hidden, 3000, w)
+test_data, test_label   = generateDriveData(n_visible, n_hidden, 100, w)
 
 ###########################################################################################################
 #### Create a DBM  #####
 
-DBM = DBM_class(shape = DBM_SHAPE,
-				liveplot = 0,
-				classification = DO_CLASSIFICATION,
-				UserSettings = UserSettings,
+DBM = DBM_class(UserSettings = UserSettings,
 				logger = log,
 				workdir = workdir,
-				saveto_path = saveto_path
+				saveto_path = saveto_path,
+				liveplot = 0
 )
 
 
@@ -186,8 +148,22 @@ DBM.test(test_data, test_label, N = 50)
 # Plot the results or save them to file (see Settings.py)
 DBM.show_results()
 
-# gibbs sampling? generate images from freerunning ... grade sowas wie "ich habe nur zwei von 5 infos, wie unsicher ist er und was könnten die anderen 3 infos sein"
-# split show results into multiple functions ? (show weights, show train log, show test restuls ....) also check if testing again and then plotting again really plots the new tested daata and results
-# include "is image data" variable in init to create better plots and analytics -> show matri tiled or not, show v2 layer desired vs result, better remap of data to images fro plot
+
+"""
+- richtige daten versuchen zu lernen, zB die aus dem paper von alex
+
+- gibbs sampling? generate images from freerunning ... grade sowas wie 
+		"ich habe nur zwei von 5 infos, wie unsicher ist er und was könnten die anderen 3 infos sein"
+		-> oder recommender: gebe niedrige unsicherheit vor, halte features fest die grade nicht geändert 
+		werden können (wegen äußeren umständen) und dann sample die restlichen nodes
+
+- split show results into multiple functions ? (show weights, show train log, show test restuls ....) 
+		also check if testing again and then plotting again really plots the new tested daata and results
+
+- include "is image data" variable in init to create better plots and analytics -> show matri tiled or not,
+		show v2 layer desired vs result, better remap of data to images fro plot
+
+- change the zip(range, range) lines so that last part is not missing all the time 
+"""
 
 print("Finished")
