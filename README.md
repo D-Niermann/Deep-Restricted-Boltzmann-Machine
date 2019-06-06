@@ -115,7 +115,13 @@ A 3 layers DBM (1 hidden layer) could get classification errors of around 6% wit
 The weights between the first and second layer are (biological) plausible and are sometimes used to initialize a perzeptron or other neural networks. Under the following link is a image of the learned weights of one DBM.
 <embed>https://github.com/D-Niermann/Deep-Restricted-Boltzmann-Machine/blob/master/DBM%20Project/data/Mon_Jun__4_15-55-25_2018_%5B784%2C%20225%2C%20225%2C%20225%2C%2010%5D%20-%20%5B'original'%5D%2015%25/weights_img.pdf</embed>
 
-<object data="https://github.com/D-Niermann/Deep-Restricted-Boltzmann-Machine/raw/master/DBM%20Project/data/Mon_Jun__4_15-55-25_2018_%5B784%2C%20225%2C%20225%2C%20225%2C%2010%5D%20-%20%5B'original'%5D%2015%25/weights_img.pdf" type="application/pdf" width="700px" height="700px">
-    <embed src="https://github.com/D-Niermann/Deep-Restricted-Boltzmann-Machine/raw/master/DBM%20Project/data/Mon_Jun__4_15-55-25_2018_%5B784%2C%20225%2C%20225%2C%20225%2C%2010%5D%20-%20%5B'original'%5D%2015%25/weights_img.pdf">
-    </embed>
-</object>
+Also, extracting information about single neurons reveals that they learned to cluster classes the more the deeper the layers are (which makes a lot of sense but still). 
+Here is and typical neuron of the third hidden layer in a five layer DBM:
+
+![alt text](https://raw.githubusercontent.com/D-Niermann/Deep-Restricted-Boltzmann-Machine/master/Results/PCA%20Plots/PCA%20Methode/Layer_3/6.png "Generated images from a deep BM.")
+
+It clusters very well as can be seen in the PCA. The histogram shows on what classes the neuron reacts the most.
+
+In the first hidden layer, a typical neuron cannot cluster the classes so well, as seen here:
+![alt text](https://raw.githubusercontent.com/D-Niermann/Deep-Restricted-Boltzmann-Machine/master/Results/PCA%20Plots/PCA%20Methode/Layer_1/7.png "Generated images from a deep BM.")
+Most of the time, neurons in this layer can distinguish between certain classes alread as seen above, but they react to far to many classes to be usefull for classification. Thats why layter neuron sort out even more details and therefore distinguish only between one or two classes or, in extreme cases, filter out special cases within one class (e.g. for MNIST spezial methods of drawing a digit).
