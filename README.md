@@ -113,4 +113,4 @@ A 3 layers DBM (1 hidden layer) could get classification errors of around 6% wit
 
 ### Neuron clustering
 
-[embed]https://github.com/D-Niermann/Deep-Restricted-Boltzmann-Machine/blob/master/DBM%20Project/data/Mon_Jun__4_15-55-25_2018_%5B784%2C%20225%2C%20225%2C%20225%2C%2010%5D%20-%20%5B'original'%5D%2015%25/weights_img.pdf[/embed]
+<embed>https://github.com/D-Niermann/Deep-Restricted-Boltzmann-Machine/blob/master/DBM%20Project/data/Mon_Jun__4_15-55-25_2018_%5B784%2C%20225%2C%20225%2C%20225%2C%2010%5D%20-%20%5B'original'%5D%2015%25/weights_img.pdf</embed>
