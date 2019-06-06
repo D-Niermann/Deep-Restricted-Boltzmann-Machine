@@ -112,5 +112,11 @@ Boltzmann Machines learn to recreate learned data in a stochastic way, so that a
 A 3 layers DBM (1 hidden layer) could get classification errors of around 6% without any optimazation like backpropagation or rolling ball methods. Only the "normal" BM learning rule proposed by G.Hinton, called Contrastive Divergence was used. There are other puplications where this error is even smaller.
 
 ### Neuron clustering
-
+The weights between the first and second layer are (biological) plausible and are sometimes used to initialize a perzeptron or other neural networks. Under the following link is a image of the learned weights of one DBM.
 <embed>https://github.com/D-Niermann/Deep-Restricted-Boltzmann-Machine/blob/master/DBM%20Project/data/Mon_Jun__4_15-55-25_2018_%5B784%2C%20225%2C%20225%2C%20225%2C%2010%5D%20-%20%5B'original'%5D%2015%25/weights_img.pdf</embed>
+
+<object data="https://github.com/D-Niermann/Deep-Restricted-Boltzmann-Machine/blob/master/DBM%20Project/data/Mon_Jun__4_15-55-25_2018_%5B784%2C%20225%2C%20225%2C%20225%2C%2010%5D%20-%20%5B" type="application/pdf" width="700px" height="700px">
+    <embed src="https://github.com/D-Niermann/Deep-Restricted-Boltzmann-Machine/blob/master/DBM%20Project/data/Mon_Jun__4_15-55-25_2018_%5B784%2C%20225%2C%20225%2C%20225%2C%2010%5D%20-%20%5B">
+        <p>This browser does not support PDFs. Please download the PDF to view it: <a href="https://github.com/D-Niermann/Deep-Restricted-Boltzmann-Machine/blob/master/DBM%20Project/data/Mon_Jun__4_15-55-25_2018_%5B784%2C%20225%2C%20225%2C%20225%2C%2010%5D%20-%20%5B">Download PDF</a>.</p>
+    </embed>
+</object>
