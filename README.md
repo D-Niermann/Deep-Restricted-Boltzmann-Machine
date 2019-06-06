@@ -8,7 +8,7 @@ the main.py file needs to be executed. In there, a DBM is defined. After loading
 
 
 
-```
+```python
 #### Create a DBM  #####
 
 DBM = DBM_class( UserSettings = UserSettings,
@@ -37,7 +37,7 @@ Instead of the DBM class, the RBM class, Shape_BM or the DBM_attention class is 
 <asd>
 ### User Settings
 These Settings can be used in a default DBM
-```
+```python
 """ These settings get loaded in by a DBM instance and all variables are copied into that. """
 
 UserSettings = {
