@@ -684,6 +684,7 @@ class DBM_class(object):
 										temp_start      = self.temp,
 										temp_end        = self.temp,
 										sess 			= sess,
+										discrete_label  = False,
 						)
 
 					### backup params
@@ -791,9 +792,11 @@ class DBM_class(object):
 			# calc hidden layer samples (not the visible & label layer)
 			for hidden in range(M):
 				if self.classification:
-					sess.run(self.update_l_s[1:-1],{self.temp_tf : self.temp})#self.glauber_step(clamp="v+l",self.temp=self.temp) #sess.run(self.update_l_s[1:-1],{self.temp_tf : self.temp})
+					sess.run(self.update_l_s[1:-1],{self.temp_tf : self.temp})
+					#self.glauber_step(clamp="v+l",self.temp=self.temp) 
 				else:
-					sess.run(self.update_l_s[1:],{self.temp_tf : self.temp})#self.glauber_step(clamp="v",self.temp=self.temp) #sess.run(self.update_l_s[1:],{self.temp_tf : self.temp})
+					sess.run(self.update_l_s[1:],{self.temp_tf : self.temp})
+					#self.glauber_step(clamp="v",self.temp=self.temp)
 
 			# last run calc only the probs to reduce noise
 			sess.run(self.update_l_p[1:-1],{self.temp_tf : self.temp})
@@ -907,8 +910,14 @@ class DBM_class(object):
 
 		self.log.reset()
 
-	def test(self, test_data, test_label = None, N = 50):
-		""" wrapper function for the old _test_() function"""
+	def test(self, test_data, test_label = None, N = 50, discrete_label = False):
+		""" 
+		wrapper function for the old _test_() function
+
+		N = Number of gibbs samples
+		
+		discrete_label = if labels are class vectors (True) or continous (False)
+		"""
 		self.test_data = test_data
 		self.test_label = test_label
 
@@ -921,17 +930,19 @@ class DBM_class(object):
 					create_conf_mat = 0,
 					temp_start      = self.temp,
 					temp_end        = self.temp,
-					sess = sess
+					sess            = sess,
+					discrete_label  = discrete_label,
 					)
 
-	def _test_(self, my_test_data, my_test_label, N, create_conf_mat, temp_start, temp_end, sess):
+	def _test_(self, my_test_data, my_test_label, N, create_conf_mat, temp_start, temp_end, sess, discrete_label):
 		"""
 		(old test function without session definition, use new wrapper test() instead)
 		testing runs without giving h2 , only v is given and h2 has to be infered
 		by the DBM
-		array my_test_data :: images to test, get assigned to v layer
-		int N :: Number of updates from hidden layers
 
+		array my_test_data :: images to test, get assigned to v layer
+		
+		int N :: Number of updates from hidden layers
 		"""
 
 		### init the vars and reset the weights and biases
@@ -1026,16 +1037,17 @@ class DBM_class(object):
 			## error of classifivation labels
 			self.class_error_test = np.mean(np.abs(self.label_l_save-my_test_label[:,:10]))
 
-			# for i in range(len(self.label_l_save)):
-			# 	digit   = np.where(my_test_label[i]==1)[0][0]
-			# 	maxi    = self.label_l_save[i].max()
-			# 	max_pos = np.where(self.label_l_save[i] == maxi)[0][0]
-			# 	if max_pos != digit:
-			# 		wrong_classified_ind.append(i)
-			# 		wrong_maxis.append(maxi)#
-			# 	elif max_pos == digit:
-			# 		right_maxis.append(maxi)
-			# n_wrongs = len(wrong_maxis)
+			if discrete_label:
+				for i in range(len(self.label_l_save)):
+					digit   = np.where(my_test_label[i]==1)[0][0]
+					maxi    = self.label_l_save[i].max()
+					max_pos = np.where(self.label_l_save[i] == maxi)[0][0]
+					if max_pos != digit:
+						wrong_classified_ind.append(i)
+						wrong_maxis.append(maxi)#
+					elif max_pos == digit:
+						right_maxis.append(maxi)
+				n_wrongs = len(wrong_maxis)
 
 			if create_conf_mat:
 				self.log.out("Making Confusion Matrix")
@@ -1071,8 +1083,9 @@ class DBM_class(object):
 		# if self.n_layers==2: self.log.info("Reconstr. error reverse: ",np.round(self.recon_error_reverse,5))
 		if self.classification:
 			self.log.info("Class error: ",np.round(self.class_error_test, 5))
-			self.log.info("Wrong Digits: ",n_wrongs," with average: ",round(np.mean(wrong_maxis),3))
-			self.log.info("Correct Digits: ",len(right_maxis)," with average: ",round(np.mean(right_maxis),3))
+			if discrete_label:
+				self.log.info("Wrong: ",n_wrongs," with average: ",round(np.mean(wrong_maxis),3))
+				self.log.info("Correct: ",len(right_maxis)," with average: ",round(np.mean(right_maxis),3))
 		self.log.reset()
 		return wrong_classified_ind
 
@@ -1463,7 +1476,8 @@ class DBM_class(object):
 	def get_hidden_layer_ind(self):
 		return range(1,self.n_layers-self.n_label_layer)
 
-	def show_results(self):
+	def _show_results_(self):
+		""" old function used while trianing image data (MNIST) """ 
 
 		if self.DO_SHOW_PLOTS:
 			
@@ -1654,6 +1668,79 @@ class DBM_class(object):
 			
 			
 			plt.show()
+
+	def plot_layer_div(self):
+		if self.DO_SHOW_PLOTS:
+			
+			if self.DO_TRAINING:
+
+				# plot layer diversity
+				try:
+					plt.figure("Layer diversity train")
+					for i in range(self.n_layers):
+						label_str = get_layer_label(self.type(),self.n_layers, i)
+						y = smooth(np.array(self.layer_diversity_train)[:,i],10)
+						plt.plot(self.updates[:len(y)],y,label=label_str,alpha=0.7)
+						plt.legend()
+					plt.xlabel("Update Number")
+					plt.ylabel("Deviation")
+					plt.tight_layout()
+					save_fig(self.saveto_path+"/layer_diversity.png", self.DO_SAVE_TO_FILE)
+				except:
+					print("Could not plot layer diversity.")
+
+	def plot_train_errors(self):
+		if self.DO_SHOW_PLOTS:
+			if self.DO_TRAINING:
+				plt.figure("Errors")
+				# plt.plot(self.updates,self.recon_error_train,".",label="Recon Error Train",alpha=0.2)
+				if self.classification:
+					plt.plot(self.updates,self.class_error_train,".",label="Class Error Train",alpha=0.2)
+				## test errors
+				x = np.array(self.save_dict["Test_Epoch"]) * self.N_BATCHES_TRAIN
+				# plt.plot(x,self.save_dict["Recon_Error"],"o--",label="Recon Error Test")
+				if self.classification:
+					plt.plot(x,self.save_dict["Class_Error"],"^--",label="Class Error Test")
+					try:
+						plt.plot(x[:-1],self.save_dict["Class_Error_Train_Data"],"x--",label="Class Error Test\nTrain Data")
+					except:
+						pass
+				plt.legend(loc="best")
+				plt.xlabel("Update Number")
+				plt.ylabel("Mean Square Error")
+				save_fig(self.saveto_path+"/errors.png", self.DO_SAVE_TO_FILE)
+
+	def plot_weight_hist(self):
+		n_weights = len(self.w_np)
+		fig,ax    = plt.subplots(n_weights,1,figsize=(8,10),sharex="col")
+		for i in range(n_weights):
+			if n_weights>1:
+				seaborn.distplot(self.w_np[i].flatten(),rug=False,bins=60,ax=ax[i],label="After Training")
+				ylim = ax[i].get_ylim()
+				ax[i].axvline(self.w_np[i].max(),0,0.2, linestyle="-", color="k")
+				ax[i].axvline(self.w_np[i].min(),0,0.2, linestyle="-", color="k")
+				# ax[i].hist((self.w_np[i]).flatten(),bins=60,alpha=0.5,label="After Training")
+				ax[i].set_title("W %i"%i)
+				# ax[i].set_ylim(-ylim[1]/5,ylim[1])
+				ax[i].legend()
+			else:
+				ax.hist((self.w_np[i]).flatten(),bins=60,alpha=0.5,label="After Training")
+				ax.set_title("W %i"%i)
+				ax.legend()
+
+			try:
+				seaborn.distplot(self.w_np_old[i].flatten(),rug=False,bins=60,ax=ax[i],label="Before Training",color="r")
+				# ax[i].hist((self.w_np_old[i]).flatten(),color="r",bins=60,alpha=0.5,label="Before Training")
+			except:
+				pass
+		plt.tight_layout()
+		save_fig(self.saveto_path+"/weights_hist.pdf", self.DO_SAVE_TO_FILE)
+	
+	def show(self):
+		if self.DO_SHOW_PLOTS:
+			plt.show()
+
+
 
 
 

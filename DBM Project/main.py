@@ -18,6 +18,7 @@ if True:
 	import numpy as np
 	import numpy.random as rnd
 	import matplotlib.pyplot as plt
+	# plt.style.use('classic')
 	import tensorflow as tf
 	os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3' 
 	from pandas import DataFrame, Series,read_csv
@@ -60,6 +61,8 @@ if True:
 		mpl.rcParams["grid.linewidth"] = 0.5
 		mpl.rcParams["lines.linewidth"] = 1.25
 		mpl.rcParams["font.family"]= "serif"
+		mpl.rcParams['xtick.minor.visible']  = True
+		mpl.rcParams['ytick.minor.visible']  = True
 
 		# plt.rc('text', usetex=True)
 		plt.rc('font', family='serif')
@@ -117,9 +120,9 @@ n_hidden  = UserSettings["DBM_SHAPE"][1]
 w = rnd.randn(n_visible, n_hidden)*0.5
 # set small elemts to zero
 w[np.abs(w)<0.45] = 0
-fig = plt.figure("Org Weights")
-plt.matshow(w,fig.number)
-plt.colorbar()
+# fig = plt.figure("Org Weights")
+# plt.matshow(w,fig.number)
+# plt.colorbar()
 
 # calculate test and train data
 train_data, train_label = generateDriveData(n_visible, n_hidden, 3000, w)
@@ -146,7 +149,10 @@ DBM.train(train_data, test_data, train_label, test_label)
 DBM.test(test_data, test_label, N = 50)
 
 # Plot the results or save them to file (see Settings.py)
-DBM.show_results()
+DBM.plot_layer_div()
+DBM.plot_train_errors()
+
+DBM.show()
 
 
 """
@@ -160,8 +166,6 @@ DBM.show_results()
 - split show results into multiple functions ? (show weights, show train log, show test restuls ....) 
 		also check if testing again and then plotting again really plots the new tested daata and results
 
-- include "is image data" variable in init to create better plots and analytics -> show matri tiled or not,
-		show v2 layer desired vs result, better remap of data to images fro plot
 
 - change the zip(range, range) lines so that last part is not missing all the time 
 """

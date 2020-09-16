@@ -9,8 +9,8 @@ UserSettings = {
 		"N_BATCHES_PRETRAIN" : 200, 				# how many batches per epoch for pretraining
 		"N_BATCHES_TRAIN"    : 200, 				# how many batches per epoch for complete DBM training
 		"N_EPOCHS_PRETRAIN"  : [0,0,0,0,0,0], 		# pretrain epochs for each RBM
-		"N_EPOCHS_TRAIN"     : 200, 					# how often to iter through the test images
-		"TEST_EVERY_EPOCH"   : 50, 					# how many epochs to train before testing on the test data
+		"N_EPOCHS_TRAIN"     : 10, 					# how often to iter through the test images
+		"TEST_EVERY_EPOCH"   : 3, 					# how many epochs to train before testing on the test data
 
 	### learnrates
 		"LEARNRATE_PRETRAIN" : 0.002,				# learnrate for pretraining
