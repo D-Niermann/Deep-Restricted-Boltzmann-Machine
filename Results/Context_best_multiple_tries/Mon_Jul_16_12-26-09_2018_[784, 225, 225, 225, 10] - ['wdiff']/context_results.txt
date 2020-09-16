@@ -1,5 +1,0 @@
-Found images: 5139
-Inorrect Context: 520/10.12%
-Inorrect No Context: 735/14.3%
-Diff: 215
-Outside subspace (c/nc): 0,567
