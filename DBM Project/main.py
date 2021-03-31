@@ -28,8 +28,8 @@ if True:
 	from Logger 		import *
 	from RBM_Functions 	import *
 	from DBM_Class 		import *
-	from gen_gradients 	import * 
-	from gen_driveData 	import *
+	# from gen_gradients 	import * 
+	# from gen_driveData 	import *
 
 
 	 # set the numpy print precision
@@ -84,19 +84,21 @@ additional_args = sys.argv[1:]
 ###########################################################################################################
 #### Load User Settings ###
 
-if len(additional_args)>0:
-	log.out("Loading Settings from ", additional_args[0])
+try:
 	Settings = __import__(additional_args[0])
-else:
+	log.out("Loaded Settings from ", additional_args[0])
+except:
+	print(f"Warning: Could not load Settings '{additional_args[0]}'")
 	import DefaultSettings as Settings
+	print("Loaded DefaultSettings.py")
 
 # rename 
 UserSettings = Settings.UserSettings
 
 # path were results are saved 
 saveto_path = data_dir+"/"+time_now+"_"+str(UserSettings["DBM_SHAPE"])
-if len(additional_args) > 0:
-	saveto_path  += " - " + str(additional_args)
+# if len(additional_args) > 0:
+# 	saveto_path  += " - " + str(additional_args)
 
 ## open the logger-file
 if UserSettings["DO_SAVE_TO_FILE"]:
@@ -105,29 +107,19 @@ if UserSettings["DO_SAVE_TO_FILE"]:
 
 
 ### modify the parameters with additional_args
-if len(additional_args) > 0:
-	first_param = int(additional_args[1]) #...
-	# change settigns here
-	log.out(UserSettings)
+# if len(additional_args) > 0:
+# 	first_param = int(additional_args[1]) #...
+# 	# change settigns here
+# 	log.out(UserSettings)
 	
 
 
 ###########################################################################################################
 #### Get test and train data  #####
-n_visible = UserSettings["DBM_SHAPE"][0]
-n_hidden  = UserSettings["DBM_SHAPE"][1]
-# define a weight matrix
-w = rnd.randn(n_visible, n_hidden)*0.5
-# set small elemts to zero
-w[np.abs(w)<0.45] = 0
-# fig = plt.figure("Org Weights")
-# plt.matshow(w,fig.number)
-# plt.colorbar()
-
-# calculate test and train data
-train_data, train_label = generateDriveData(n_visible, n_hidden, 3000, w)
-test_data, test_label   = generateDriveData(n_visible, n_hidden, 100, w)
-
+log.out("Loading Data")
+from tensorflow.examples.tutorials.mnist import input_data
+mnist = input_data.read_data_sets("MNIST_data/", one_hot=True)
+train_data, train_label, test_data, test_label = mnist.train.images, mnist.train.labels, mnist.test.images, mnist.test.labels
 ###########################################################################################################
 #### Create a DBM  #####
 
